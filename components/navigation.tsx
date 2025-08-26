@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, User, LogOut, Settings, Home, Search, PlusCircle, BookOpen, Loader2 } from "lucide-react"
+import { Menu, User, LogOut, Settings, Home, Search, PlusCircle, BookOpen, Loader2, AlertTriangle } from "lucide-react"
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
@@ -26,8 +26,8 @@ export default function Navigation() {
 
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -38,7 +38,7 @@ export default function Navigation() {
         description: "ขอบคุณที่ใช้งาน DreamHome",
       })
     } catch (error) {
-      console.error("Sign out error:", error)
+      console.error("Error signing out:", error)
       toast({
         title: "ออกจากระบบไม่สำเร็จ",
         description: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
@@ -49,22 +49,17 @@ export default function Navigation() {
     }
   }
 
-  const switchToSignUp = () => {
-    setIsSignInOpen(false)
-    setIsSignUpOpen(true)
-  }
-
-  const switchToSignIn = () => {
-    setIsSignUpOpen(false)
-    setIsSignInOpen(true)
-  }
-
   const getUserInitials = (email: string) => {
     return email.charAt(0).toUpperCase()
   }
 
-  const navigationItems = [
-    { href: "/", label: "หน้าหลัก", icon: Home },
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text
+    return text.substring(0, maxLength) + "..."
+  }
+
+  const navItems = [
+    { href: "/", label: "หน้าแรก", icon: Home },
     { href: "/buy", label: "ซื้อ", icon: Search },
     { href: "/rent", label: "เช่า", icon: Search },
     { href: "/sell", label: "ขาย", icon: PlusCircle },
@@ -86,71 +81,87 @@ export default function Navigation() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              {navigationItems.map((item) => (
+              {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   {item.label}
                 </Link>
               ))}
             </div>
 
-            {/* Desktop Auth Section */}
-            <div className="hidden md:flex items-center space-x-4">
+            {/* User Section */}
+            <div className="flex items-center space-x-4">
               {loading ? (
                 <div className="flex items-center space-x-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-gray-600">กำลังโหลด...</span>
+                  <span className="text-sm text-gray-600 hidden sm:inline">กำลังโหลด...</span>
                 </div>
               ) : user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.photoURL || ""} alt={user.email || ""} />
-                        <AvatarFallback className="bg-blue-600 text-white">
-                          {getUserInitials(user.email || "U")}
-                        </AvatarFallback>
-                      </Avatar>
-                      {!user.emailVerified && (
-                        <Badge
-                          variant="destructive"
-                          className="absolute -top-1 -right-1 h-3 w-3 p-0 flex items-center justify-center text-xs"
-                        >
-                          !
-                        </Badge>
-                      )}
+                    <Button variant="ghost" className="relative h-10 w-auto px-2 sm:px-3">
+                      <div className="flex items-center space-x-2 sm:space-x-3">
+                        <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                          <AvatarImage src="/placeholder.svg" alt={user.email || ""} />
+                          <AvatarFallback className="text-xs sm:text-sm bg-blue-600 text-white">
+                            {getUserInitials(user.email || "U")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col items-start min-w-0 max-w-[120px] sm:max-w-[200px]">
+                          <span className="text-xs sm:text-sm font-medium text-gray-900 truncate w-full">
+                            {user.displayName || truncateText(user.email?.split("@")[0] || "ผู้ใช้", 15)}
+                          </span>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs text-gray-500 truncate max-w-[100px] sm:max-w-[150px]">
+                              {truncateText(user.email || "", 20)}
+                            </span>
+                            {!user.emailVerified && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0 h-4 flex items-center">
+                                <AlertTriangle className="h-2 w-2 mr-1" />
+                                <span className="hidden sm:inline">ยังไม่ยืนยัน</span>
+                                <span className="sm:hidden">!</span>
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">บัญชีของคุณ</p>
-                        <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                        <p className="text-sm font-medium leading-none">{user.displayName || "ผู้ใช้"}</p>
+                        <p className="text-xs leading-none text-muted-foreground break-all">{user.email}</p>
                         {!user.emailVerified && (
                           <Badge variant="outline" className="text-xs w-fit">
-                            ยังไม่ยืนยันอีเมล
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            อีเมลยังไม่ได้รับการยืนยัน
                           </Badge>
                         )}
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/profile" className="flex items-center">
+                      <Link href="/profile" className="cursor-pointer">
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/settings" className="flex items-center">
+                      <Link href="/settings" className="cursor-pointer">
                         <Settings className="mr-2 h-4 w-4" />
                         <span>การตั้งค่า</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
+                    <DropdownMenuItem
+                      className="cursor-pointer text-red-600 focus:text-red-600"
+                      onClick={handleSignOut}
+                      disabled={isSigningOut}
+                    >
                       {isSigningOut ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -161,33 +172,36 @@ export default function Navigation() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <div className="flex items-center space-x-2">
-                  <Button variant="ghost" onClick={() => setIsSignInOpen(true)}>
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                  <Button variant="ghost" onClick={() => setIsSignInOpen(true)} className="text-sm font-medium">
                     เข้าสู่ระบบ
                   </Button>
-                  <Button onClick={() => setIsSignUpOpen(true)}>สมัครสมาชิก</Button>
+                  <Button
+                    onClick={() => setIsSignUpOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-sm font-medium"
+                  >
+                    สมัครสมาชิก
+                  </Button>
                 </div>
               )}
-            </div>
 
-            {/* Mobile Menu Button */}
-            <div className="md:hidden">
+              {/* Mobile Menu */}
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Menu className="h-6 w-6" />
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">เปิดเมนู</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                   <div className="flex flex-col space-y-4 mt-6">
-                    {/* Mobile Navigation Links */}
-                    {navigationItems.map((item) => {
+                    {navItems.map((item) => {
                       const Icon = item.icon
                       return (
                         <Link
                           key={item.href}
                           href={item.href}
-                          className="flex items-center space-x-3 text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                          className="flex items-center space-x-3 text-lg font-medium text-gray-600 hover:text-gray-900 transition-colors"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <Icon className="h-5 w-5" />
@@ -196,91 +210,35 @@ export default function Navigation() {
                       )
                     })}
 
-                    <div className="border-t pt-4">
-                      {loading ? (
-                        <div className="flex items-center space-x-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm text-gray-600">กำลังโหลด...</span>
-                        </div>
-                      ) : user ? (
-                        <div className="space-y-4">
-                          <div className="flex items-center space-x-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={user.photoURL || ""} alt={user.email || ""} />
-                              <AvatarFallback className="bg-blue-600 text-white">
-                                {getUserInitials(user.email || "U")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{user.email}</span>
-                              {!user.emailVerified && (
-                                <Badge variant="outline" className="text-xs w-fit">
-                                  ยังไม่ยืนยันอีเมล
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Link
-                              href="/profile"
-                              className="flex items-center space-x-3 text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                              onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                              <User className="h-5 w-5" />
-                              <span>โปรไฟล์</span>
-                            </Link>
-                            <Link
-                              href="/settings"
-                              className="flex items-center space-x-3 text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                              onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                              <Settings className="h-5 w-5" />
-                              <span>การตั้งค่า</span>
-                            </Link>
+                    {!user && (
+                      <>
+                        <div className="border-t pt-4 mt-6">
+                          <div className="flex flex-col space-y-3">
                             <Button
-                              variant="ghost"
-                              className="w-full justify-start p-0 h-auto text-lg font-medium text-gray-700 hover:text-blue-600"
+                              variant="outline"
                               onClick={() => {
-                                handleSignOut()
+                                setIsSignInOpen(true)
                                 setIsMobileMenuOpen(false)
                               }}
-                              disabled={isSigningOut}
+                              className="w-full justify-start"
                             >
-                              <div className="flex items-center space-x-3">
-                                {isSigningOut ? (
-                                  <Loader2 className="h-5 w-5 animate-spin" />
-                                ) : (
-                                  <LogOut className="h-5 w-5" />
-                                )}
-                                <span>{isSigningOut ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}</span>
-                              </div>
+                              <User className="mr-2 h-4 w-4" />
+                              เข้าสู่ระบบ
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setIsSignUpOpen(true)
+                                setIsMobileMenuOpen(false)
+                              }}
+                              className="w-full justify-start bg-blue-600 hover:bg-blue-700"
+                            >
+                              <PlusCircle className="mr-2 h-4 w-4" />
+                              สมัครสมาชิก
                             </Button>
                           </div>
                         </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              setIsSignInOpen(true)
-                              setIsMobileMenuOpen(false)
-                            }}
-                          >
-                            เข้าสู่ระบบ
-                          </Button>
-                          <Button
-                            className="w-full"
-                            onClick={() => {
-                              setIsSignUpOpen(true)
-                              setIsMobileMenuOpen(false)
-                            }}
-                          >
-                            สมัครสมาชิก
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </div>
                 </SheetContent>
               </Sheet>
@@ -289,9 +247,23 @@ export default function Navigation() {
         </div>
       </nav>
 
-      {/* Auth Modals */}
-      <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
-      <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
+      {/* Modals */}
+      <SignInModal
+        isOpen={isSignInOpen}
+        onClose={() => setIsSignInOpen(false)}
+        onSwitchToSignUp={() => {
+          setIsSignInOpen(false)
+          setIsSignUpOpen(true)
+        }}
+      />
+      <SignUpModal
+        isOpen={isSignUpOpen}
+        onClose={() => setIsSignUpOpen(false)}
+        onSwitchToSignIn={() => {
+          setIsSignUpOpen(false)
+          setIsSignInOpen(true)
+        }}
+      />
     </>
   )
 }

@@ -1,7 +1,4 @@
-"use client"
-
-import { initializeApp, getApps, type FirebaseApp } from "firebase/app"
-import { getAnalytics, isSupported, type Analytics } from "firebase/analytics"
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app"
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -14,50 +11,16 @@ const firebaseConfig = {
   measurementId: "G-VZL6HX0EWT",
 }
 
-let app: FirebaseApp | null = null
-let analytics: Analytics | null = null
+// Initialize Firebase app
+let firebaseApp: FirebaseApp
 
-export const getFirebaseApp = (): FirebaseApp => {
-  if (typeof window === "undefined") {
-    throw new Error("Firebase can only be initialized on the client side")
-  }
-
-  if (!app) {
-    try {
-      // Check if Firebase app already exists
-      const existingApps = getApps()
-      if (existingApps.length > 0) {
-        app = existingApps[0]
-      } else {
-        app = initializeApp(firebaseConfig)
-      }
-
-      console.log("Firebase app initialized successfully")
-
-      // Initialize Analytics if supported and not already initialized
-      if (!analytics) {
-        isSupported()
-          .then((supported) => {
-            if (supported && app) {
-              analytics = getAnalytics(app)
-              console.log("Firebase Analytics initialized successfully")
-            }
-          })
-          .catch((error) => {
-            console.warn("Firebase Analytics initialization failed:", error)
-          })
-      }
-    } catch (error) {
-      console.error("Error initializing Firebase app:", error)
-      throw error
-    }
-  }
-
-  return app
+if (typeof window !== "undefined") {
+  // Client-side initialization
+  firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
+} else {
+  // Server-side - create a dummy app that won't be used
+  firebaseApp = {} as FirebaseApp
 }
 
-export const getFirebaseAnalytics = (): Analytics | null => {
-  return analytics
-}
-
-export default getFirebaseApp
+export { firebaseApp }
+export default firebaseApp

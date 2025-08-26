@@ -4,11 +4,11 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "firebase/auth"
 import {
-  signIn as authSignIn,
-  signUp as authSignUp,
-  signOutUser,
-  resetPassword as authResetPassword,
-  onAuthStateChange,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
 } from "@/lib/auth"
 
 interface AuthContextType {
@@ -27,138 +27,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  // Ensure we're on the client side
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
 
   useEffect(() => {
-    if (!isClient) {
-      return
-    }
-
     let unsubscribe: (() => void) | undefined
 
-    const initAuth = () => {
+    const initAuth = async () => {
       try {
-        console.log("Initializing Firebase Auth state listener...")
+        // Wait for client-side hydration
+        await new Promise((resolve) => setTimeout(resolve, 100))
 
-        unsubscribe = onAuthStateChange((user) => {
-          console.log("Auth state changed:", user ? `User: ${user.email}` : "No user")
+        unsubscribe = onAuthStateChanged((user: User | null) => {
+          console.log("Auth state changed:", user?.email || "No user")
           setUser(user)
           setLoading(false)
           setError(null)
         })
-
-        console.log("Firebase Auth state listener initialized successfully")
       } catch (error) {
-        console.error("Error initializing Firebase Auth:", error)
-        setError(error instanceof Error ? error.message : "Failed to initialize Firebase Auth")
+        console.error("Error initializing auth:", error)
+        setError("Failed to initialize authentication")
         setLoading(false)
       }
     }
 
-    // Add a delay to ensure Firebase is properly loaded
-    const timer = setTimeout(initAuth, 500)
+    initAuth()
 
     return () => {
-      clearTimeout(timer)
       if (unsubscribe) {
-        console.log("Cleaning up auth listener")
         unsubscribe()
       }
     }
-  }, [isClient])
+  }, [])
 
-  const signIn = async (email: string, password: string) => {
-    if (!isClient) {
-      throw new Error("Auth operations can only be performed on the client side")
-    }
-
+  const handleSignIn = async (email: string, password: string) => {
     try {
       setError(null)
-      await authSignIn(email, password)
+      await signInWithEmailAndPassword(email, password)
     } catch (error) {
-      console.error("Sign in error in context:", error)
-      setError(error instanceof Error ? error.message : "Sign in failed")
+      console.error("Error signing in:", error)
       throw error
     }
   }
 
-  const signUp = async (email: string, password: string) => {
-    if (!isClient) {
-      throw new Error("Auth operations can only be performed on the client side")
-    }
-
+  const handleSignUp = async (email: string, password: string) => {
     try {
       setError(null)
-      await authSignUp(email, password)
+      await createUserWithEmailAndPassword(email, password)
     } catch (error) {
-      console.error("Sign up error in context:", error)
-      setError(error instanceof Error ? error.message : "Sign up failed")
+      console.error("Error signing up:", error)
       throw error
     }
   }
 
-  const signOut = async () => {
-    if (!isClient) {
-      throw new Error("Auth operations can only be performed on the client side")
-    }
-
+  const handleSignOut = async () => {
     try {
       setError(null)
-      await signOutUser()
+      await signOut()
     } catch (error) {
-      console.error("Sign out error in context:", error)
-      setError(error instanceof Error ? error.message : "Sign out failed")
+      console.error("Error signing out:", error)
       throw error
     }
   }
 
-  const resetPassword = async (email: string) => {
-    if (!isClient) {
-      throw new Error("Auth operations can only be performed on the client side")
-    }
-
+  const handleResetPassword = async (email: string) => {
     try {
       setError(null)
-      await authResetPassword(email)
+      await sendPasswordResetEmail(email)
     } catch (error) {
-      console.error("Reset password error in context:", error)
-      setError(error instanceof Error ? error.message : "Reset password failed")
+      console.error("Error resetting password:", error)
       throw error
     }
   }
 
-  const value: AuthContextType = {
+  const value = {
     user,
     loading,
     error,
-    signIn,
-    signUp,
-    signOut,
-    resetPassword,
-  }
-
-  // Show loading state until client-side initialization is complete
-  if (!isClient) {
-    return (
-      <AuthContext.Provider
-        value={{
-          user: null,
-          loading: true,
-          error: null,
-          signIn: async () => {},
-          signUp: async () => {},
-          signOut: async () => {},
-          resetPassword: async () => {},
-        }}
-      >
-        {children}
-      </AuthContext.Provider>
-    )
+    signIn: handleSignIn,
+    signUp: handleSignUp,
+    signOut: handleSignOut,
+    resetPassword: handleResetPassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

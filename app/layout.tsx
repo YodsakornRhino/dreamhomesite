@@ -9,10 +9,9 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "DreamHome - Find Your Perfect Property",
-  description:
-    "Discover your dream home with DreamHome. Browse properties for sale and rent, connect with agents, and find the perfect place to call home.",
-  keywords: ["real estate", "property", "home", "house", "apartment", "buy", "rent", "sell"],
+  title: "DreamHome - ค้นหาบ้านในฝันของคุณ",
+  description: "แพลตฟอร์มอสังหาริมทรัพย์ออนไลน์ที่ดีที่สุด สำหรับการซื้อ ขาย และเช่าบ้าน",
+  keywords: "บ้าน, อสังหาริมทรัพย์, ซื้อบ้าน, ขายบ้าน, เช่าบ้าน, DreamHome",
   authors: [{ name: "DreamHome Team" }],
   creator: "DreamHome",
   publisher: "DreamHome",
