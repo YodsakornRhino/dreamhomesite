@@ -1,9 +1,19 @@
-import { getAuth, type Auth } from "firebase/auth"
+import {
+  getAuth,
+  signInWithEmailAndPassword as firebaseSignIn,
+  createUserWithEmailAndPassword as firebaseSignUp,
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  sendEmailVerification as firebaseSendEmailVerification,
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  type Auth,
+  type User,
+} from "firebase/auth"
 import { firebaseApp } from "./firebase"
 
 let authInstance: Auth | null = null
 
-export const getAuthInstance = (): Auth => {
+const getAuthInstance = (): Auth => {
   if (typeof window === "undefined") {
     throw new Error("Auth can only be used on the client side")
   }
@@ -15,37 +25,49 @@ export const getAuthInstance = (): Auth => {
   return authInstance
 }
 
-// Re-export Firebase Auth functions with our auth instance
+// Sign in with email and password
 export const signInWithEmailAndPassword = async (email: string, password: string) => {
-  const { signInWithEmailAndPassword: firebaseSignIn } = await import("firebase/auth")
   const auth = getAuthInstance()
   return firebaseSignIn(auth, email, password)
 }
 
+// Sign up with email and password
 export const createUserWithEmailAndPassword = async (email: string, password: string) => {
-  const { createUserWithEmailAndPassword: firebaseSignUp } = await import("firebase/auth")
   const auth = getAuthInstance()
   return firebaseSignUp(auth, email, password)
 }
 
+// Send email verification
+export const sendEmailVerification = async (user: User) => {
+  return firebaseSendEmailVerification(user, {
+    url: `${window.location.origin}/?verified=true`,
+    handleCodeInApp: false,
+  })
+}
+
+// Sign out
 export const signOut = async () => {
-  const { signOut: firebaseSignOut } = await import("firebase/auth")
   const auth = getAuthInstance()
   return firebaseSignOut(auth)
 }
 
+// Send password reset email
 export const sendPasswordResetEmail = async (email: string) => {
-  const { sendPasswordResetEmail: firebaseSendPasswordResetEmail } = await import("firebase/auth")
   const auth = getAuthInstance()
-  return firebaseSendPasswordResetEmail(auth, email)
+  return firebaseSendPasswordResetEmail(auth, email, {
+    url: `${window.location.origin}/`,
+    handleCodeInApp: false,
+  })
 }
 
-export const onAuthStateChanged = (callback: (user: any) => void) => {
+// Auth state change listener
+export const onAuthStateChanged = (callback: (user: User | null) => void) => {
   if (typeof window === "undefined") {
     return () => {}
   }
 
   const auth = getAuthInstance()
-  const { onAuthStateChanged: firebaseOnAuthStateChanged } = require("firebase/auth")
   return firebaseOnAuthStateChanged(auth, callback)
 }
+
+export { getAuthInstance }

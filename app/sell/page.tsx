@@ -1,6 +1,4 @@
 import { Inter } from "next/font/google"
-import Navigation from "@/components/navigation"
-import Footer from "@/components/footer"
 import ChatWidget from "@/components/chat-widget"
 import { Camera, TrendingUp, Users, Calculator, CheckCircle, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,8 +11,6 @@ const inter = Inter({ subsets: ["latin"] })
 export default function SellPage() {
   return (
     <div className={`${inter.className} bg-gray-50 min-h-screen`}>
-      <Navigation />
-
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -236,7 +232,6 @@ export default function SellPage() {
         </div>
       </section>
 
-      <Footer />
       <ChatWidget />
     </div>
   )

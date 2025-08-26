@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Loader2, Mail, Lock, User, AlertCircle, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Loader2, Mail, Lock, User, AlertCircle, CheckCircle, Send } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 
@@ -34,6 +33,7 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [agreeToTerms, setAgreeToTerms] = useState(false)
+  const [signUpSuccess, setSignUpSuccess] = useState(false)
 
   const validateForm = () => {
     if (!formData.name.trim()) {
@@ -101,14 +101,22 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
 
     setIsLoading(true)
     try {
-      await signUp(formData.email, formData.password)
+      const user = await signUp(formData.email, formData.password)
+
+      // Show success message with email verification info
+      setSignUpSuccess(true)
       toast({
-        title: "สมัครสมาชิกสำเร็จ",
-        description: "ยินดีต้อนรับสู่ DreamHome! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี",
+        title: "สมัครสมาชิกสำเร็จ!",
+        description: `ยินดีต้อนรับ ${formData.name}! เราได้ส่งลิงค์ยืนยันไปยังอีเมล ${formData.email} แล้ว`,
       })
-      onClose()
-      setFormData({ name: "", email: "", password: "", confirmPassword: "" })
-      setAgreeToTerms(false)
+
+      // Reset form after successful signup
+      setTimeout(() => {
+        setFormData({ name: "", email: "", password: "", confirmPassword: "" })
+        setAgreeToTerms(false)
+        setSignUpSuccess(false)
+        onClose()
+      }, 3000)
     } catch (error: any) {
       console.error("Sign up error:", error)
       const errorMessage = getFirebaseErrorMessage(error.code)
@@ -124,12 +132,60 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
   }
 
   const handleClose = () => {
-    setFormData({ name: "", email: "", password: "", confirmPassword: "" })
-    setError("")
-    setShowPassword(false)
-    setShowConfirmPassword(false)
-    setAgreeToTerms(false)
-    onClose()
+    if (!isLoading && !signUpSuccess) {
+      setFormData({ name: "", email: "", password: "", confirmPassword: "" })
+      setError("")
+      setShowPassword(false)
+      setShowConfirmPassword(false)
+      setAgreeToTerms(false)
+      setSignUpSuccess(false)
+      onClose()
+    }
+  }
+
+  if (signUpSuccess) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="w-[95vw] max-w-[400px] sm:max-w-[450px] md:max-w-[500px]">
+          <DialogHeader className="space-y-3 text-center">
+            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+              <Send className="h-6 w-6 text-green-600" />
+            </div>
+            <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-green-800">
+              สมัครสมาชิกสำเร็จ!
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm md:text-base text-gray-600">
+              เราได้ส่งลิงค์ยืนยันบัญชีไปยังอีเมล
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-center">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <Mail className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+              <p className="text-sm font-medium text-blue-800 break-all">{formData.email}</p>
+            </div>
+
+            <Alert className="border-yellow-200 bg-yellow-50">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-sm text-yellow-800">
+                <strong>สำคัญ:</strong> กรุณาตรวจสอบอีเมลของคุณ (รวมถึงโฟลเดอร์ Spam) และคลิกลิงค์ยืนยันเพื่อเปิดใช้งานบัญชี
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2 text-xs sm:text-sm text-gray-600">
+              <p>• ลิงค์ยืนยันจะหมดอายุใน 24 ชั่วโมง</p>
+              <p>• หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์ Spam</p>
+              <p>• คุณสามารถเข้าสู่ระบบได้หลังจากยืนยันอีเมลแล้ว</p>
+            </div>
+
+            <Button onClick={() => onSwitchToSignIn()} className="w-full h-9 sm:h-10 bg-blue-600 hover:bg-blue-700">
+              <CheckCircle className="mr-2 h-4 w-4" />
+              ไปยังหน้าเข้าสู่ระบบ
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   return (
@@ -164,6 +220,7 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
                 onChange={(e) => handleInputChange("name", e.target.value)}
                 className="pl-8 sm:pl-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -182,6 +239,7 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 className="pl-8 sm:pl-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -200,11 +258,13 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
                 onChange={(e) => handleInputChange("password", e.target.value)}
                 className="pl-8 sm:pl-10 pr-8 sm:pr-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
                 required
+                disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -229,11 +289,13 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
                 onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
                 className="pl-8 sm:pl-10 pr-8 sm:pr-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
                 required
+                disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                disabled={isLoading}
               >
                 {showConfirmPassword ? (
                   <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -250,6 +312,7 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
               checked={agreeToTerms}
               onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
               className="mt-0.5"
+              disabled={isLoading}
             />
             <Label htmlFor="terms" className="text-xs sm:text-sm text-gray-600 leading-relaxed cursor-pointer">
               ฉันยอมรับ{" "}
@@ -288,6 +351,7 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
                 type="button"
                 onClick={onSwitchToSignIn}
                 className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                disabled={isLoading}
               >
                 เข้าสู่ระบบ
               </button>

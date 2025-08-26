@@ -1,6 +1,4 @@
 import { Inter } from "next/font/google"
-import Navigation from "@/components/navigation"
-import Footer from "@/components/footer"
 import ChatWidget from "@/components/chat-widget"
 import { Calendar, User, ArrowRight, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -80,8 +78,6 @@ export default function BlogPage() {
 
   return (
     <div className={`${inter.className} bg-gray-50 min-h-screen`}>
-      <Navigation />
-
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -225,7 +221,6 @@ export default function BlogPage() {
         </div>
       </section>
 
-      <Footer />
       <ChatWidget />
     </div>
   )

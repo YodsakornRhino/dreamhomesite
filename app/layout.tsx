@@ -5,13 +5,15 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { Toaster } from "@/components/ui/toaster"
+import Navigation from "@/components/navigation"
+import Footer from "@/components/footer"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "DreamHome - ค้นหาบ้านในฝันของคุณ",
-  description: "แพลตฟอร์มอสังหาริมทรัพย์ออนไลน์ที่ดีที่สุด สำหรับการซื้อ ขาย และเช่าบ้าน",
-  keywords: "บ้าน, อสังหาริมทรัพย์, ซื้อบ้าน, ขายบ้าน, เช่าบ้าน, DreamHome",
+  description: "แพลตฟอร์มอสังหาริมทรัพย์ออนไลน์ที่ดีที่สุดในประเทศไทย ค้นหา ซื้อ ขาย เช่า บ้าน คอนโด ที่ดิน",
+  keywords: "อสังหาริมทรัพย์, บ้าน, คอนโด, ที่ดิน, ซื้อบ้าน, ขายบ้าน, เช่าบ้าน",
   authors: [{ name: "DreamHome Team" }],
   creator: "DreamHome",
   publisher: "DreamHome",
@@ -19,6 +21,35 @@ export const metadata: Metadata = {
     email: false,
     address: false,
     telephone: false,
+  },
+  metadataBase: new URL("https://dreamhome.com"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "DreamHome - ค้นหาบ้านในฝันของคุณ",
+    description: "แพลตฟอร์มอสังหาริมทรัพย์ออนไลน์ที่ดีที่สุดในประเทศไทย",
+    url: "https://dreamhome.com",
+    siteName: "DreamHome",
+    locale: "th_TH",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DreamHome - ค้นหาบ้านในฝันของคุณ",
+    description: "แพลตฟอร์มอสังหาริมทรัพย์ออนไลน์ที่ดีที่สุดในประเทศไทย",
+    creator: "@dreamhome",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
     generator: 'v0.app'
 }
@@ -33,7 +64,11 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            {children}
+            <div className="min-h-screen flex flex-col">
+              <Navigation />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

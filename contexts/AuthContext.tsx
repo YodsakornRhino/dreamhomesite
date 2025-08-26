@@ -8,6 +8,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   onAuthStateChanged,
 } from "@/lib/auth"
 
@@ -16,9 +17,10 @@ interface AuthContextType {
   loading: boolean
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string) => Promise<User>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  sendVerificationEmail: (user: User) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -34,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       try {
         // Wait for client-side hydration
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 200))
 
         unsubscribe = onAuthStateChanged((user: User | null) => {
           console.log("Auth state changed:", user?.email || "No user")
@@ -68,10 +70,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSignUp = async (email: string, password: string) => {
+  const handleSignUp = async (email: string, password: string): Promise<User> => {
     try {
       setError(null)
-      await createUserWithEmailAndPassword(email, password)
+      const userCredential = await createUserWithEmailAndPassword(email, password)
+
+      // Send email verification immediately after sign up
+      await sendEmailVerification(userCredential.user)
+
+      return userCredential.user
     } catch (error) {
       console.error("Error signing up:", error)
       throw error
@@ -98,6 +105,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const handleSendVerificationEmail = async (user: User) => {
+    try {
+      setError(null)
+      await sendEmailVerification(user)
+    } catch (error) {
+      console.error("Error sending verification email:", error)
+      throw error
+    }
+  }
+
   const value = {
     user,
     loading,
@@ -106,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp: handleSignUp,
     signOut: handleSignOut,
     resetPassword: handleResetPassword,
+    sendVerificationEmail: handleSendVerificationEmail,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

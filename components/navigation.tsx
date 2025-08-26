@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -14,20 +15,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, User, LogOut, Settings, Home, Search, PlusCircle, BookOpen, Loader2, AlertTriangle } from "lucide-react"
+import {
+  Menu,
+  Home,
+  ShoppingCart,
+  Building,
+  PenTool,
+  BookOpen,
+  LogOut,
+  User,
+  Mail,
+  AlertCircle,
+  Loader2,
+} from "lucide-react"
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 
-export default function Navigation() {
+const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
-
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text
+    return text.substring(0, maxLength) + "..."
+  }
+
+  const getInitials = (email: string) => {
+    return email.substring(0, 2).toUpperCase()
+  }
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -38,10 +58,10 @@ export default function Navigation() {
         description: "ขอบคุณที่ใช้งาน DreamHome",
       })
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Sign out error:", error)
       toast({
         title: "ออกจากระบบไม่สำเร็จ",
-        description: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+        description: "กรุณาลองใหม่อีกครั้ง",
         variant: "destructive",
       })
     } finally {
@@ -49,83 +69,85 @@ export default function Navigation() {
     }
   }
 
-  const getUserInitials = (email: string) => {
-    return email.charAt(0).toUpperCase()
-  }
-
-  const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + "..."
-  }
-
   const navItems = [
     { href: "/", label: "หน้าแรก", icon: Home },
-    { href: "/buy", label: "ซื้อ", icon: Search },
-    { href: "/rent", label: "เช่า", icon: Search },
-    { href: "/sell", label: "ขาย", icon: PlusCircle },
+    { href: "/buy", label: "ซื้อ", icon: ShoppingCart },
+    { href: "/rent", label: "เช่า", icon: Building },
+    { href: "/sell", label: "ขาย", icon: PenTool },
     { href: "/blog", label: "บล็อก", icon: BookOpen },
   ]
 
+  const switchToSignUp = () => {
+    setIsSignInOpen(false)
+    setIsSignUpOpen(true)
+  }
+
+  const switchToSignIn = () => {
+    setIsSignUpOpen(false)
+    setIsSignInOpen(true)
+  }
+
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
+          <div className="flex h-14 sm:h-16 items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <Home className="h-5 w-5 text-white" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Home className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">DreamHome</span>
+              <span className="text-lg sm:text-xl font-bold text-gray-900">DreamHome</span>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
+            <div className="hidden md:flex items-center space-x-1">
               {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  {item.label}
+                <Link key={item.href} href={item.href}>
+                  <Button variant="ghost" className="text-sm font-medium">
+                    <item.icon className="w-4 h-4 mr-2" />
+                    {item.label}
+                  </Button>
                 </Link>
               ))}
             </div>
 
             {/* User Section */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               {loading ? (
                 <div className="flex items-center space-x-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-gray-600 hidden sm:inline">กำลังโหลด...</span>
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  <span className="text-sm text-gray-500 hidden sm:inline">กำลังโหลด...</span>
                 </div>
               ) : user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-auto px-2 sm:px-3">
-                      <div className="flex items-center space-x-2 sm:space-x-3">
+                    <Button
+                      variant="ghost"
+                      className="relative h-8 w-8 sm:h-9 sm:w-auto sm:px-3 rounded-full sm:rounded-md"
+                    >
+                      <div className="flex items-center space-x-2">
                         <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
-                          <AvatarImage src="/placeholder.svg" alt={user.email || ""} />
-                          <AvatarFallback className="text-xs sm:text-sm bg-blue-600 text-white">
-                            {getUserInitials(user.email || "U")}
+                          <AvatarImage src={user.photoURL || ""} alt={user.email || ""} />
+                          <AvatarFallback className="text-xs sm:text-sm bg-blue-100 text-blue-700">
+                            {getInitials(user.email || "U")}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex flex-col items-start min-w-0 max-w-[120px] sm:max-w-[200px]">
-                          <span className="text-xs sm:text-sm font-medium text-gray-900 truncate w-full">
-                            {user.displayName || truncateText(user.email?.split("@")[0] || "ผู้ใช้", 15)}
-                          </span>
+                        <div className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] lg:max-w-[200px]">
                           <div className="flex items-center space-x-1">
-                            <span className="text-xs text-gray-500 truncate max-w-[100px] sm:max-w-[150px]">
-                              {truncateText(user.email || "", 20)}
+                            <span className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                              {truncateText(user.displayName || user.email?.split("@")[0] || "ผู้ใช้", 15)}
                             </span>
                             {!user.emailVerified && (
-                              <Badge variant="secondary" className="text-xs px-1 py-0 h-4 flex items-center">
-                                <AlertTriangle className="h-2 w-2 mr-1" />
-                                <span className="hidden sm:inline">ยังไม่ยืนยัน</span>
-                                <span className="sm:hidden">!</span>
+                              <Badge variant="destructive" className="text-xs px-1 py-0 h-4 lg:px-2 lg:h-5">
+                                <span className="lg:hidden">!</span>
+                                <span className="hidden lg:inline">ยังไม่ยืนยัน</span>
                               </Badge>
                             )}
                           </div>
+                          <span className="text-xs text-gray-500 truncate max-w-full">
+                            {truncateText(user.email || "", 20)}
+                          </span>
                         </div>
                       </div>
                     </Button>
@@ -133,35 +155,29 @@ export default function Navigation() {
                   <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user.displayName || "ผู้ใช้"}</p>
+                        <p className="text-sm font-medium leading-none">
+                          {user.displayName || user.email?.split("@")[0] || "ผู้ใช้"}
+                        </p>
                         <p className="text-xs leading-none text-muted-foreground break-all">{user.email}</p>
                         {!user.emailVerified && (
-                          <Badge variant="outline" className="text-xs w-fit">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            อีเมลยังไม่ได้รับการยืนยัน
-                          </Badge>
+                          <div className="flex items-center space-x-1 mt-2">
+                            <AlertCircle className="h-3 w-3 text-yellow-600" />
+                            <span className="text-xs text-yellow-600">อีเมลยังไม่ได้รับการยืนยัน</span>
+                          </div>
                         )}
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile" className="cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>โปรไฟล์</span>
-                      </Link>
+                    <DropdownMenuItem>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>โปรไฟล์</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/settings" className="cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>การตั้งค่า</span>
-                      </Link>
+                    <DropdownMenuItem>
+                      <Mail className="mr-2 h-4 w-4" />
+                      <span>ข้อความ</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="cursor-pointer text-red-600 focus:text-red-600"
-                      onClick={handleSignOut}
-                      disabled={isSigningOut}
-                    >
+                    <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
                       {isSigningOut ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -172,13 +188,19 @@ export default function Navigation() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <div className="flex items-center space-x-2 sm:space-x-4">
-                  <Button variant="ghost" onClick={() => setIsSignInOpen(true)} className="text-sm font-medium">
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsSignInOpen(true)}
+                    className="text-xs sm:text-sm"
+                  >
                     เข้าสู่ระบบ
                   </Button>
                   <Button
+                    size="sm"
                     onClick={() => setIsSignUpOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-sm font-medium"
+                    className="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700"
                   >
                     สมัครสมาชิก
                   </Button>
@@ -186,59 +208,22 @@ export default function Navigation() {
               )}
 
               {/* Mobile Menu */}
-              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden">
+                  <Button variant="ghost" size="sm" className="md:hidden">
                     <Menu className="h-5 w-5" />
-                    <span className="sr-only">เปิดเมนู</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                   <div className="flex flex-col space-y-4 mt-6">
-                    {navItems.map((item) => {
-                      const Icon = item.icon
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className="flex items-center space-x-3 text-lg font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Icon className="h-5 w-5" />
-                          <span>{item.label}</span>
-                        </Link>
-                      )
-                    })}
-
-                    {!user && (
-                      <>
-                        <div className="border-t pt-4 mt-6">
-                          <div className="flex flex-col space-y-3">
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setIsSignInOpen(true)
-                                setIsMobileMenuOpen(false)
-                              }}
-                              className="w-full justify-start"
-                            >
-                              <User className="mr-2 h-4 w-4" />
-                              เข้าสู่ระบบ
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setIsSignUpOpen(true)
-                                setIsMobileMenuOpen(false)
-                              }}
-                              className="w-full justify-start bg-blue-600 hover:bg-blue-700"
-                            >
-                              <PlusCircle className="mr-2 h-4 w-4" />
-                              สมัครสมาชิก
-                            </Button>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    {navItems.map((item) => (
+                      <Link key={item.href} href={item.href}>
+                        <Button variant="ghost" className="w-full justify-start text-base">
+                          <item.icon className="w-5 h-5 mr-3" />
+                          {item.label}
+                        </Button>
+                      </Link>
+                    ))}
                   </div>
                 </SheetContent>
               </Sheet>
@@ -248,22 +233,10 @@ export default function Navigation() {
       </nav>
 
       {/* Modals */}
-      <SignInModal
-        isOpen={isSignInOpen}
-        onClose={() => setIsSignInOpen(false)}
-        onSwitchToSignUp={() => {
-          setIsSignInOpen(false)
-          setIsSignUpOpen(true)
-        }}
-      />
-      <SignUpModal
-        isOpen={isSignUpOpen}
-        onClose={() => setIsSignUpOpen(false)}
-        onSwitchToSignIn={() => {
-          setIsSignUpOpen(false)
-          setIsSignInOpen(true)
-        }}
-      />
+      <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
+      <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
     </>
   )
 }
+
+export default Navigation

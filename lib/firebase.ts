@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app"
+import { initializeApp, getApps, getApp } from "firebase/app"
+import { getAnalytics, isSupported } from "firebase/analytics"
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDb_QTKrHNQZVQ-Pi1_vzuNvWyu9DBR46o",
   authDomain: "dreamhome-2025.firebaseapp.com",
@@ -11,16 +11,23 @@ const firebaseConfig = {
   measurementId: "G-VZL6HX0EWT",
 }
 
-// Initialize Firebase app
-let firebaseApp: FirebaseApp
-
-if (typeof window !== "undefined") {
-  // Client-side initialization
-  firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
+// Initialize Firebase
+let firebaseApp
+if (getApps().length === 0) {
+  firebaseApp = initializeApp(firebaseConfig)
 } else {
-  // Server-side - create a dummy app that won't be used
-  firebaseApp = {} as FirebaseApp
+  firebaseApp = getApp()
 }
 
-export { firebaseApp }
+// Initialize Analytics only on client side
+let analytics
+if (typeof window !== "undefined") {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(firebaseApp)
+    }
+  })
+}
+
+export { firebaseApp, analytics }
 export default firebaseApp
