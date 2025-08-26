@@ -80,6 +80,8 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
         return "รหัสผ่านไม่ปลอดภัย กรุณาใช้รหัสผ่านที่แข็งแกร่งกว่านี้"
       case "auth/too-many-requests":
         return "มีการสมัครสมาชิกมากเกินไป กรุณาลองใหม่ในภายหลัง"
+      case "auth/network-request-failed":
+        return "เกิดข้อผิดพลาดเครือข่าย กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต"
       default:
         return "เกิดข้อผิดพลาดในการสมัครสมาชิก กรุณาลองใหม่อีกครั้ง"
     }
@@ -100,7 +102,9 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
 
     setIsLoading(true)
     try {
+      console.log("Starting signup process for:", formData.email)
       const user = await signUp(formData.email, formData.password)
+      console.log("Signup successful, user created:", user.uid)
 
       // Show success message
       toast({
@@ -113,8 +117,10 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
       setAgreeToTerms(false)
       onClose()
 
-      // Redirect to verification page
-      window.location.href = "/verify-email"
+      // Small delay before redirect to ensure modal closes properly
+      setTimeout(() => {
+        window.location.href = "/verify-email"
+      }, 500)
     } catch (error: any) {
       console.error("Sign up error:", error)
       const errorMessage = getFirebaseErrorMessage(error.code)

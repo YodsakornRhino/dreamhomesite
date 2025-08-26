@@ -8,7 +8,6 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  sendEmailVerification,
   onAuthStateChanged,
 } from "@/lib/auth"
 import { sendVerificationEmail } from "@/lib/send-verification"
@@ -22,6 +21,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   sendVerificationEmail: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -41,6 +41,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         unsubscribe = onAuthStateChanged((user: User | null) => {
           console.log("Auth state changed:", user?.email || "No user")
+          if (user) {
+            console.log("User email verified:", user.emailVerified)
+          }
           setUser(user)
           setLoading(false)
           setError(null)
@@ -74,14 +77,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignUp = async (email: string, password: string): Promise<User> => {
     try {
       setError(null)
+      console.log("Creating user account for:", email)
+
       const userCredential = await createUserWithEmailAndPassword(email, password)
+      console.log("User account created successfully")
+
+      // Wait a moment for the user to be fully created
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       // Send email verification using the new system
       try {
+        console.log("Attempting to send verification email...")
         await sendVerificationEmail()
+        console.log("Verification email sent successfully")
       } catch (verificationError) {
         console.error("Error sending verification email:", verificationError)
         // Don't throw here, user is still created successfully
+        // But we should notify the user about the email issue
       }
 
       return userCredential.user
@@ -114,10 +126,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSendVerificationEmail = async () => {
     try {
       setError(null)
-      await sendEmailVerification()
+      await sendVerificationEmail()
     } catch (error) {
       console.error("Error sending verification email:", error)
       throw error
+    }
+  }
+
+  const refreshUser = async () => {
+    try {
+      if (user) {
+        await user.reload()
+        // Force a re-render by updating the user state
+        setUser({ ...user })
+      }
+    } catch (error) {
+      console.error("Error refreshing user:", error)
     }
   }
 
@@ -130,6 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut: handleSignOut,
     resetPassword: handleResetPassword,
     sendVerificationEmail: handleSendVerificationEmail,
+    refreshUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
