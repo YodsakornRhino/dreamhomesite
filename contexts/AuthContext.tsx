@@ -11,6 +11,7 @@ import {
   sendEmailVerification,
   onAuthStateChanged,
 } from "@/lib/auth"
+import { sendVerificationEmail } from "@/lib/send-verification"
 
 interface AuthContextType {
   user: User | null
@@ -20,7 +21,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<User>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  sendVerificationEmail: (user: User) => Promise<void>
+  sendVerificationEmail: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -75,8 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null)
       const userCredential = await createUserWithEmailAndPassword(email, password)
 
-      // Send email verification immediately after sign up
-      await sendEmailVerification(userCredential.user)
+      // Send email verification using the new system
+      try {
+        await sendVerificationEmail()
+      } catch (verificationError) {
+        console.error("Error sending verification email:", verificationError)
+        // Don't throw here, user is still created successfully
+      }
 
       return userCredential.user
     } catch (error) {
@@ -105,10 +111,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSendVerificationEmail = async (user: User) => {
+  const handleSendVerificationEmail = async () => {
     try {
       setError(null)
-      await sendEmailVerification(user)
+      await sendEmailVerification()
     } catch (error) {
       console.error("Error sending verification email:", error)
       throw error
