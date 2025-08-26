@@ -6,7 +6,7 @@ import type { User } from "firebase/auth"
 import {
   signIn as authSignIn,
   signUp as authSignUp,
-  logOut as authLogOut,
+  signOutUser,
   resetPassword as authResetPassword,
   onAuthStateChange,
 } from "@/lib/auth"
@@ -17,21 +17,13 @@ interface AuthContextType {
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
-  logOut: () => Promise<void>
+  signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export const useAuthContext = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuthContext must be used within an AuthProvider")
-  }
-  return context
-}
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -51,16 +43,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initAuth = () => {
       try {
-        console.log("Starting Firebase Auth initialization...")
+        console.log("Initializing Firebase Auth state listener...")
 
         unsubscribe = onAuthStateChange((user) => {
-          console.log("Auth state changed:", user ? `User logged in: ${user.email}` : "User logged out")
+          console.log("Auth state changed:", user ? `User: ${user.email}` : "No user")
           setUser(user)
           setLoading(false)
           setError(null)
         })
 
-        console.log("Firebase Auth initialization completed successfully")
+        console.log("Firebase Auth state listener initialized successfully")
       } catch (error) {
         console.error("Error initializing Firebase Auth:", error)
         setError(error instanceof Error ? error.message : "Failed to initialize Firebase Auth")
@@ -69,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Add a delay to ensure Firebase is properly loaded
-    const timer = setTimeout(initAuth, 200)
+    const timer = setTimeout(initAuth, 500)
 
     return () => {
       clearTimeout(timer)
@@ -86,9 +78,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
+      setError(null)
       await authSignIn(email, password)
     } catch (error) {
       console.error("Sign in error in context:", error)
+      setError(error instanceof Error ? error.message : "Sign in failed")
       throw error
     }
   }
@@ -99,22 +93,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
+      setError(null)
       await authSignUp(email, password)
     } catch (error) {
       console.error("Sign up error in context:", error)
+      setError(error instanceof Error ? error.message : "Sign up failed")
       throw error
     }
   }
 
-  const logOut = async () => {
+  const signOut = async () => {
     if (!isClient) {
       throw new Error("Auth operations can only be performed on the client side")
     }
 
     try {
-      await authLogOut()
+      setError(null)
+      await signOutUser()
     } catch (error) {
-      console.error("Log out error in context:", error)
+      console.error("Sign out error in context:", error)
+      setError(error instanceof Error ? error.message : "Sign out failed")
       throw error
     }
   }
@@ -125,9 +123,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
+      setError(null)
       await authResetPassword(email)
     } catch (error) {
       console.error("Reset password error in context:", error)
+      setError(error instanceof Error ? error.message : "Reset password failed")
       throw error
     }
   }
@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     signIn,
     signUp,
-    logOut,
+    signOut,
     resetPassword,
   }
 
@@ -152,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           error: null,
           signIn: async () => {},
           signUp: async () => {},
-          logOut: async () => {},
+          signOut: async () => {},
           resetPassword: async () => {},
         }}
       >
@@ -162,4 +162,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuthContext() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuthContext must be used within an AuthProvider")
+  }
+  return context
 }

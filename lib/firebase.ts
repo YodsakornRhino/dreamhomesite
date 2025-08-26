@@ -1,5 +1,7 @@
-import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app"
-import { getAnalytics, type Analytics } from "firebase/analytics"
+"use client"
+
+import { initializeApp, getApps, type FirebaseApp } from "firebase/app"
+import { getAnalytics, isSupported, type Analytics } from "firebase/analytics"
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -22,13 +24,28 @@ export const getFirebaseApp = (): FirebaseApp => {
 
   if (!app) {
     try {
-      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
+      // Check if Firebase app already exists
+      const existingApps = getApps()
+      if (existingApps.length > 0) {
+        app = existingApps[0]
+      } else {
+        app = initializeApp(firebaseConfig)
+      }
+
       console.log("Firebase app initialized successfully")
 
-      // Initialize Analytics only in browser environment
-      if (typeof window !== "undefined" && !analytics) {
-        analytics = getAnalytics(app)
-        console.log("Firebase Analytics initialized successfully")
+      // Initialize Analytics if supported and not already initialized
+      if (!analytics) {
+        isSupported()
+          .then((supported) => {
+            if (supported && app) {
+              analytics = getAnalytics(app)
+              console.log("Firebase Analytics initialized successfully")
+            }
+          })
+          .catch((error) => {
+            console.warn("Firebase Analytics initialization failed:", error)
+          })
       }
     } catch (error) {
       console.error("Error initializing Firebase app:", error)
@@ -40,18 +57,6 @@ export const getFirebaseApp = (): FirebaseApp => {
 }
 
 export const getFirebaseAnalytics = (): Analytics | null => {
-  if (typeof window === "undefined") {
-    return null
-  }
-
-  if (!analytics && app) {
-    try {
-      analytics = getAnalytics(app)
-    } catch (error) {
-      console.error("Error initializing Firebase Analytics:", error)
-    }
-  }
-
   return analytics
 }
 

@@ -1,12 +1,14 @@
-import type { User, UserCredential, Auth } from "firebase/auth"
+"use client"
+
 import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  updatePassword,
   onAuthStateChanged,
+  type User,
+  type Auth,
 } from "firebase/auth"
 import { getFirebaseApp } from "./firebase"
 
@@ -31,89 +33,52 @@ const getAuthInstance = (): Auth => {
   return authInstance
 }
 
-// Sign in with email and password
-export const signIn = async (email: string, password: string): Promise<UserCredential> => {
+export const signIn = async (email: string, password: string) => {
   try {
     const auth = getAuthInstance()
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
     console.log("User signed in successfully:", userCredential.user.email)
-    return userCredential
+    return userCredential.user
   } catch (error) {
-    console.error("Error signing in:", error)
+    console.error("Sign in error:", error)
     throw error
   }
 }
 
-// Sign up with email and password
-export const signUp = async (email: string, password: string): Promise<UserCredential> => {
+export const signUp = async (email: string, password: string) => {
   try {
     const auth = getAuthInstance()
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
     console.log("User signed up successfully:", userCredential.user.email)
-    return userCredential
+    return userCredential.user
   } catch (error) {
-    console.error("Error signing up:", error)
+    console.error("Sign up error:", error)
     throw error
   }
 }
 
-// Sign out
-export const logOut = async (): Promise<void> => {
+export const signOutUser = async () => {
   try {
     const auth = getAuthInstance()
     await signOut(auth)
     console.log("User signed out successfully")
   } catch (error) {
-    console.error("Error signing out:", error)
+    console.error("Sign out error:", error)
     throw error
   }
 }
 
-// Send password reset email
-export const resetPassword = async (email: string): Promise<void> => {
+export const resetPassword = async (email: string) => {
   try {
     const auth = getAuthInstance()
     await sendPasswordResetEmail(auth, email)
     console.log("Password reset email sent to:", email)
   } catch (error) {
-    console.error("Error sending password reset email:", error)
+    console.error("Reset password error:", error)
     throw error
   }
 }
 
-// Update user password
-export const changePassword = async (newPassword: string): Promise<void> => {
-  try {
-    const auth = getAuthInstance()
-    const user = auth.currentUser
-    if (user) {
-      await updatePassword(user, newPassword)
-      console.log("Password updated successfully")
-    } else {
-      throw new Error("No user is currently signed in")
-    }
-  } catch (error) {
-    console.error("Error updating password:", error)
-    throw error
-  }
-}
-
-// Get current user
-export const getCurrentUser = (): User | null => {
-  if (typeof window === "undefined") {
-    return null
-  }
-
-  try {
-    const auth = getAuthInstance()
-    return auth.currentUser
-  } catch (error) {
-    console.error("Error getting current user:", error)
-    return null
-  }
-}
-
-// Auth state observer
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   if (typeof window === "undefined") {
     return () => {}
