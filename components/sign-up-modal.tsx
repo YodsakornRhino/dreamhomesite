@@ -103,7 +103,11 @@ export default function SignUpModal({ isOpen, onClose, onSwitchToSignIn }: SignU
     setIsLoading(true)
     try {
       console.log("Starting signup process for:", formData.email)
-      const user = await signUp(formData.email, formData.password)
+      const user = await signUp(
+        formData.email,
+        formData.password,
+        formData.name,
+      )
       console.log("Signup successful, user created:", user.uid)
 
       // Show success message
