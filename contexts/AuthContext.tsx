@@ -18,7 +18,7 @@ interface AuthContextType {
   loading: boolean
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<User>
+  signUp: (email: string, password: string, name: string) => Promise<User>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   sendVerificationEmail: () => Promise<void>
@@ -75,7 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSignUp = async (email: string, password: string): Promise<User> => {
+  const handleSignUp = async (
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<User> => {
     try {
       setError(null)
       console.log("Creating user account for:", email)
@@ -100,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Store user data in Firestore
       try {
         await setDocument("users", userCredential.user.uid, {
+          name,
           email,
           createdAt: new Date().toISOString(),
         })

@@ -1,5 +1,10 @@
-import { initializeApp, getApps, getApp } from "firebase/app"
-import { getAnalytics, isSupported } from "firebase/analytics"
+import {
+  initializeApp,
+  getApps,
+  getApp,
+  type FirebaseApp,
+} from "firebase/app"
+import { getAnalytics, isSupported, type Analytics } from "firebase/analytics"
 
 const firebaseConfig = {
   apiKey: "AIzaSyDb_QTKrHNQZVQ-Pi1_vzuNvWyu9DBR46o",
@@ -11,16 +16,24 @@ const firebaseConfig = {
   measurementId: "G-VZL6HX0EWT",
 }
 
-// Initialize Firebase
-let firebaseApp
-if (getApps().length === 0) {
-  firebaseApp = initializeApp(firebaseConfig)
-} else {
-  firebaseApp = getApp()
+let firebaseApp: FirebaseApp
+
+/**
+ * Returns the singleton Firebase app instance, initializing it if necessary.
+ */
+export const getFirebaseApp = (): FirebaseApp => {
+  if (!firebaseApp) {
+    firebaseApp =
+      getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
+  }
+  return firebaseApp
 }
 
+// Initialize the app immediately so modules importing firebaseApp work as before
+firebaseApp = getFirebaseApp()
+
 // Initialize Analytics only on client side
-let analytics
+let analytics: Analytics | undefined
 if (typeof window !== "undefined") {
   isSupported().then((supported) => {
     if (supported) {
