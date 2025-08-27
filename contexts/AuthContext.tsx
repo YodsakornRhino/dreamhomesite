@@ -11,6 +11,7 @@ import {
   onAuthStateChanged,
 } from "@/lib/auth"
 import { sendVerificationEmail } from "@/lib/send-verification"
+import { addDocument } from "@/lib/firestore"
 
 interface AuthContextType {
   user: User | null
@@ -94,6 +95,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Error sending verification email:", verificationError)
         // Don't throw here, user is still created successfully
         // But we should notify the user about the email issue
+      }
+
+      // Store user data in Firestore
+      try {
+        await addDocument("users", {
+          uid: userCredential.user.uid,
+          email,
+          createdAt: new Date().toISOString(),
+        })
+        console.log("User data stored in Firestore")
+      } catch (firestoreError) {
+        console.error("Error storing user data:", firestoreError)
       }
 
       return userCredential.user
