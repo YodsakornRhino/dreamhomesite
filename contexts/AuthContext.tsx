@@ -4,15 +4,13 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "firebase/auth"
 import {
-  ensureAuth,
-  onAuthStateChanged as onAuthChanged,
-  signInWithEmailAndPassword as signInAPI,
-  createUserWithEmailAndPassword as signUpAPI,
-  signOut as signOutAPI,
-  sendPasswordResetEmail as resetAPI,
-  reloadCurrentUser,
-  sendEmailVerification as sendVerifyAPI,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
 } from "@/lib/auth"
+import { sendVerificationEmail } from "@/lib/send-verification"
 
 interface AuthContextType {
   user: User | null
@@ -34,74 +32,128 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let unsub: undefined | (() => void)
+    let unsubscribe: (() => void) | undefined
 
-    ;(async () => {
+    const initAuth = async () => {
       try {
-        await ensureAuth()
-        unsub = await onAuthChanged((u) => {
-          console.log("Auth state changed:", u?.email ?? "No user", "verified:", u?.emailVerified)
-          setUser(u)
+        // Wait for client-side hydration
+        await new Promise((resolve) => setTimeout(resolve, 200))
+
+        unsubscribe = onAuthStateChanged((user: User | null) => {
+          console.log("Auth state changed:", user?.email || "No user")
+          if (user) {
+            console.log("User email verified:", user.emailVerified)
+          }
+          setUser(user)
           setLoading(false)
           setError(null)
         })
-      } catch (e) {
-        console.error("Error initializing auth:", e)
+      } catch (error) {
+        console.error("Error initializing auth:", error)
         setError("Failed to initialize authentication")
         setLoading(false)
       }
-    })()
+    }
 
-    return () => unsub?.()
+    initAuth()
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [])
 
-  const signIn = async (email: string, password: string) => {
-    setError(null)
-    await signInAPI(email, password)
-  }
-
-  const signUp = async (email: string, password: string) => {
-    setError(null)
-    const cred = await signUpAPI(email, password)
+  const handleSignIn = async (email: string, password: string) => {
     try {
-      // เว้นจังหวะเล็กน้อยเผื่อสถานะ session
-      await new Promise((r) => setTimeout(r, 400))
-      await sendVerifyAPI()
-    } catch (e) {
-      console.error("sendVerificationEmail failed:", e)
+      setError(null)
+      await signInWithEmailAndPassword(email, password)
+    } catch (error) {
+      console.error("Error signing in:", error)
+      throw error
     }
-    return cred.user
   }
 
-  const signOut = async () => {
-    setError(null)
-    await signOutAPI()
+  const handleSignUp = async (email: string, password: string): Promise<User> => {
+    try {
+      setError(null)
+      console.log("Creating user account for:", email)
+
+      const userCredential = await createUserWithEmailAndPassword(email, password)
+      console.log("User account created successfully")
+
+      // Wait a moment for the user to be fully created
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Send email verification using the new system
+      try {
+        console.log("Attempting to send verification email...")
+        await sendVerificationEmail()
+        console.log("Verification email sent successfully")
+      } catch (verificationError) {
+        console.error("Error sending verification email:", verificationError)
+        // Don't throw here, user is still created successfully
+        // But we should notify the user about the email issue
+      }
+
+      return userCredential.user
+    } catch (error) {
+      console.error("Error signing up:", error)
+      throw error
+    }
   }
 
-  const resetPassword = async (email: string) => {
-    setError(null)
-    await resetAPI(email)
+  const handleSignOut = async () => {
+    try {
+      setError(null)
+      await signOut()
+    } catch (error) {
+      console.error("Error signing out:", error)
+      throw error
+    }
   }
 
-  const sendVerificationEmail = async () => {
-    setError(null)
-    await sendVerifyAPI()
+  const handleResetPassword = async (email: string) => {
+    try {
+      setError(null)
+      await sendPasswordResetEmail(email)
+    } catch (error) {
+      console.error("Error resetting password:", error)
+      throw error
+    }
+  }
+
+  const handleSendVerificationEmail = async () => {
+    try {
+      setError(null)
+      await sendVerificationEmail()
+    } catch (error) {
+      console.error("Error sending verification email:", error)
+      throw error
+    }
   }
 
   const refreshUser = async () => {
-    const u = await reloadCurrentUser()
-    if (u) setUser({ ...u })
+    try {
+      if (user) {
+        await user.reload()
+        // Force a re-render by updating the user state
+        setUser({ ...user })
+      }
+    } catch (error) {
+      console.error("Error refreshing user:", error)
+    }
   }
 
   const value = {
     user,
     loading,
     error,
-    signIn,
-    signUp,
-    signOut,
-    resetPassword,
-    sendVerificationEmail,
+    signIn: handleSignIn,
+    signUp: handleSignUp,
+    signOut: handleSignOut,
+    resetPassword: handleResetPassword,
+    sendVerificationEmail: handleSendVerificationEmail,
     refreshUser,
   }
 
@@ -109,7 +161,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuthContext() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuthContext must be used within an AuthProvider")
-  return ctx
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuthContext must be used within an AuthProvider")
+  }
+  return context
 }

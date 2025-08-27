@@ -1,5 +1,5 @@
-// lib/firebase.ts
-import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app"
+import { initializeApp, getApps, getApp } from "firebase/app"
+import { getAnalytics, isSupported } from "firebase/analytics"
 
 const firebaseConfig = {
   apiKey: "AIzaSyDb_QTKrHNQZVQ-Pi1_vzuNvWyu9DBR46o",
@@ -11,15 +11,23 @@ const firebaseConfig = {
   measurementId: "G-VZL6HX0EWT",
 }
 
-export const firebaseApp: FirebaseApp =
-  getApps().length ? getApp() : initializeApp(firebaseConfig)
-
-// โหลด analytics เฉพาะฝั่ง client และแบบ dynamic เท่านั้น (กัน SSR แตก)
-export async function initAnalytics() {
-  if (typeof window === "undefined") return null
-  const { isSupported, getAnalytics } = await import("firebase/analytics")
-  if (await isSupported()) {
-    return getAnalytics(firebaseApp)
-  }
-  return null
+// Initialize Firebase
+let firebaseApp
+if (getApps().length === 0) {
+  firebaseApp = initializeApp(firebaseConfig)
+} else {
+  firebaseApp = getApp()
 }
+
+// Initialize Analytics only on client side
+let analytics
+if (typeof window !== "undefined") {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(firebaseApp)
+    }
+  })
+}
+
+export { firebaseApp, analytics }
+export default firebaseApp
