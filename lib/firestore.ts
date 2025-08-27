@@ -41,6 +41,23 @@ export const addDocument = async (
   }
 }
 
+// Set a document with a specific ID
+export const setDocument = async (
+  collectionName: string,
+  docId: string,
+  data: DocumentData,
+): Promise<void> => {
+  try {
+    const { doc, setDoc } = await import("firebase/firestore")
+    const db = await getFirestoreInstance()
+    const docRef = doc(db, collectionName, docId)
+    await setDoc(docRef, data)
+  } catch (error) {
+    console.error("Error setting document:", error)
+    throw error
+  }
+}
+
 // Get a document by ID
 export const getDocument = async (
   collectionName: string,
