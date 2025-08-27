@@ -42,6 +42,7 @@ export const addDocument = async (
 }
 
 // Set a document with a specific ID
+// firestore.ts
 export const setDocument = async (
   collectionName: string,
   docId: string,
@@ -51,12 +52,14 @@ export const setDocument = async (
     const { doc, setDoc } = await import("firebase/firestore")
     const db = await getFirestoreInstance()
     const docRef = doc(db, collectionName, docId)
-    await setDoc(docRef, data)
+    // ✅ ใช้ merge: true เพื่อให้เพิ่มฟิลด์ภายหลังได้โดยไม่ทับทั้ง doc
+    await setDoc(docRef, data, { merge: true })
   } catch (error) {
     console.error("Error setting document:", error)
     throw error
   }
 }
+
 
 // Get a document by ID
 export const getDocument = async (

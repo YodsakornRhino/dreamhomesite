@@ -3,6 +3,8 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "firebase/auth"
+// AuthContext.tsx (ส่วน import เพิ่ม)
+import { updateProfile } from "firebase/auth"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -75,50 +77,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSignUp = async (
-    email: string,
-    password: string,
-    name: string,
-  ): Promise<User> => {
+  // AuthContext.tsx (แทนที่เฉพาะฟังก์ชัน handleSignUp)
+const handleSignUp = async (
+  email: string,
+  password: string,
+  name: string,
+): Promise<User> => {
+  try {
+    setError(null)
+    console.log("Creating user account for:", email)
+
+    const userCredential = await createUserWithEmailAndPassword(email, password)
+    const user = userCredential.user
+    console.log("User account created successfully")
+
+    // ✅ อัปเดตชื่อบน Auth (displayName)
     try {
-      setError(null)
-      console.log("Creating user account for:", email)
-
-      const userCredential = await createUserWithEmailAndPassword(email, password)
-      console.log("User account created successfully")
-
-      // Wait a moment for the user to be fully created
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Send email verification using the new system
-      try {
-        console.log("Attempting to send verification email...")
-        await sendVerificationEmail()
-        console.log("Verification email sent successfully")
-      } catch (verificationError) {
-        console.error("Error sending verification email:", verificationError)
-        // Don't throw here, user is still created successfully
-        // But we should notify the user about the email issue
-      }
-
-      // Store user data in Firestore
-      try {
-        await setDocument("users", userCredential.user.uid, {
-          name,
-          email,
-          createdAt: new Date().toISOString(),
-        })
-        console.log("User data stored in Firestore")
-      } catch (firestoreError) {
-        console.error("Error storing user data:", firestoreError)
-      }
-
-      return userCredential.user
-    } catch (error) {
-      console.error("Error signing up:", error)
-      throw error
+      await updateProfile(user, { displayName: name })
+    } catch (e) {
+      console.error("Error updating displayName:", e)
+      // ไม่ต้อง throw เพื่อไม่ให้ signup ล้ม
     }
+
+    // ✅ ใช้ serverTimestamp สำหรับ createdAt/updatedAt
+    const { serverTimestamp } = await import("firebase/firestore")
+    const now = serverTimestamp()
+
+    // ✅ ส่งอีเมลยืนยัน (ลองก่อน หากพลาดไม่ทำให้ signup ล้ม)
+    try {
+      console.log("Attempting to send verification email...")
+      await sendVerificationEmail()
+      console.log("Verification email sent successfully")
+    } catch (verificationError) {
+      console.error("Error sending verification email:", verificationError)
+      // แจ้งเตือนได้ แต่ไม่ throw
+    }
+
+    // ✅ สร้าง/อัปเดตเอกสาร users/{uid} ด้วยฟิลด์ตั้งต้น
+    try {
+      await setDocument("users", user.uid, {
+        uid: user.uid,
+        name,
+        email,
+        emailVerified: user.emailVerified ?? false,
+        photoURL: user.photoURL ?? null,
+        providerId: user.providerData?.[0]?.providerId ?? "password",
+        role: "user", // ค่าเริ่มต้น ปรับได้ภายหลัง
+        preferences: {
+          // โครงสร้างที่ “เพิ่มได้ที่หลัง”
+          language: "th",
+          theme: "system",
+          notifications: true,
+        },
+        createdAt: now,
+        updatedAt: now,
+      })
+      console.log("User data stored in Firestore")
+    } catch (firestoreError) {
+      console.error("Error storing user data:", firestoreError)
+      // ไม่ throw เพื่อไม่ให้ขั้นตอนก่อนหน้าล้ม
+    }
+
+    return user
+  } catch (error) {
+    console.error("Error signing up:", error)
+    throw error
   }
+}
+
 
   const handleSignOut = async () => {
     try {
