@@ -43,7 +43,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     name: "",
     email: "",
     photoURL: "",
-    preferences: { language: "th", theme: "system", notifications: true },
+    preferences: { language: "th", theme: "light", notifications: true },
   })
 
   const initials = useMemo(() => {
@@ -77,7 +77,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             photoURL: data?.photoURL ?? user.photoURL ?? "",
             preferences: {
               language: data?.preferences?.language ?? "th",
-              theme: data?.preferences?.theme ?? "system",
+              theme: data?.preferences?.theme ?? "light",
               notifications: data?.preferences?.notifications ?? true,
               ...data?.preferences,
             },
@@ -88,7 +88,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             name: user.displayName ?? "",
             email: user.email ?? "",
             photoURL: user.photoURL ?? "",
-            preferences: { language: "th", theme: "system", notifications: true },
+            preferences: { language: "th", theme: "light", notifications: true },
           })
         }
       } catch (e: any) {
@@ -143,7 +143,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         photoURL: form.photoURL || null,
         preferences: {
           language: form.preferences?.language ?? "th",
-          theme: form.preferences?.theme ?? "system",
+          theme: form.preferences?.theme ?? "light",
           notifications: !!form.preferences?.notifications,
         },
         updatedAt: serverTimestamp(),
@@ -278,14 +278,12 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <div className="space-y-1 sm:space-y-2">
                 <Label className="text-xs sm:text-sm font-medium">ธีม</Label>
                 <select
-                  value={form.preferences.theme ?? "system"}
+                  value={form.preferences.theme ?? "light"}
                   onChange={(e) => handlePrefChange("theme", e.target.value)}
                   className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm px-3 border rounded-md bg-white"
                   disabled={saving}
                 >
-                  <option value="system">System</option>
                   <option value="light">Light</option>
-                  <option value="dark">Dark</option>
                 </select>
               </div>
             </div>

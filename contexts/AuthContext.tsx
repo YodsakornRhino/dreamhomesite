@@ -123,12 +123,12 @@ const handleSignUp = async (
         photoURL: user.photoURL ?? null,
         providerId: user.providerData?.[0]?.providerId ?? "password",
         role: "user", // ค่าเริ่มต้น ปรับได้ภายหลัง
-        preferences: {
-          // โครงสร้างที่ “เพิ่มได้ที่หลัง”
-          language: "th",
-          theme: "system",
-          notifications: true,
-        },
+          preferences: {
+            // โครงสร้างที่ “เพิ่มได้ที่หลัง”
+            language: "th",
+            theme: "light",
+            notifications: true,
+          },
         createdAt: now,
         updatedAt: now,
       })
