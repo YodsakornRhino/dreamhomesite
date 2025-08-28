@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import ProfileModal from "./profile-modal"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ const Navigation: React.FC = () => {
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
 
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text
@@ -168,9 +170,9 @@ const Navigation: React.FC = () => {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <User className="mr-2 h-4 w-4" />
-                      <span>โปรไฟล์</span>
+                    <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>โปรไฟล์</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem>
                       <Mail className="mr-2 h-4 w-4" />
@@ -235,6 +237,7 @@ const Navigation: React.FC = () => {
       {/* Modals */}
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
+      <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />  
     </>
   )
 }
