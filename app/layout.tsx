@@ -58,8 +58,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClientOnly>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"      // แทน "light" เพื่อไม่ flip หลังอ่าน system theme
-            enableSystem
+            defaultTheme="light"
+            forcedTheme="light"
+            enableSystem={false}
             disableTransitionOnChange
           >
             <AuthProvider>

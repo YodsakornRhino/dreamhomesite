@@ -34,7 +34,7 @@ export default function MobileFilterDrawer({
       {isOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={toggleDrawer} />
+          <div className="absolute inset-0 bg-white bg-opacity-50" onClick={toggleDrawer} />
 
           {/* Drawer */}
           <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto">

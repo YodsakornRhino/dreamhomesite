@@ -26,7 +26,7 @@ export default function PropertyModal({ propertyId, onClose }: PropertyModalProp
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4"
+      className="fixed inset-0 bg-white bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={handleBackdropClick}
     >
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto mx-2 sm:mx-4">
