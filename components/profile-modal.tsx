@@ -13,7 +13,15 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { getDocument, setDocument } from "@/lib/firestore"
 import { updateProfile } from "firebase/auth"
-import { Loader2, User as UserIcon, Mail, Image as ImageIcon, CheckCircle, AlertCircle } from "lucide-react"
+import {
+  Loader2,
+  User as UserIcon,
+  Mail,
+  Image as ImageIcon,
+  CheckCircle,
+  AlertCircle,
+  Phone,
+} from "lucide-react"
 
 type Preferences = {
   language?: "th" | "en" | string
@@ -26,6 +34,8 @@ type FormState = {
   name: string
   email: string
   photoURL: string
+  phoneNumber: string
+  phoneVerified?: boolean
   preferences: Preferences
 }
 
@@ -35,7 +45,7 @@ interface ProfileModalProps {
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const { user } = useAuthContext()
+  const { user, verifyPhone } = useAuthContext()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -44,8 +54,16 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     name: "",
     email: "",
     photoURL: "",
+    phoneNumber: "",
+    phoneVerified: false,
     preferences: { language: "th", theme: "light", notifications: true },
   })
+
+  const [otp, setOtp] = useState("")
+  const [otpSent, setOtpSent] = useState(false)
+  const [verificationId, setVerificationId] = useState<string>("")
+  const [sendingOtp, setSendingOtp] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
 
   const initials = useMemo(() => {
     if (!form.name) return (user?.email ?? "U").slice(0, 2).toUpperCase()
@@ -53,13 +71,57 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   }, [form.name, user?.email])
 
   const handleChange = (key: keyof FormState, value: any) => {
-    setForm(prev => ({ ...prev, [key]: value }))
+    setForm(prev => {
+      const updated: FormState = { ...prev, [key]: value }
+      if (key === "phoneNumber") {
+        updated.phoneVerified = false
+      }
+      return updated
+    })
+    if (key === "phoneNumber") {
+      setOtp("")
+      setOtpSent(false)
+    }
     setError("")
   }
 
   const handlePrefChange = (key: keyof Preferences, value: any) => {
     setForm(prev => ({ ...prev, preferences: { ...prev.preferences, [key]: value } }))
     setError("")
+  }
+
+  const handleSendOtp = async () => {
+    try {
+      setSendingOtp(true)
+      setError("")
+      const vid = await verifyPhone.send(form.phoneNumber)
+      setVerificationId(vid)
+      setOtpSent(true)
+      toast({ title: "ส่งรหัสยืนยันแล้ว", description: "กรุณากรอกรหัส OTP" })
+    } catch (e: any) {
+      console.error(e)
+      setError(e?.message ?? "ส่งรหัสไม่สำเร็จ")
+    } finally {
+      setSendingOtp(false)
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (!verificationId) return
+    try {
+      setVerifyingOtp(true)
+      setError("")
+      await verifyPhone.confirm(verificationId, otp, form.phoneNumber)
+      setForm(prev => ({ ...prev, phoneVerified: true }))
+      setOtp("")
+      setOtpSent(false)
+      toast({ title: "ยืนยันเบอร์เรียบร้อย", description: "เบอร์โทรของคุณถูกยืนยันแล้ว" })
+    } catch (e: any) {
+      console.error(e)
+      setError(e?.message ?? "ยืนยันรหัสไม่สำเร็จ")
+    } finally {
+      setVerifyingOtp(false)
+    }
   }
 
   // โหลดข้อมูลโปรไฟล์จาก Firestore ตาม uid
@@ -76,6 +138,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             name: data?.name ?? user.displayName ?? "",
             email: data?.email ?? user.email ?? "",
             photoURL: data?.photoURL ?? user.photoURL ?? "",
+            phoneNumber: data?.phoneNumber ?? user.phoneNumber ?? "",
+            phoneVerified: data?.phoneVerified ?? false,
             preferences: {
               language: data?.preferences?.language ?? "th",
               theme: data?.preferences?.theme ?? "light",
@@ -89,6 +153,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             name: user.displayName ?? "",
             email: user.email ?? "",
             photoURL: user.photoURL ?? "",
+            phoneNumber: user.phoneNumber ?? "",
+            phoneVerified: false,
             preferences: { language: "th", theme: "light", notifications: true },
           })
         }
@@ -142,6 +208,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         name: form.name,
         email: form.email, // read-only ในฟอร์มนี้
         photoURL: form.photoURL || null,
+        phoneNumber: form.phoneNumber || null,
+        phoneVerified: !!form.phoneVerified,
         preferences: {
           language: form.preferences?.language ?? "th",
           theme: form.preferences?.theme ?? "light",
@@ -175,7 +243,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <>
+      <div id="recaptcha-container" />
+      <Dialog open={isOpen} onOpenChange={handleClose}>
       {/* ✅ ขนาด/สไตล์เท่ากับ sign-up modal */}
       <DialogContent className="w-[95vw] max-w-[400px] sm:max-w-[450px] md:max-w-[500px] max-h-[95vh] overflow-y-auto">
         <DialogHeader className="space-y-2 sm:space-y-3">
@@ -232,6 +302,66 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 />
               </div>
             </div>
+
+            {/* Phone */}
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="phone" className="text-xs sm:text-sm font-medium">เบอร์โทรศัพท์</Label>
+              <div className="flex items-center space-x-2">
+                <div className="relative flex-1">
+                  <Phone className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+                  <Input
+                    id="phone"
+                    value={form.phoneNumber}
+                    onChange={(e) => handleChange("phoneNumber", e.target.value)}
+                    placeholder="กรอกเบอร์โทร"
+                    className="pl-8 sm:pl-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
+                    disabled={saving || !!form.phoneVerified}
+                  />
+                </div>
+                {form.phoneVerified ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSendOtp}
+                    disabled={sendingOtp || !form.phoneNumber}
+                  >
+                    {sendingOtp ? (
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                    ) : (
+                      "ส่งรหัสยืนยัน"
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {otpSent && !form.phoneVerified && (
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="otp" className="text-xs sm:text-sm font-medium">รหัส OTP</Label>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    id="otp"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleVerifyOtp}
+                    disabled={verifyingOtp || otp.length < 6}
+                  >
+                    {verifyingOtp ? (
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                    ) : (
+                      "ยืนยันรหัส"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Photo URL */}
             <div className="space-y-1 sm:space-y-2">
@@ -310,6 +440,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </form>
         )}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

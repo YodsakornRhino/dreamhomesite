@@ -3,20 +3,31 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "firebase/auth"
-// AuthContext.tsx (ส่วน import เพิ่ม)
-import { updateProfile } from "firebase/auth"
+import {
+  updateProfile,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  PhoneAuthProvider,
+  linkWithCredential,
+} from "firebase/auth"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  getAuthInstance,
 } from "@/lib/auth"
 import { sendVerificationEmail } from "@/lib/send-verification"
 import { setDocument } from "@/lib/firestore"
 
+interface ExtendedUser extends User {
+  phoneNumber?: string
+  phoneVerified?: boolean
+}
+
 interface AuthContextType {
-  user: User | null
+  user: ExtendedUser | null
   loading: boolean
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
@@ -25,12 +36,20 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>
   sendVerificationEmail: () => Promise<void>
   refreshUser: () => Promise<void>
+  verifyPhone: {
+    send: (phoneNumber: string) => Promise<string>
+    confirm: (
+      verificationId: string,
+      code: string,
+      phoneNumber: string,
+    ) => Promise<void>
+  }
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<ExtendedUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -188,6 +207,38 @@ const handleSignUp = async (
     }
   }
 
+  const verifyPhone = {
+    send: async (phoneNumber: string) => {
+      const auth = getAuthInstance()
+      let verifier = (window as any).recaptchaVerifier as
+        | RecaptchaVerifier
+        | undefined
+      if (!verifier) {
+        verifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+          size: "invisible",
+        })
+        await verifier.render()
+        ;(window as any).recaptchaVerifier = verifier
+      }
+      const result = await signInWithPhoneNumber(auth, phoneNumber, verifier)
+      return result.verificationId
+    },
+    confirm: async (
+      verificationId: string,
+      code: string,
+      phoneNumber: string,
+    ) => {
+      const auth = getAuthInstance()
+      const credential = PhoneAuthProvider.credential(verificationId, code)
+      await linkWithCredential(auth.currentUser!, credential)
+      await setDocument("users", auth.currentUser!.uid, {
+        phoneNumber,
+        phoneVerified: true,
+      })
+      setUser({ ...(auth.currentUser as ExtendedUser), phoneNumber, phoneVerified: true })
+    },
+  }
+
   const value = {
     user,
     loading,
@@ -198,6 +249,7 @@ const handleSignUp = async (
     resetPassword: handleResetPassword,
     sendVerificationEmail: handleSendVerificationEmail,
     refreshUser,
+    verifyPhone,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
