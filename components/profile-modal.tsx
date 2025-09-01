@@ -13,7 +13,7 @@ import {
   Phone as PhoneIcon, Send, CheckCheck, RotateCw, CheckCircle
 } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { getDocument, setDocument } from "@/lib/firestore"
+import { getDocument, setDocument, getDocuments } from "@/lib/firestore" // ⬅️ เพิ่ม getDocuments
 import { useToast } from "@/hooks/use-toast"
 import {
   updateProfile, RecaptchaVerifier, linkWithPhoneNumber,
@@ -71,7 +71,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [otpSent, setOtpSent] = useState(false)
   const [mode, setMode] = useState<"link" | "update">("link")
 
-  // ✅ เพิ่มสถานะ “ยืนยันแล้ว” และเบอร์ที่ได้รับการยืนยันล่าสุด
+  // ✅ สถานะยืนยันเบอร์
   const [phoneVerified, setPhoneVerified] = useState(false)
   const [verifiedPhone, setVerifiedPhone] = useState("")
 
@@ -109,12 +109,14 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     return s
   }
 
+  // ✅ อธิบาย error เพิ่ม “เบอร์ถูกใช้แล้ว”
   const explainFirebaseError = (e: any) => {
     const code = e?.code || ""
     const serverMsg = e?.customData?.serverResponse?.error?.message || e?.message || ""
     console.error("Phone verify error:", code, serverMsg, e)
     if (code === "auth/invalid-phone-number" || serverMsg.includes("INVALID_PHONE_NUMBER")) return "รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"
     if (code === "auth/too-many-requests" || serverMsg.includes("QUOTA_EXCEEDED")) return "ขอรหัสบ่อยเกินไป ระบบขอให้รอสักครู่ก่อนส่งใหม่"
+    if (code === "auth/credential-already-in-use" || code === "auth/phone-number-already-exists") return "เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว"
     if (serverMsg.includes("RECAPTCHA") || code.includes("recaptcha")) return "reCAPTCHA ไม่ผ่าน ตรวจสอบโดเมน/การตั้งค่าใน Firebase หรือปิด Ad-block แล้วลองใหม่"
     if (code === "auth/network-request-failed") return "เครือข่ายมีปัญหา กรุณาลองใหม่"
     if (code === "auth/app-not-authorized" || code === "auth/invalid-api-key") return "การตั้งค่า API Key/แอปไม่ถูกต้อง ตรวจสอบ Firebase config และ Authorized domains"
@@ -263,6 +265,22 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     try { await ensureRecaptcha(); setRecaptchaReady(true) } catch (e) { setRecaptchaReady(false); setError(explainFirebaseError(e)) }
   }
 
+  // -------------------- 🔎 เช็คเบอร์ซ้ำใน Firestore --------------------
+  const isPhoneTakenByOther = async (e164: string): Promise<boolean> => {
+    try {
+      const { where, limit } = await import("firebase/firestore")
+      const docs = await getDocuments("users", where("phoneNumber", "==", e164), limit(1))
+      if (docs.length === 0) return false
+      const doc = docs[0]
+      // ถ้าเป็นเอกสารของตัวเอง ถือว่าไม่ซ้ำ
+      return doc.id !== uid
+    } catch (e) {
+      // ถ้าเช็คไม่ได้ ให้ยอมผ่าน (หรือจะบล็อกก็ได้) — ที่ confirm เราจะกันอีกชั้น
+      console.warn("Check phone unique failed:", e)
+      return false
+    }
+  }
+
   // ---------- Save profile ----------
   const handleSaveProfile = async () => {
     if (!uid) return
@@ -297,12 +315,20 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     try {
       const auth = getAuthInstance()
       if (!auth.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
-      const verifier = await ensureRecaptcha()
 
       const e164 = normalizePhone(phone)
       if (!/^\+\d{8,15}$/.test(e164)) { setError("รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"); return }
 
+      // ⛔ เช็คความซ้ำใน Firestore ก่อนส่ง OTP
+      if (await isPhoneTakenByOther(e164)) {
+        setError("เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว")
+        toast({ title: "ส่งรหัสไม่สำเร็จ", description: "เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว", variant: "destructive" })
+        return
+      }
+
+      const verifier = await ensureRecaptcha()
       setSending(true)
+
       if (verifiedPhone) {
         // เคยมีเบอร์แล้ว → เปลี่ยนเบอร์
         const provider = new PhoneAuthProvider(auth)
@@ -316,11 +342,12 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       setOtpSent(true)
       startCooldown(OTP_COOLDOWN_MS)
-      // กำลังจะยืนยัน → ซ่อนติ๊กชั่วคราวถ้าเปลี่ยนเบอร์ใหม่
+      // ถ้ากำลังเปลี่ยนเป็นเบอร์ใหม่ ให้ซ่อนติ๊กจนกว่าจะยืนยัน
       if (normalizePhone(e164) !== normalizePhone(verifiedPhone)) setPhoneVerified(false)
       toast({ title: "ส่งรหัสยืนยันแล้ว", description: "กรุณากรอก OTP ที่ได้รับ" })
     } catch (e: any) {
-      setError(explainFirebaseError(e))
+      const msg = explainFirebaseError(e)
+      setError(msg)
       if (e?.code === "auth/too-many-requests") startCooldown(THROTTLE_PENALTY_MS)
     } finally {
       setSending(false)
@@ -335,6 +362,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       const auth = getAuthInstance()
       if (!auth.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
 
+      // ลองบล็อกอีกชั้น (กัน race) ก่อนยืนยันจริง
+      const e164 = normalizePhone(phone)
+      if (await isPhoneTakenByOther(e164)) {
+        setError("เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว")
+        return
+      }
+
       if (mode === "link" && confirmationResultRef.current) {
         await confirmationResultRef.current.confirm(otp)
       } else if (mode === "update" && verificationIdRef.current) {
@@ -345,12 +379,12 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       }
 
       await auth.currentUser.reload()
-      const latest = auth.currentUser.phoneNumber ?? normalizePhone(phone)
+      const latest = auth.currentUser.phoneNumber ?? e164
 
       const { serverTimestamp } = await import("firebase/firestore")
       await setDocument("users", uid, { phoneNumber: latest, phoneVerified: true, updatedAt: serverTimestamp() })
 
-      // ✅ อัปเดตสถานะใน UI: ติ๊กเขียว “ยืนยันแล้ว”
+      // ✅ อัปเดตสถานะใน UI
       setVerifiedPhone(latest)
       setPhone(latest)
       setPhoneVerified(true)
@@ -358,7 +392,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       setOtpSent(false); setOtp("")
       toast({ title: "ยืนยันเบอร์สำเร็จ" })
     } catch (e: any) {
-      setError(explainFirebaseError(e))
+      const msg = explainFirebaseError(e)
+      setError(msg)
     } finally {
       setVerifying(false)
     }
@@ -367,10 +402,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const nowLabel = fmtDateTime(nowTs)
   const nextAllowedAt = Number(localStorage.getItem(cooldownKey) || 0)
   const nextAllowedLabel = nextAllowedAt > nowTs ? fmtTime(nextAllowedAt) : null
-  const lastSentAt = Number(localStorage.getItem(lastSentKey) || 0)
-  const lastSentLabel = lastSentAt ? fmtTime(lastSentAt) : null
 
-  // ✅ ใช้เงื่อนไขสำหรับแสดงติ๊กถูกเฉพาะเมื่อ “เบอร์ในช่อง” ตรงกับ “เบอร์ที่ยืนยันแล้ว”
   const isCurrentInputVerified =
     phoneVerified && verifiedPhone && normalizePhone(phone) === normalizePhone(verifiedPhone)
 
@@ -444,8 +476,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   <PhoneIcon className="h-4 w-4" />
                   เบอร์โทร ({verifiedPhone ? "เปลี่ยนเบอร์" : "เพิ่ม/ยืนยัน"})
                 </Label>
-
-                {/* ✅ ติ๊กเขียวเมื่อยืนยันแล้ว */}
                 <div className="flex items-center gap-2">
                   {isCurrentInputVerified ? (
                     <span className="inline-flex items-center text-[11px] text-green-600">
@@ -457,7 +487,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   ) : (
                     <span className="text-[11px] text-gray-500">ยังไม่ยืนยัน</span>
                   )}
-
                   <span className="text-[11px] text-gray-500">
                     {recaptchaStatus === "preparing" && "กำลังเตรียม reCAPTCHA…"}
                     {recaptchaStatus === "ready" && "reCAPTCHA พร้อม"}
@@ -485,22 +514,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     <><Send className="h-4 w-4 mr-1" />ส่งรหัส</>
                   )}
                 </Button>
-                <Button type="button" variant="ghost" onClick={async () => { await repairRecaptcha() }} title="ซ่อม reCAPTCHA">
+                <Button type="button" variant="ghost" onClick={repairRecaptcha} title="ซ่อม reCAPTCHA">
                   <RotateCw className="h-4 w-4" />
                 </Button>
-              </div>
-
-              {/* เวลา/คูลดาวน์ */}
-              <div className="text-[11px] text-gray-600 space-y-0.5">
-                <div>เวลาในระบบตอนนี้: <span className="font-medium">{fmtTime(nowTs)}</span> (ICT)</div>
-                {Number(localStorage.getItem(lastSentKey)) ? (
-                  <div>ส่งรหัสล่าสุด: <span className="font-medium">{fmtTime(Number(localStorage.getItem(lastSentKey)))}</span> (ICT)</div>
-                ) : null}
-                {nextAllowedLabel ? (
-                  <div>ส่งรหัสได้อีกครั้งเวลา: <span className="font-medium">{nextAllowedLabel}</span> (ICT)</div>
-                ) : (
-                  <div className="text-green-600">พร้อมส่งรหัสได้ทันที</div>
-                )}
               </div>
 
               {otpSent && (
@@ -511,6 +527,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   </Button>
                 </div>
               )}
+
+              {/* แสดงเวลาคูลดาวน์/ส่งได้อีกครั้ง */}
+              
             </div>
 
             {/* UID */}

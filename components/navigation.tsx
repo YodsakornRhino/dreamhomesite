@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"          // ⬅️ ใช้ตรวจจับ route change
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -37,10 +38,24 @@ import { useToast } from "@/hooks/use-toast"
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
+  const pathname = usePathname()                       // ⬅️ เส้นทางปัจจุบัน
+
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+
+  // ⬅️ คุมเมนูมือถือ (Sheet)
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  // ⬅️ ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
+  useEffect(() => {
+    setIsMobileOpen(false)
+  }, [pathname])
+
+  const handleMobileNavClick = () => {
+    setIsMobileOpen(false)
+  }
 
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text
@@ -171,8 +186,8 @@ const Navigation: React.FC = () => {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>โปรไฟล์</span>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>โปรไฟล์</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem>
                       <Mail className="mr-2 h-4 w-4" />
@@ -210,7 +225,7 @@ const Navigation: React.FC = () => {
               )}
 
               {/* Mobile Menu */}
-              <Sheet>
+              <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="sm" className="md:hidden">
                     <Menu className="h-5 w-5" />
@@ -220,7 +235,11 @@ const Navigation: React.FC = () => {
                   <div className="flex flex-col space-y-4 mt-6">
                     {navItems.map((item) => (
                       <Link key={item.href} href={item.href}>
-                        <Button variant="ghost" className="w-full justify-start text-base">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-base"
+                          onClick={handleMobileNavClick}   // ⬅️ กดแล้วปิดเมนูทันที
+                        >
                           <item.icon className="w-5 h-5 mr-3" />
                           {item.label}
                         </Button>
@@ -237,7 +256,7 @@ const Navigation: React.FC = () => {
       {/* Modals */}
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
-      <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />  
+      <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </>
   )
 }
