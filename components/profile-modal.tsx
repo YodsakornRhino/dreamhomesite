@@ -1,312 +1,536 @@
-// profile-modal.tsx
-//fix profile modal
+// src/components/profile-modal.tsx
 "use client"
 
-import type React from "react"
-import { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Loader2, Mail, IdCard, Image as ImageIcon, Save, X, User as UserIcon,
+  Phone as PhoneIcon, Send, CheckCheck, RotateCw, CheckCircle
+} from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { getDocument, setDocument } from "@/lib/firestore"
-import { updateProfile } from "firebase/auth"
-import { Loader2, User as UserIcon, Mail, Image as ImageIcon, CheckCircle, AlertCircle } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import {
+  updateProfile, RecaptchaVerifier, linkWithPhoneNumber,
+  PhoneAuthProvider, updatePhoneNumber, type ConfirmationResult,
+} from "firebase/auth"
+import { getAuthInstance } from "@/lib/auth"
 
-type Preferences = {
-  language?: "th" | "en" | string
-  theme?: "system" | "light" | "dark" | string
-  notifications?: boolean
-  [k: string]: any
+type ProfileModalProps = { isOpen: boolean; onClose: () => void }
+
+// ✅ ใช้ container ถาวรจาก layout (ต้องมี <div id="recaptcha-container-root" />)
+const CAPTCHA_ID = "recaptcha-container-root"
+
+const OTP_COOLDOWN_MS = 60_000
+const THROTTLE_PENALTY_MS = 10 * 60_000
+
+let globalRecaptcha: RecaptchaVerifier | null = null
+let globalRecaptchaInitPromise: Promise<RecaptchaVerifier> | null = null
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+const fmtDateTime = (ts: number) =>
+  new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Bangkok" }).format(ts)
+const fmtTime = (ts: number) =>
+  new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Bangkok", hour12: false }).format(ts)
+
+const resetAllRecaptchaWidgets = () => {
+  try { const gre: any = (window as any)?.grecaptcha; if (gre?.reset) gre.reset() } catch {}
 }
-
-type FormState = {
-  name: string
-  email: string
-  photoURL: string
-  preferences: Preferences
-}
-
-interface ProfileModalProps {
-  isOpen: boolean
-  onClose: () => void
+const getRootEl = () => (typeof document !== "undefined" ? document.getElementById(CAPTCHA_ID) : null)
+const cleanupRecaptchaRoot = () => { const root = getRootEl(); if (!root) return; while (root.firstChild) root.removeChild(root.firstChild) }
+const createFreshSlot = (): HTMLElement => {
+  const root = getRootEl()
+  if (!root) throw new Error('ไม่พบ reCAPTCHA root ใน DOM (layout.tsx ต้องมี <div id="recaptcha-container-root" />)')
+  const slot = document.createElement("div")
+  slot.id = `recaptcha-slot-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  slot.setAttribute("data-recaptcha-slot", "1")
+  root.appendChild(slot)
+  return slot
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const { user } = useAuthContext()
+  const uid = user?.uid
   const { toast } = useToast()
+
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string>("")
-  const [form, setForm] = useState<FormState>({
-    name: "",
-    email: "",
-    photoURL: "",
-    preferences: { language: "th", theme: "light", notifications: true },
-  })
+  const [sending, setSending] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [form, setForm] = useState({ name: "", email: "", photoURL: "" })
+  const [phone, setPhone] = useState("")
+  const [otp, setOtp] = useState("")
+  const [otpSent, setOtpSent] = useState(false)
+  const [mode, setMode] = useState<"link" | "update">("link")
+
+  // ✅ เพิ่มสถานะ “ยืนยันแล้ว” และเบอร์ที่ได้รับการยืนยันล่าสุด
+  const [phoneVerified, setPhoneVerified] = useState(false)
+  const [verifiedPhone, setVerifiedPhone] = useState("")
+
+  // reCAPTCHA
+  const [recaptchaReady, setRecaptchaReady] = useState(false)
+  const [recaptchaStatus, setRecaptchaStatus] = useState<"idle" | "preparing" | "ready" | "error">("idle")
+
+  // OTP state
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
+  const verificationIdRef = useRef<string | null>(null)
+
+  // นาฬิกา + คูลดาวน์
+  const [nowTs, setNowTs] = useState<number>(Date.now())
+  const [cooldownLeft, setCooldownLeft] = useState(0)
+  const cooldownTimerRef = useRef<number | null>(null)
+
+  const cooldownKey = useMemo(() => {
+    const safePhone = (phone || "").replace(/\D/g, "")
+    return `otpNextAllowedAt:${uid || "nouid"}:${safePhone}`
+  }, [uid, phone])
+  const lastSentKey = useMemo(() => {
+    const safePhone = (phone || "").replace(/\D/g, "")
+    return `otpLastSentAt:${uid || "nouid"}:${safePhone}`
+  }, [uid, phone])
 
   const initials = useMemo(() => {
-    if (!form.name) return (user?.email ?? "U").slice(0, 2).toUpperCase()
-    return form.name.split(" ").map(s => s[0]).join("").slice(0, 2).toUpperCase()
-  }, [form.name, user?.email])
+    const n = form.name?.trim() || user?.displayName || user?.email || "U"
+    return n.slice(0, 2).toUpperCase()
+  }, [form.name, user])
 
-  const handleChange = (key: keyof FormState, value: any) => {
-    setForm(prev => ({ ...prev, [key]: value }))
-    setError("")
+  const normalizePhone = (raw: string) => {
+    const s = raw.replace(/\s|-/g, "")
+    if (s.startsWith("+")) return s
+    if (s.startsWith("0")) return "+66" + s.slice(1)
+    return s
   }
 
-  const handlePrefChange = (key: keyof Preferences, value: any) => {
-    setForm(prev => ({ ...prev, preferences: { ...prev.preferences, [key]: value } }))
-    setError("")
+  const explainFirebaseError = (e: any) => {
+    const code = e?.code || ""
+    const serverMsg = e?.customData?.serverResponse?.error?.message || e?.message || ""
+    console.error("Phone verify error:", code, serverMsg, e)
+    if (code === "auth/invalid-phone-number" || serverMsg.includes("INVALID_PHONE_NUMBER")) return "รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"
+    if (code === "auth/too-many-requests" || serverMsg.includes("QUOTA_EXCEEDED")) return "ขอรหัสบ่อยเกินไป ระบบขอให้รอสักครู่ก่อนส่งใหม่"
+    if (serverMsg.includes("RECAPTCHA") || code.includes("recaptcha")) return "reCAPTCHA ไม่ผ่าน ตรวจสอบโดเมน/การตั้งค่าใน Firebase หรือปิด Ad-block แล้วลองใหม่"
+    if (code === "auth/network-request-failed") return "เครือข่ายมีปัญหา กรุณาลองใหม่"
+    if (code === "auth/app-not-authorized" || code === "auth/invalid-api-key") return "การตั้งค่า API Key/แอปไม่ถูกต้อง ตรวจสอบ Firebase config และ Authorized domains"
+    return "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง"
   }
 
-  // โหลดข้อมูลโปรไฟล์จาก Firestore ตาม uid
   useEffect(() => {
-    const load = async () => {
-      if (!isOpen || !user?.uid) return
-      try {
-        setLoading(true)
-        setError("")
-        const snap = await getDocument("users", user.uid)
-        if (snap?.exists()) {
-          const data = snap.data() as any
-          setForm({
-            name: data?.name ?? user.displayName ?? "",
-            email: data?.email ?? user.email ?? "",
-            photoURL: data?.photoURL ?? user.photoURL ?? "",
-            preferences: {
-              language: data?.preferences?.language ?? "th",
-              theme: data?.preferences?.theme ?? "light",
-              notifications: data?.preferences?.notifications ?? true,
-              ...data?.preferences,
-            },
-          })
-        } else {
-          // ถ้ายังไม่มีเอกสารใน users/{uid} ให้เติมจาก Auth ไว้ก่อน
-          setForm({
-            name: user.displayName ?? "",
-            email: user.email ?? "",
-            photoURL: user.photoURL ?? "",
-            preferences: { language: "th", theme: "light", notifications: true },
-          })
-        }
-      } catch (e: any) {
-        console.error(e)
-        setError(e?.message ?? "โหลดโปรไฟล์ไม่สำเร็จ")
-      } finally {
-        setLoading(false)
+    if (!isOpen) return
+    const id = window.setInterval(() => setNowTs(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [isOpen])
+
+  const tickCooldown = (nextAt: number) => {
+    if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current)
+    const update = () => {
+      const left = Math.max(0, Math.ceil((nextAt - Date.now()) / 1000))
+      setCooldownLeft(left)
+      if (left === 0 && cooldownTimerRef.current) {
+        window.clearInterval(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
       }
     }
-    load()
-  }, [isOpen, user?.uid])
-
-  const validate = () => {
-    if (!form.name.trim()) return "กรุณากรอกชื่อ"
-    if (form.name.trim().length < 2) return "ชื่อต้องมีอย่างน้อย 2 ตัวอักษร"
-    if (!form.email) return "ไม่พบอีเมลผู้ใช้"
-    return ""
+    update()
+    cooldownTimerRef.current = window.setInterval(update, 1000) as unknown as number
+  }
+  const startCooldown = (ms: number) => {
+    const next = Date.now() + ms
+    localStorage.setItem(cooldownKey, String(next))
+    localStorage.setItem(lastSentKey, String(Date.now()))
+    tickCooldown(next)
   }
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const msg = validate()
-    if (msg) {
-      setError(msg)
-      return
-    }
-    if (!user?.uid) {
-      setError("ไม่พบผู้ใช้ที่ลงชื่อเข้าใช้")
-      return
-    }
+  // โหลดโปรไฟล์ + set phoneVerified/verifiedPhone
+  useEffect(() => {
+    if (!isOpen) return
+    if (!uid) { setError("ไม่พบผู้ใช้ที่เข้าสู่ระบบ"); return }
 
-    setSaving(true)
-    try {
-      // อัปเดต displayName / photoURL บน Firebase Auth (ถ้ามีการเปลี่ยน)
-      if (user.displayName !== form.name || user.photoURL !== form.photoURL) {
-        try {
-          await updateProfile(user, {
-            displayName: form.name,
-            photoURL: form.photoURL || null,
-          })
-        } catch (e) {
-          console.warn("updateProfile failed (not blocking):", e)
-        }
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoading(true); setError(null)
+        const snap = await getDocument("users", uid)
+        const data = snap?.data?.() ?? {}
+        const name = data?.name ?? user?.displayName ?? ""
+        const email = data?.email ?? user?.email ?? ""
+        const photoURL = data?.photoURL ?? user?.photoURL ?? ""
+        const phoneNumber = data?.phoneNumber ?? user?.phoneNumber ?? ""
+        const pv = data?.phoneVerified ?? Boolean(phoneNumber)
+
+        setForm({ name, email, photoURL })
+        setPhone(phoneNumber || "")
+        setVerifiedPhone(phoneNumber || "")
+        setPhoneVerified(Boolean(pv))
+        setMode(phoneNumber ? "update" : "link")
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? "โหลดโปรไฟล์ไม่สำเร็จ")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+
+    const saved = Number(localStorage.getItem(cooldownKey) || 0)
+    if (saved > Date.now()) tickCooldown(saved)
+
+    return () => {
+      cancelled = true
+      setOtp(""); setOtpSent(false)
+      if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current)
+      confirmationResultRef.current = null
+      verificationIdRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, uid])
+
+  // ---------- reCAPTCHA: singleton ----------
+  const ensureRecaptcha = async (attempt = 1): Promise<RecaptchaVerifier> => {
+    if (globalRecaptcha) return globalRecaptcha
+    if (globalRecaptchaInitPromise) return globalRecaptchaInitPromise
+
+    const auth = getAuthInstance()
+    if (!auth?.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
+
+    const root = getRootEl()
+    if (!root) throw new Error('ไม่พบ reCAPTCHA root ใน DOM (layout.tsx ต้องมี <div id="recaptcha-container-root" />)')
+
+    setRecaptchaStatus("preparing")
+    resetAllRecaptchaWidgets()
+    cleanupRecaptchaRoot()
+    const slot = createFreshSlot()
+
+    globalRecaptchaInitPromise = (async () => {
+      let verifier: RecaptchaVerifier
+      try {
+        // v10
+        // @ts-ignore
+        verifier = new RecaptchaVerifier(auth, slot, { size: "invisible" })
+      } catch {
+        // v9
+        // @ts-ignore
+        verifier = new RecaptchaVerifier(slot, { size: "invisible" }, auth)
       }
 
-      // ใช้ merge: true (ตั้งไว้ใน setDocument ของคุณแล้ว) + updatedAt
+      try {
+        await verifier.render()
+        globalRecaptcha = verifier
+        setRecaptchaStatus("ready")
+        return verifier
+      } catch (err) {
+        try { verifier.clear() } catch {}
+        resetAllRecaptchaWidgets()
+        cleanupRecaptchaRoot()
+        if (attempt < 3) {
+          await sleep(250 * attempt * attempt)
+          globalRecaptchaInitPromise = null
+          return ensureRecaptcha(attempt + 1)
+        }
+        setRecaptchaStatus("error")
+        throw err
+      } finally {
+        globalRecaptchaInitPromise = null
+      }
+    })()
+
+    return globalRecaptchaInitPromise
+  }
+
+  useEffect(() => {
+    if (!isOpen || !uid) return
+    const id = window.setTimeout(() => {
+      ensureRecaptcha()
+        .then(() => setRecaptchaReady(true))
+        .catch(() => setRecaptchaReady(false))
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [isOpen, uid])
+
+  const repairRecaptcha = async () => {
+    try { await globalRecaptcha?.clear?.() } catch {}
+    globalRecaptcha = null
+    globalRecaptchaInitPromise = null
+    setRecaptchaReady(false)
+    setRecaptchaStatus("idle")
+    resetAllRecaptchaWidgets()
+    cleanupRecaptchaRoot()
+    await sleep(100)
+    try { await ensureRecaptcha(); setRecaptchaReady(true) } catch (e) { setRecaptchaReady(false); setError(explainFirebaseError(e)) }
+  }
+
+  // ---------- Save profile ----------
+  const handleSaveProfile = async () => {
+    if (!uid) return
+    if (!form.name.trim()) { setError("กรุณากรอกชื่อ"); return }
+    setSaving(true); setError(null)
+    try {
       const { serverTimestamp } = await import("firebase/firestore")
-      await setDocument("users", user.uid, {
-        uid: user.uid,
-        name: form.name,
-        email: form.email, // read-only ในฟอร์มนี้
+      await setDocument("users", uid, {
+        uid,
+        name: form.name.trim(),
+        email: form.email || user?.email || null,
         photoURL: form.photoURL || null,
-        preferences: {
-          language: form.preferences?.language ?? "th",
-          theme: form.preferences?.theme ?? "light",
-          notifications: !!form.preferences?.notifications,
-        },
+        // เก็บสถานะ/เบอร์ล่าสุดไว้ด้วย
+        phoneNumber: verifiedPhone || null,
+        phoneVerified: phoneVerified,
         updatedAt: serverTimestamp(),
       })
-
-      toast({
-        title: "บันทึกโปรไฟล์สำเร็จ",
-        description: "ข้อมูลของคุณอัปเดตเรียบร้อยแล้ว",
-      })
+      try { await updateProfile(user!, { displayName: form.name.trim(), photoURL: form.photoURL || null }) } catch {}
+      toast({ title: "บันทึกโปรไฟล์สำเร็จ" })
       onClose()
     } catch (e: any) {
-      console.error(e)
-      setError(e?.message ?? "บันทึกโปรไฟล์ไม่สำเร็จ")
-      toast({
-        title: "บันทึกไม่สำเร็จ",
-        description: "กรุณาลองใหม่อีกครั้ง",
-        variant: "destructive",
-      })
+      setError(e?.message ?? "บันทึกไม่สำเร็จ")
+    } finally { setSaving(false) }
+  }
+
+  // ---------- Send OTP ----------
+  const handleSendOtp = async () => {
+    setError(null); setOtp("")
+    const nextAllowed = Number(localStorage.getItem(cooldownKey) || 0)
+    if (nextAllowed > Date.now()) { tickCooldown(nextAllowed); return }
+
+    try {
+      const auth = getAuthInstance()
+      if (!auth.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
+      const verifier = await ensureRecaptcha()
+
+      const e164 = normalizePhone(phone)
+      if (!/^\+\d{8,15}$/.test(e164)) { setError("รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"); return }
+
+      setSending(true)
+      if (verifiedPhone) {
+        // เคยมีเบอร์แล้ว → เปลี่ยนเบอร์
+        const provider = new PhoneAuthProvider(auth)
+        verificationIdRef.current = await provider.verifyPhoneNumber(e164, verifier)
+        setMode("update")
+      } else {
+        // ยังไม่เคยผูก → link
+        confirmationResultRef.current = await linkWithPhoneNumber(auth.currentUser, e164, verifier)
+        setMode("link")
+      }
+
+      setOtpSent(true)
+      startCooldown(OTP_COOLDOWN_MS)
+      // กำลังจะยืนยัน → ซ่อนติ๊กชั่วคราวถ้าเปลี่ยนเบอร์ใหม่
+      if (normalizePhone(e164) !== normalizePhone(verifiedPhone)) setPhoneVerified(false)
+      toast({ title: "ส่งรหัสยืนยันแล้ว", description: "กรุณากรอก OTP ที่ได้รับ" })
+    } catch (e: any) {
+      setError(explainFirebaseError(e))
+      if (e?.code === "auth/too-many-requests") startCooldown(THROTTLE_PENALTY_MS)
     } finally {
-      setSaving(false)
+      setSending(false)
     }
   }
 
-  const handleClose = () => {
-    if (saving) return
-    setError("")
-    onClose()
+  // ---------- Confirm OTP ----------
+  const handleConfirmOtp = async () => {
+    if (!uid) return
+    setVerifying(true); setError(null)
+    try {
+      const auth = getAuthInstance()
+      if (!auth.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
+
+      if (mode === "link" && confirmationResultRef.current) {
+        await confirmationResultRef.current.confirm(otp)
+      } else if (mode === "update" && verificationIdRef.current) {
+        const credential = PhoneAuthProvider.credential(verificationIdRef.current, otp)
+        await updatePhoneNumber(auth.currentUser, credential)
+      } else {
+        throw new Error("ไม่มีข้อมูลการยืนยันที่ถูกต้อง")
+      }
+
+      await auth.currentUser.reload()
+      const latest = auth.currentUser.phoneNumber ?? normalizePhone(phone)
+
+      const { serverTimestamp } = await import("firebase/firestore")
+      await setDocument("users", uid, { phoneNumber: latest, phoneVerified: true, updatedAt: serverTimestamp() })
+
+      // ✅ อัปเดตสถานะใน UI: ติ๊กเขียว “ยืนยันแล้ว”
+      setVerifiedPhone(latest)
+      setPhone(latest)
+      setPhoneVerified(true)
+
+      setOtpSent(false); setOtp("")
+      toast({ title: "ยืนยันเบอร์สำเร็จ" })
+    } catch (e: any) {
+      setError(explainFirebaseError(e))
+    } finally {
+      setVerifying(false)
+    }
   }
 
+  const nowLabel = fmtDateTime(nowTs)
+  const nextAllowedAt = Number(localStorage.getItem(cooldownKey) || 0)
+  const nextAllowedLabel = nextAllowedAt > nowTs ? fmtTime(nextAllowedAt) : null
+  const lastSentAt = Number(localStorage.getItem(lastSentKey) || 0)
+  const lastSentLabel = lastSentAt ? fmtTime(lastSentAt) : null
+
+  // ✅ ใช้เงื่อนไขสำหรับแสดงติ๊กถูกเฉพาะเมื่อ “เบอร์ในช่อง” ตรงกับ “เบอร์ที่ยืนยันแล้ว”
+  const isCurrentInputVerified =
+    phoneVerified && verifiedPhone && normalizePhone(phone) === normalizePhone(verifiedPhone)
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      {/* ✅ ขนาด/สไตล์เท่ากับ sign-up modal */}
-      <DialogContent className="w-[95vw] max-w-[400px] sm:max-w-[450px] md:max-w-[500px] max-h-[95vh] overflow-y-auto">
-        <DialogHeader className="space-y-2 sm:space-y-3">
-          <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-center">โปรไฟล์ผู้ใช้</DialogTitle>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="w-[95vw] max-w-[500px] max-h-[95vh] overflow-y-auto bg-white">
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-center">โปรไฟล์</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm md:text-base text-center text-gray-600">
-            แก้ไขข้อมูลบัญชี DreamHome ของคุณ
+            ดูและแก้ไขข้อมูลบัญชีของคุณ
           </DialogDescription>
+          <div className="text-center text-xs text-gray-500">เวลาในระบบ: {nowLabel} (ICT)</div>
         </DialogHeader>
 
         {error && (
-          <Alert variant="destructive" className="py-2 sm:py-3">
-            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+          <Alert variant="destructive" className="py-2">
             <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
           </Alert>
         )}
 
         {loading ? (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-5 w-24 bg-gray-200 rounded" />
-            <div className="h-10 bg-gray-200 rounded" />
-            <div className="h-5 w-24 bg-gray-200 rounded" />
-            <div className="h-10 bg-gray-200 rounded" />
-            <div className="h-10 bg-gray-200 rounded" />
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            <span className="ml-2 text-sm text-gray-500">กำลังโหลด...</span>
           </div>
         ) : (
-          <form onSubmit={handleSave} className="space-y-3 sm:space-y-4">
+          <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-4">
+            {/* Avatar */}
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={form.photoURL} alt={form.name} />
+                <AvatarFallback className="bg-blue-100 text-blue-700">{initials}</AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{form.name || "—"}</div>
+                <div className="text-xs text-gray-500">{form.email || "—"}</div>
+              </div>
+            </div>
+
             {/* Name */}
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="name" className="text-xs sm:text-sm font-medium">ชื่อ-นามสกุล</Label>
+            <div className="space-y-1">
+              <Label htmlFor="name" className="text-xs sm:text-sm font-medium">ชื่อที่แสดง</Label>
               <div className="relative">
-                <UserIcon className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-                <Input
-                  id="name"
-                  value={form.name}
-                  onChange={(e) => handleChange("name", e.target.value)}
-                  placeholder="กรอกชื่อ-นามสกุล"
-                  className="pl-8 sm:pl-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
-                  disabled={saving}
-                />
+                <UserIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input id="name" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="pl-8" placeholder="เช่น Napat R." />
               </div>
             </div>
 
             {/* Email (read-only) */}
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="email" className="text-xs sm:text-sm font-medium">อีเมล</Label>
+            <div className="space-y-1">
+              <Label htmlFor="email" className="text-xs sm:text-sm font-medium">อีเมล (อ่านอย่างเดียว)</Label>
               <div className="relative">
-                <Mail className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  readOnly
-                  className="pl-8 sm:pl-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm bg-gray-50"
-                />
+                <Mail className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input id="email" value={form.email} disabled className="pl-8 bg-gray-50" />
               </div>
             </div>
 
             {/* Photo URL */}
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-1">
               <Label htmlFor="photoURL" className="text-xs sm:text-sm font-medium">รูปโปรไฟล์ (URL)</Label>
               <div className="relative">
-                <ImageIcon className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-                <Input
-                  id="photoURL"
-                  value={form.photoURL}
-                  onChange={(e) => handleChange("photoURL", e.target.value)}
-                  placeholder="เช่น https://..."
-                  className="pl-8 sm:pl-10 h-9 sm:h-10 md:h-11 text-xs sm:text-sm"
-                  disabled={saving}
-                />
+                <ImageIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input id="photoURL" value={form.photoURL} onChange={(e) => setForm(p => ({ ...p, photoURL: e.target.value }))} className="pl-8" placeholder="https://…" />
               </div>
-              {/* ตัวอย่าง preview แบบง่าย */}
-              {form.photoURL ? (
-                <img
-                  src={form.photoURL}
-                  alt="preview"
-                  className="mt-2 h-14 w-14 rounded-full object-cover border"
+            </div>
+
+            {/* Phone verify */}
+            <div className="space-y-2 p-3 border rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="phone" className="text-xs sm:text-sm font-medium flex items-center gap-2">
+                  <PhoneIcon className="h-4 w-4" />
+                  เบอร์โทร ({verifiedPhone ? "เปลี่ยนเบอร์" : "เพิ่ม/ยืนยัน"})
+                </Label>
+
+                {/* ✅ ติ๊กเขียวเมื่อยืนยันแล้ว */}
+                <div className="flex items-center gap-2">
+                  {isCurrentInputVerified ? (
+                    <span className="inline-flex items-center text-[11px] text-green-600">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      ยืนยันแล้ว
+                    </span>
+                  ) : verifiedPhone ? (
+                    <span className="text-[11px] text-amber-600">กำลังเปลี่ยนเบอร์ – ต้องยืนยัน</span>
+                  ) : (
+                    <span className="text-[11px] text-gray-500">ยังไม่ยืนยัน</span>
+                  )}
+
+                  <span className="text-[11px] text-gray-500">
+                    {recaptchaStatus === "preparing" && "กำลังเตรียม reCAPTCHA…"}
+                    {recaptchaStatus === "ready" && "reCAPTCHA พร้อม"}
+                    {recaptchaStatus === "error" && "reCAPTCHA มีปัญหา"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="เช่น +66912345678 หรือ 0912345678"
                 />
-              ) : (
-                <div className="mt-2 h-14 w-14 rounded-full bg-gray-100 border flex items-center justify-center text-xs font-semibold">
-                  {initials}
+                <Button type="button" onClick={handleSendOtp} variant="secondary" disabled={!recaptchaReady || sending || verifying || cooldownLeft > 0}>
+                  {!recaptchaReady || sending ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" />{sending ? "กำลังส่ง..." : "กำลังเตรียม…"}</>
+                  ) : cooldownLeft > 0 ? (
+                    <>ส่งใหม่ใน {cooldownLeft}s</>
+                  ) : (
+                    <><Send className="h-4 w-4 mr-1" />ส่งรหัส</>
+                  )}
+                </Button>
+                <Button type="button" variant="ghost" onClick={async () => { await repairRecaptcha() }} title="ซ่อม reCAPTCHA">
+                  <RotateCw className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* เวลา/คูลดาวน์ */}
+              <div className="text-[11px] text-gray-600 space-y-0.5">
+                <div>เวลาในระบบตอนนี้: <span className="font-medium">{fmtTime(nowTs)}</span> (ICT)</div>
+                {Number(localStorage.getItem(lastSentKey)) ? (
+                  <div>ส่งรหัสล่าสุด: <span className="font-medium">{fmtTime(Number(localStorage.getItem(lastSentKey)))}</span> (ICT)</div>
+                ) : null}
+                {nextAllowedLabel ? (
+                  <div>ส่งรหัสได้อีกครั้งเวลา: <span className="font-medium">{nextAllowedLabel}</span> (ICT)</div>
+                ) : (
+                  <div className="text-green-600">พร้อมส่งรหัสได้ทันที</div>
+                )}
+              </div>
+
+              {otpSent && (
+                <div className="flex gap-2">
+                  <Input id="otp" type="text" inputMode="numeric" pattern="\d*" autoComplete="one-time-code" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="กรอกรหัส OTP" />
+                  <Button type="button" onClick={handleConfirmOtp} disabled={verifying} className="bg-blue-600 hover:bg-blue-700">
+                    {verifying ? (<><Loader2 className="h-4 w-4 mr-1 animate-spin" />กำลังยืนยัน</>) : (<><CheckCheck className="h-4 w-4 mr-1" />ยืนยัน</>)}
+                  </Button>
                 </div>
               )}
             </div>
 
-            {/* Preferences */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1 sm:space-y-2">
-                <Label className="text-xs sm:text-sm font-medium">ภาษา</Label>
-                <select
-                  value={form.preferences.language ?? "th"}
-                  onChange={(e) => handlePrefChange("language", e.target.value)}
-                  className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm px-3 border rounded-md bg-white"
-                  disabled={saving}
-                >
-                  <option value="th">ไทย</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-
-              <div className="space-y-1 sm:space-y-2">
-                <Label className="text-xs sm:text-sm font-medium">ธีม</Label>
-                <select
-                  value={form.preferences.theme ?? "light"}
-                  onChange={(e) => handlePrefChange("theme", e.target.value)}
-                  className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm px-3 border rounded-md bg-white"
-                  disabled={saving}
-                >
-                  <option value="light">Light</option>
-                </select>
+            {/* UID */}
+            <div className="space-y-1">
+              <Label htmlFor="uid" className="text-xs sm:text-sm font-medium">UID</Label>
+              <div className="relative">
+                <IdCard className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input id="uid" value={uid ?? ""} disabled className="pl-8 bg-gray-50" />
               </div>
             </div>
 
-            {/* Save */}
-            <Button
-              type="submit"
-              className="w-full h-8 sm:h-9 md:h-10 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700"
-              disabled={saving}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                  กำลังบันทึก...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  บันทึกโปรไฟล์
-                </>
-              )}
-            </Button>
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={onClose} className="text-gray-600">
+                <X className="h-4 w-4 mr-1" />ยกเลิก
+              </Button>
+              <Button type="button" onClick={handleSaveProfile} className="bg-blue-600 hover:bg-blue-700" disabled={saving}>
+                {saving ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />กำลังบันทึก...</>) : (<><Save className="h-4 w-4 mr-2" />บันทึก</>)}
+              </Button>
+            </div>
           </form>
         )}
       </DialogContent>

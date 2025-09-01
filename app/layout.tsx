@@ -63,7 +63,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             enableSystem={false}
             disableTransitionOnChange
           >
-            <AuthProvider>
+             <AuthProvider>
+              {/* ✅ reCAPTCHA container แบบถาวร: ใช้ id นี้ให้ตรงกับใน profile-modal */}
+              <div
+                id="recaptcha-container-root"
+                // มองไม่เห็น แต่ยังอยู่ใน DOM ตลอดอายุเพจ (อย่าใช้ display:none)
+                className="sr-only"
+                aria-hidden="true"
+              />
+
               <div className="min-h-screen flex flex-col">
                 <Navigation />
                 <main className="flex-1">{children}</main>
