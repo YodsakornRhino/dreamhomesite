@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { Inter } from "next/font/google"
 import ChatWidget from "@/components/chat-widget"
@@ -9,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Upload, Video, Camera, MapPin, TreePine, Building2, Waves, Shield, Dumbbell, Square, Wifi, Flame } from "lucide-react"
+
+import { useAuthContext } from "@/contexts/AuthContext"
+import SellAuthPrompt from "@/components/sell-auth-prompt"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,6 +29,11 @@ const features = [
 ]
 
 export default function SellCreatePage() {
+  const { user, loading } = useAuthContext()
+
+  if (loading) return null
+  if (!user) return <SellAuthPrompt />
+
   return (
     <div className={`${inter.className} bg-gray-50 min-h-screen`}>
       <div className="max-w-4xl mx-auto p-4 sm:p-8 space-y-8">
