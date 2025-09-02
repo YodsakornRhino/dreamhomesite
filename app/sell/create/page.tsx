@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Inter } from "next/font/google"
 import ChatWidget from "@/components/chat-widget"
 import { Button } from "@/components/ui/button"
@@ -26,8 +27,13 @@ export default function SellCreatePage() {
   return (
     <div className={`${inter.className} bg-gray-50 min-h-screen`}>
       <div className="max-w-4xl mx-auto p-4 sm:p-8 space-y-8">
-        <header className="space-y-4 text-center">
-          <h1 className="text-3xl font-bold">Post Your Property for Sale</h1>
+        <header className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Post Your Property for Sale</h1>
+            <Link href="/sell">
+              <Button variant="outline">Back to My Posts</Button>
+            </Link>
+          </div>
           <div>
             <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
               <span>Progress</span>
