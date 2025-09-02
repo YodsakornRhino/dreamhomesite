@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Check } from "lucide-react"
 import ChatWidget from "@/components/chat-widget"
 import { Button } from "@/components/ui/button"
 import SignInModal from "@/components/sign-in-modal"
@@ -21,13 +22,27 @@ export default function SellAuthPrompt() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-6 text-center">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-bold">Sell Your Property with DreamHome</h1>
-        <p className="text-gray-500">
-          Sign in or create an account to start listing your properties for sale.
+    <div className="max-w-4xl mx-auto p-8 space-y-8 text-center bg-gradient-to-b from-white to-slate-50 rounded-lg shadow">
+      <header className="space-y-4">
+        <h1 className="text-4xl font-bold">Sell Your Property with DreamHome</h1>
+        <p className="text-lg text-gray-600">
+          Reach buyers, manage inquiries, and close deals faster.
         </p>
       </header>
+      <ul className="grid gap-4 text-left sm:grid-cols-3">
+        <li className="flex items-start gap-2">
+          <Check className="h-5 w-5 text-green-500 mt-1" />
+          <span>List your property for free</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <Check className="h-5 w-5 text-green-500 mt-1" />
+          <span>Connect with qualified buyers</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <Check className="h-5 w-5 text-green-500 mt-1" />
+          <span>Track messages and offers easily</span>
+        </li>
+      </ul>
       <div className="flex justify-center gap-4">
         <Button onClick={() => setIsSignInOpen(true)}>Sign In</Button>
         <Button variant="outline" onClick={() => setIsSignUpOpen(true)}>
