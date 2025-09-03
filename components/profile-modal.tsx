@@ -193,7 +193,24 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   // ---------- reCAPTCHA: singleton ----------
   const ensureRecaptcha = async (attempt = 1): Promise<RecaptchaVerifier> => {
-    if (globalRecaptcha) return globalRecaptcha
+    // ถ้ามี verifier อยู่แล้ว ให้เช็คว่ามี token ที่ยังไม่ถูกใช้อยู่ไหม
+    if (globalRecaptcha) {
+      try {
+        const gre: any = (window as any)?.grecaptcha
+        const wid = (globalRecaptcha as any)?._widgetId
+        // ถ้าไม่มี token (เช่น ถูกใช้หรือหมดอายุ) ให้ล้างและสร้างใหม่
+        if (gre && wid !== undefined && !gre.getResponse(wid)) {
+          try { await globalRecaptcha.clear?.() } catch {}
+          resetAllRecaptchaWidgets()
+          cleanupRecaptchaRoot()
+          globalRecaptcha = null
+        } else {
+          return globalRecaptcha
+        }
+      } catch {
+        return globalRecaptcha
+      }
+    }
     if (globalRecaptchaInitPromise) return globalRecaptchaInitPromise
 
     const auth = getAuthInstance()
@@ -327,6 +344,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       }
 
       const verifier = await ensureRecaptcha()
+      // เคลียร์ verifier เดิมและ render ใหม่เพื่อรับ token สด
+      try { await verifier.clear?.() } catch {}
+      await verifier.render()
       setSending(true)
 
       if (verifiedPhone) {
