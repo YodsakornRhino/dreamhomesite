@@ -24,6 +24,12 @@ function VerifyEmailContent() {
   const isVerified = searchParams.get("verified") === "true"
 
   useEffect(() => {
+    if (isVerified) {
+      void refreshUser()
+    }
+  }, [isVerified, refreshUser])
+
+  useEffect(() => {
     // Start cooldown timer if we have a last sent time
     if (lastSentTime) {
       const elapsed = Date.now() - lastSentTime

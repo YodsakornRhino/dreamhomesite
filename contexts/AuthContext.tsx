@@ -182,6 +182,14 @@ const handleSignUp = async (
         await user.reload()
         // Force a re-render by updating the user state
         setUser({ ...user })
+
+        if (user.emailVerified) {
+          const { serverTimestamp } = await import("firebase/firestore")
+          await setDocument("users", user.uid, {
+            emailVerified: true,
+            updatedAt: serverTimestamp(),
+          })
+        }
       }
     } catch (error) {
       console.error("Error refreshing user:", error)
