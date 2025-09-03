@@ -20,6 +20,7 @@ import {
   PhoneAuthProvider, updatePhoneNumber, type ConfirmationResult,
 } from "firebase/auth"
 import { getAuthInstance } from "@/lib/auth"
+import { normalizePhoneNumber } from "@/lib/utils"
 
 type ProfileModalProps = { isOpen: boolean; onClose: () => void }
 
@@ -102,12 +103,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     return n.slice(0, 2).toUpperCase()
   }, [form.name, user])
 
-  const normalizePhone = (raw: string) => {
-    const s = raw.replace(/\s|-/g, "")
-    if (s.startsWith("+")) return s
-    if (s.startsWith("0")) return "+66" + s.slice(1)
-    return s
-  }
 
   // ✅ อธิบาย error เพิ่ม “เบอร์ถูกใช้แล้ว”
   const explainFirebaseError = (e: any) => {
@@ -316,7 +311,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       const auth = getAuthInstance()
       if (!auth.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
 
-      const e164 = normalizePhone(phone)
+      const e164 = normalizePhoneNumber(phone)
       if (!/^\+\d{8,15}$/.test(e164)) { setError("รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"); return }
 
       // ⛔ เช็คความซ้ำใน Firestore ก่อนส่ง OTP
@@ -343,7 +338,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       setOtpSent(true)
       startCooldown(OTP_COOLDOWN_MS)
       // ถ้ากำลังเปลี่ยนเป็นเบอร์ใหม่ ให้ซ่อนติ๊กจนกว่าจะยืนยัน
-      if (normalizePhone(e164) !== normalizePhone(verifiedPhone)) setPhoneVerified(false)
+      if (e164 !== normalizePhoneNumber(verifiedPhone)) setPhoneVerified(false)
       toast({ title: "ส่งรหัสยืนยันแล้ว", description: "กรุณากรอก OTP ที่ได้รับ" })
     } catch (e: any) {
       const msg = explainFirebaseError(e)
@@ -363,7 +358,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       if (!auth.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
 
       // ลองบล็อกอีกชั้น (กัน race) ก่อนยืนยันจริง
-      const e164 = normalizePhone(phone)
+      const e164 = normalizePhoneNumber(phone)
       if (await isPhoneTakenByOther(e164)) {
         setError("เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว")
         return
@@ -404,7 +399,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const nextAllowedLabel = nextAllowedAt > nowTs ? fmtTime(nextAllowedAt) : null
 
   const isCurrentInputVerified =
-    phoneVerified && verifiedPhone && normalizePhone(phone) === normalizePhone(verifiedPhone)
+    phoneVerified && verifiedPhone && normalizePhoneNumber(phone) === normalizePhoneNumber(verifiedPhone)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
