@@ -28,3 +28,12 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Phone Verification
+
+The profile modal sends one-time passwords via [Twilio](https://www.twilio.com/).
+Configure the following environment variables to enable SMS delivery to real devices:
+
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
