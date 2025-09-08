@@ -21,9 +21,6 @@ export default function SellDashboardPage() {
           <Link href="/sell/create">
             <Button>Create Post</Button>
           </Link>
-          <Link href="/sell/all">
-            <Button variant="outline">View All Posts</Button>
-          </Link>
         </div>
       </header>
       <Card>
