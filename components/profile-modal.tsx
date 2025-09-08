@@ -109,7 +109,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const code = e?.code || ""
     const serverMsg = e?.customData?.serverResponse?.error?.message || e?.message || ""
     console.error("Phone verify error:", code, serverMsg, e)
-    if (code === "auth/invalid-phone-number" || serverMsg.includes("INVALID_PHONE_NUMBER")) return "รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"
+    if (code === "auth/invalid-phone-number" || serverMsg.includes("INVALID_PHONE_NUMBER"))
+      return "รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"
     if (code === "auth/too-many-requests" || serverMsg.includes("QUOTA_EXCEEDED")) return "ขอรหัสบ่อยเกินไป ระบบขอให้รอสักครู่ก่อนส่งใหม่"
     if (code === "auth/credential-already-in-use" || code === "auth/phone-number-already-exists") return "เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว"
     if (serverMsg.includes("RECAPTCHA") || code.includes("recaptcha")) return "reCAPTCHA ไม่ผ่าน ตรวจสอบโดเมน/การตั้งค่าใน Firebase หรือปิด Ad-block แล้วลองใหม่"
