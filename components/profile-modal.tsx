@@ -13,7 +13,7 @@ import {
   Phone as PhoneIcon, Send, CheckCheck, RotateCw, CheckCircle
 } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { getDocument, setDocument, getDocuments } from "@/lib/firestore" // ⬅️ เพิ่ม getDocuments
+import { getDocument, setDocument, getDocuments } from "@/lib/firestore"
 import { useToast } from "@/hooks/use-toast"
 import {
   updateProfile, RecaptchaVerifier, linkWithPhoneNumber,
@@ -24,7 +24,7 @@ import { normalizePhoneNumber } from "@/lib/utils"
 
 type ProfileModalProps = { isOpen: boolean; onClose: () => void }
 
-// ✅ ใช้ container ถาวรจาก layout (ต้องมี <div id="recaptcha-container-root" />)
+// ต้องมี <div id="recaptcha-container-root" /> ใน layout.tsx
 const CAPTCHA_ID = "recaptcha-container-root"
 
 const OTP_COOLDOWN_MS = 60_000
@@ -72,7 +72,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [otpSent, setOtpSent] = useState(false)
   const [mode, setMode] = useState<"link" | "update">("link")
 
-  // ✅ สถานะยืนยันเบอร์
   const [phoneVerified, setPhoneVerified] = useState(false)
   const [verifiedPhone, setVerifiedPhone] = useState("")
 
@@ -103,22 +102,22 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     return n.slice(0, 2).toUpperCase()
   }, [form.name, user])
 
-
-  // ✅ อธิบาย error เพิ่ม “เบอร์ถูกใช้แล้ว”
+  // ---------------- helper: error ----------------
   const explainFirebaseError = (e: any) => {
     const code = e?.code || ""
     const serverMsg = e?.customData?.serverResponse?.error?.message || e?.message || ""
     console.error("Phone verify error:", code, serverMsg, e)
-    if (code === "auth/invalid-phone-number" || serverMsg.includes("INVALID_PHONE_NUMBER"))
-      return "รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"
+    if (code === "auth/invalid-phone-number" || serverMsg.includes("INVALID_PHONE_NUMBER")) return "รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"
     if (code === "auth/too-many-requests" || serverMsg.includes("QUOTA_EXCEEDED")) return "ขอรหัสบ่อยเกินไป ระบบขอให้รอสักครู่ก่อนส่งใหม่"
     if (code === "auth/credential-already-in-use" || code === "auth/phone-number-already-exists") return "เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว"
     if (serverMsg.includes("RECAPTCHA") || code.includes("recaptcha")) return "reCAPTCHA ไม่ผ่าน ตรวจสอบโดเมน/การตั้งค่าใน Firebase หรือปิด Ad-block แล้วลองใหม่"
     if (code === "auth/network-request-failed") return "เครือข่ายมีปัญหา กรุณาลองใหม่"
     if (code === "auth/app-not-authorized" || code === "auth/invalid-api-key") return "การตั้งค่า API Key/แอปไม่ถูกต้อง ตรวจสอบ Firebase config และ Authorized domains"
+    if (code === "auth/internal-error") return "reCAPTCHA ไม่พร้อมใช้งานหรือตัวตรวจสอบถูกทำลาย สร้างใหม่แล้วลองอีกครั้ง"
     return "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง"
   }
 
+  // ---------------- timer ----------------
   useEffect(() => {
     if (!isOpen) return
     const id = window.setInterval(() => setNowTs(Date.now()), 1000)
@@ -145,7 +144,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     tickCooldown(next)
   }
 
-  // โหลดโปรไฟล์ + set phoneVerified/verifiedPhone
+  // ---------------- load profile ----------------
   useEffect(() => {
     if (!isOpen) return
     if (!uid) { setError("ไม่พบผู้ใช้ที่เข้าสู่ระบบ"); return }
@@ -187,26 +186,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, uid])
 
-  // ---------- reCAPTCHA: singleton ----------
+  // ---------------- reCAPTCHA: always build fresh, render once ----------------
   const ensureRecaptcha = async (attempt = 1): Promise<RecaptchaVerifier> => {
-    // ถ้ามี verifier อยู่แล้ว ให้เช็คว่ามี token ที่ยังไม่ถูกใช้อยู่ไหม
-    if (globalRecaptcha) {
-      try {
-        const gre: any = (window as any)?.grecaptcha
-        const wid = (globalRecaptcha as any)?._widgetId
-        // ถ้าไม่มี token (เช่น ถูกใช้หรือหมดอายุ) ให้ล้างและสร้างใหม่
-        if (gre && wid !== undefined && !gre.getResponse(wid)) {
-          try { await globalRecaptcha.clear?.() } catch {}
-          resetAllRecaptchaWidgets()
-          cleanupRecaptchaRoot()
-          globalRecaptcha = null
-        } else {
-          return globalRecaptcha
-        }
-      } catch {
-        return globalRecaptcha
-      }
-    }
+    try { await globalRecaptcha?.clear?.() } catch {}
+    globalRecaptcha = null
+
     if (globalRecaptchaInitPromise) return globalRecaptchaInitPromise
 
     const auth = getAuthInstance()
@@ -215,6 +199,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const root = getRootEl()
     if (!root) throw new Error('ไม่พบ reCAPTCHA root ใน DOM (layout.tsx ต้องมี <div id="recaptcha-container-root" />)')
 
+    setRecaptchaReady(false)
     setRecaptchaStatus("preparing")
     resetAllRecaptchaWidgets()
     cleanupRecaptchaRoot()
@@ -223,11 +208,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     globalRecaptchaInitPromise = (async () => {
       let verifier: RecaptchaVerifier
       try {
-        // v10
+        // Firebase v10
         // @ts-ignore
         verifier = new RecaptchaVerifier(auth, slot, { size: "invisible" })
       } catch {
-        // v9
+        // Firebase v9
         // @ts-ignore
         verifier = new RecaptchaVerifier(slot, { size: "invisible" }, auth)
       }
@@ -236,6 +221,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         await verifier.render()
         globalRecaptcha = verifier
         setRecaptchaStatus("ready")
+        setRecaptchaReady(true)
         return verifier
       } catch (err) {
         try { verifier.clear() } catch {}
@@ -259,9 +245,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   useEffect(() => {
     if (!isOpen || !uid) return
     const id = window.setTimeout(() => {
-      ensureRecaptcha()
-        .then(() => setRecaptchaReady(true))
-        .catch(() => setRecaptchaReady(false))
+      ensureRecaptcha().catch(() => setRecaptchaReady(false))
     }, 0)
     return () => window.clearTimeout(id)
   }, [isOpen, uid])
@@ -275,26 +259,24 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     resetAllRecaptchaWidgets()
     cleanupRecaptchaRoot()
     await sleep(100)
-    try { await ensureRecaptcha(); setRecaptchaReady(true) } catch (e) { setRecaptchaReady(false); setError(explainFirebaseError(e)) }
+    try { await ensureRecaptcha() } catch (e) { setError(explainFirebaseError(e)) }
   }
 
-  // -------------------- 🔎 เช็คเบอร์ซ้ำใน Firestore --------------------
+  // -------------------- เช็คเบอร์ซ้ำใน Firestore --------------------
   const isPhoneTakenByOther = async (e164: string): Promise<boolean> => {
     try {
       const { where, limit } = await import("firebase/firestore")
       const docs = await getDocuments("users", where("phoneNumber", "==", e164), limit(1))
       if (docs.length === 0) return false
       const doc = docs[0]
-      // ถ้าเป็นเอกสารของตัวเอง ถือว่าไม่ซ้ำ
       return doc.id !== uid
     } catch (e) {
-      // ถ้าเช็คไม่ได้ ให้ยอมผ่าน (หรือจะบล็อกก็ได้) — ที่ confirm เราจะกันอีกชั้น
       console.warn("Check phone unique failed:", e)
       return false
     }
   }
 
-  // ---------- Save profile ----------
+  // ---------------- Save profile ----------------
   const handleSaveProfile = async () => {
     if (!uid) return
     if (!form.name.trim()) { setError("กรุณากรอกชื่อ"); return }
@@ -306,7 +288,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         name: form.name.trim(),
         email: form.email || user?.email || null,
         photoURL: form.photoURL || null,
-        // เก็บสถานะ/เบอร์ล่าสุดไว้ด้วย
         phoneNumber: verifiedPhone || null,
         phoneVerified: phoneVerified,
         updatedAt: serverTimestamp(),
@@ -316,10 +297,12 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       onClose()
     } catch (e: any) {
       setError(e?.message ?? "บันทึกไม่สำเร็จ")
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }
 
-  // ---------- Send OTP ----------
+  // ---------------- Send OTP ----------------
   const handleSendOtp = async () => {
     setError(null); setOtp("")
     const nextAllowed = Number(localStorage.getItem(cooldownKey) || 0)
@@ -332,33 +315,29 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       const e164 = normalizePhoneNumber(phone)
       if (!/^\+\d{8,15}$/.test(e164)) { setError("รูปแบบเบอร์ไม่ถูกต้อง (เช่น +66912345678)"); return }
 
-      // ⛔ เช็คความซ้ำใน Firestore ก่อนส่ง OTP
+      // เช็คความซ้ำก่อนส่ง
       if (await isPhoneTakenByOther(e164)) {
         setError("เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว")
         toast({ title: "ส่งรหัสไม่สำเร็จ", description: "เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว", variant: "destructive" })
         return
       }
 
+      // สร้าง reCAPTCHA พร้อมใช้งาน
       const verifier = await ensureRecaptcha()
-      // เคลียร์ verifier เดิมและ render ใหม่เพื่อรับ token สด
-      try { await verifier.clear?.() } catch {}
-      await verifier.render()
+
       setSending(true)
 
       if (verifiedPhone) {
-        // เคยมีเบอร์แล้ว → เปลี่ยนเบอร์
         const provider = new PhoneAuthProvider(auth)
         verificationIdRef.current = await provider.verifyPhoneNumber(e164, verifier)
         setMode("update")
       } else {
-        // ยังไม่เคยผูก → link
         confirmationResultRef.current = await linkWithPhoneNumber(auth.currentUser, e164, verifier)
         setMode("link")
       }
 
       setOtpSent(true)
       startCooldown(OTP_COOLDOWN_MS)
-      // ถ้ากำลังเปลี่ยนเป็นเบอร์ใหม่ ให้ซ่อนติ๊กจนกว่าจะยืนยัน
       if (e164 !== normalizePhoneNumber(verifiedPhone)) setPhoneVerified(false)
       toast({ title: "ส่งรหัสยืนยันแล้ว", description: "กรุณากรอก OTP ที่ได้รับ" })
     } catch (e: any) {
@@ -370,7 +349,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     }
   }
 
-  // ---------- Confirm OTP ----------
+  // ---------------- Confirm OTP ----------------
   const handleConfirmOtp = async () => {
     if (!uid) return
     setVerifying(true); setError(null)
@@ -378,7 +357,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       const auth = getAuthInstance()
       if (!auth.currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ")
 
-      // ลองบล็อกอีกชั้น (กัน race) ก่อนยืนยันจริง
       const e164 = normalizePhoneNumber(phone)
       if (await isPhoneTakenByOther(e164)) {
         setError("เบอร์นี้ถูกใช้งานกับบัญชีอื่นแล้ว")
@@ -400,7 +378,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       const { serverTimestamp } = await import("firebase/firestore")
       await setDocument("users", uid, { phoneNumber: latest, phoneVerified: true, updatedAt: serverTimestamp() })
 
-      // ✅ อัปเดตสถานะใน UI
       setVerifiedPhone(latest)
       setPhone(latest)
       setPhoneVerified(true)
@@ -521,7 +498,12 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="เช่น +66912345678 หรือ 0912345678"
                 />
-                <Button type="button" onClick={handleSendOtp} variant="secondary" disabled={!recaptchaReady || sending || verifying || cooldownLeft > 0}>
+                <Button
+                  type="button"
+                  onClick={handleSendOtp}
+                  variant="secondary"
+                  disabled={!recaptchaReady || sending || verifying || cooldownLeft > 0}
+                >
                   {!recaptchaReady || sending ? (
                     <><Loader2 className="h-4 w-4 mr-1 animate-spin" />{sending ? "กำลังส่ง..." : "กำลังเตรียม…"}</>
                   ) : cooldownLeft > 0 ? (
@@ -543,9 +525,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   </Button>
                 </div>
               )}
-
-              {/* แสดงเวลาคูลดาวน์/ส่งได้อีกครั้ง */}
-              
             </div>
 
             {/* UID */}

@@ -7,13 +7,13 @@ import {
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics"
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDb_QTKrHNQZVQ-Pi1_vzuNvWyu9DBR46o",
-  authDomain: "dreamhome-2025.firebaseapp.com",
-  projectId: "dreamhome-2025",
-  storageBucket: "dreamhome-2025.firebasestorage.app",
-  messagingSenderId: "261505025685",
-  appId: "1:261505025685:web:f65a447dcd44f85fa93d9c",
-  measurementId: "G-VZL6HX0EWT",
+  apiKey: "AIzaSyBJ7ZhGhalGcNXLkL5jTyY-f6RxmeAX3aY",
+  authDomain: "phoneauth-ea2ba.firebaseapp.com",
+  projectId: "phoneauth-ea2ba",
+  storageBucket: "phoneauth-ea2ba.firebasestorage.app",
+  messagingSenderId: "1056879765097",
+  appId: "1:1056879765097:web:6fdc489c1222e59b23a4f8",
+  measurementId: "G-MYX5GDLKNE"
 }
 
 let firebaseApp: FirebaseApp

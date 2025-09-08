@@ -3,7 +3,7 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"          // ⬅️ ใช้ตรวจจับ route change
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -38,17 +38,17 @@ import { useToast } from "@/hooks/use-toast"
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
-  const pathname = usePathname()                       // ⬅️ เส้นทางปัจจุบัน
+  const pathname = usePathname()
 
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
 
-  // ⬅️ คุมเมนูมือถือ (Sheet)
+  // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
-  // ⬅️ ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
+  // ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
     setIsMobileOpen(false)
   }, [pathname])
@@ -86,10 +86,11 @@ const Navigation: React.FC = () => {
     }
   }
 
+  // เพิ่ม flag disabled สำหรับ “เช่า”
   const navItems = [
     { href: "/", label: "หน้าแรก", icon: Home },
     { href: "/buy", label: "ซื้อ", icon: ShoppingCart },
-    { href: "/rent", label: "เช่า", icon: Building },
+    { href: "/rent", label: "เช่า (เร็วๆนี้)", icon: Building, disabled: true as const },
     { href: "/sell", label: "ขาย", icon: PenTool },
     { href: "/blog", label: "บล็อก", icon: BookOpen },
   ]
@@ -119,14 +120,30 @@ const Navigation: React.FC = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-1">
-              {navItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <Button variant="ghost" className="text-sm font-medium">
+              {navItems.map((item) =>
+                item.disabled ? (
+                  // ปุ่ม Disabled (ไม่ลิงก์)
+                  <Button
+                    key={item.label}
+                    variant="ghost"
+                    className="text-sm font-medium opacity-60 cursor-not-allowed"
+                    aria-disabled="true"
+                    title="ฟีเจอร์นี้จะมาเร็วๆนี้"
+                    type="button"
+                    onClick={(e) => e.preventDefault()}
+                  >
                     <item.icon className="w-4 h-4 mr-2" />
                     {item.label}
                   </Button>
-                </Link>
-              ))}
+                ) : (
+                  <Link key={item.href} href={item.href}>
+                    <Button variant="ghost" className="text-sm font-medium">
+                      <item.icon className="w-4 h-4 mr-2" />
+                      {item.label}
+                    </Button>
+                  </Link>
+                )
+              )}
             </div>
 
             {/* User Section */}
@@ -233,18 +250,34 @@ const Navigation: React.FC = () => {
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                   <div className="flex flex-col space-y-4 mt-6">
-                    {navItems.map((item) => (
-                      <Link key={item.href} href={item.href}>
+                    {navItems.map((item) =>
+                      item.disabled ? (
+                        // ปุ่ม Disabled บนมือถือ (ไม่ปิดเมนู, ไม่นำทาง)
                         <Button
+                          key={item.label}
                           variant="ghost"
-                          className="w-full justify-start text-base"
-                          onClick={handleMobileNavClick}   // ⬅️ กดแล้วปิดเมนูทันที
+                          className="w-full justify-start text-base opacity-60 cursor-not-allowed"
+                          aria-disabled="true"
+                          title="ฟีเจอร์นี้จะมาเร็วๆนี้"
+                          type="button"
+                          onClick={(e) => e.preventDefault()}
                         >
                           <item.icon className="w-5 h-5 mr-3" />
                           {item.label}
                         </Button>
-                      </Link>
-                    ))}
+                      ) : (
+                        <Link key={item.href} href={item.href}>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-base"
+                            onClick={handleMobileNavClick}
+                          >
+                            <item.icon className="w-5 h-5 mr-3" />
+                            {item.label}
+                          </Button>
+                        </Link>
+                      )
+                    )}
                   </div>
                 </SheetContent>
               </Sheet>
