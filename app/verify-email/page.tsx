@@ -23,6 +23,13 @@ function VerifyEmailContent() {
 
   const isVerified = searchParams.get("verified") === "true"
 
+  // Refresh user status automatically when returning from verification link
+  useEffect(() => {
+    if (isVerified) {
+      refreshUser()
+    }
+  }, [isVerified, refreshUser])
+
   useEffect(() => {
     // Start cooldown timer if we have a last sent time
     if (lastSentTime) {
