@@ -530,17 +530,6 @@ export default function SellCreatePage() {
                 </div>
               )}
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lat">Latitude</Label>
-                <Input id="lat" value={latlng.lat ?? ""} readOnly />
-              </div>
-              <div>
-                <Label htmlFor="lng">Longitude</Label>
-                <Input id="lng" value={latlng.lng ?? ""} readOnly />
-              </div>
-            </div>
           </CardContent>
         </Card>
 
