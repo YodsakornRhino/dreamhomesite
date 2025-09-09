@@ -222,7 +222,7 @@ export default function SellCreatePage() {
         gmap.current.setZoom(16)
         placeMarkerAndFill(loc)
       },
-      () => alert("Unable to retrieve your location")
+      () => console.error("Unable to retrieve your location")
     )
   }
 
