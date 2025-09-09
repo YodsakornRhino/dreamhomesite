@@ -129,7 +129,7 @@ const Navigation: React.FC = () => {
     <>
       <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="container mx-auto px-4">
-          <div className="flex h-14 sm:h-16 items-center justify-between">
+          <div className="flex h-14 sm:h-16 items-center">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -139,7 +139,7 @@ const Navigation: React.FC = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-1">
+            <div className="hidden md:flex flex-1 items-center justify-center space-x-1">
               {navItems.map((item) =>
                 item.disabled ? (
                   // ปุ่ม Disabled (ไม่ลิงก์)
@@ -167,7 +167,7 @@ const Navigation: React.FC = () => {
             </div>
 
             {/* User Section */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 ml-auto">
               {loading ? (
                 <div className="flex items-center space-x-2">
                   <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
