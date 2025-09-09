@@ -35,14 +35,14 @@ import { Loader } from "@googlemaps/js-api-loader"
 const inter = Inter({ subsets: ["latin"] })
 
 const features = [
-  { id: "garden", label: "Garden", icon: TreePine },
-  { id: "balcony", label: "Balcony", icon: Building2 },
-  { id: "pool", label: "Swimming Pool", icon: Waves },
-  { id: "security", label: "Security System", icon: Shield },
-  { id: "gym", label: "Gym", icon: Dumbbell },
-  { id: "elevator", label: "Lift/Elevator", icon: Square },
-  { id: "smart", label: "Smart Home", icon: Wifi },
-  { id: "fireplace", label: "Fireplace", icon: Flame },
+  { id: "garden", label: "สวน", icon: TreePine },
+  { id: "balcony", label: "ระเบียง", icon: Building2 },
+  { id: "pool", label: "สระว่ายน้ำ", icon: Waves },
+  { id: "security", label: "ระบบรักษาความปลอดภัย", icon: Shield },
+  { id: "gym", label: "ฟิตเนส", icon: Dumbbell },
+  { id: "elevator", label: "ลิฟต์", icon: Square },
+  { id: "smart", label: "สมาร์ทโฮม", icon: Wifi },
+  { id: "fireplace", label: "เตาผิง", icon: Flame },
 ]
 
 type LatLng = { lat: number | null; lng: number | null }
@@ -110,39 +110,39 @@ export default function SellCreatePage() {
     const e: Errors = {}
 
     // Seller
-    if (!isNonEmpty(sellerName)) e.sellerName = "Required"
-    if (!isNonEmpty(sellerPhone)) e.sellerPhone = "Required"
-    else if (!phoneOk(sellerPhone)) e.sellerPhone = "Invalid phone number"
-    if (!isNonEmpty(sellerEmail)) e.sellerEmail = "Required"
-    else if (!emailOk(sellerEmail)) e.sellerEmail = "Invalid email"
-    if (!isNonEmpty(sellerRole)) e.sellerRole = "Required"
+    if (!isNonEmpty(sellerName)) e.sellerName = "จำเป็น"
+    if (!isNonEmpty(sellerPhone)) e.sellerPhone = "จำเป็น"
+    else if (!phoneOk(sellerPhone)) e.sellerPhone = "เบอร์โทรไม่ถูกต้อง"
+    if (!isNonEmpty(sellerEmail)) e.sellerEmail = "จำเป็น"
+    else if (!emailOk(sellerEmail)) e.sellerEmail = "อีเมลไม่ถูกต้อง"
+    if (!isNonEmpty(sellerRole)) e.sellerRole = "จำเป็น"
 
     // Basic
-    if (!isNonEmpty(title)) e.title = "Required"
-    if (!isNonEmpty(propertyType)) e.propertyType = "Required"
-    if (!isNonEmpty(transactionType)) e.transactionType = "Required"
-    if (!isNonEmpty(price)) e.price = "Required"
-    else if (!isPositive(price)) e.price = "Must be greater than 0"
+    if (!isNonEmpty(title)) e.title = "จำเป็น"
+    if (!isNonEmpty(propertyType)) e.propertyType = "จำเป็น"
+    if (!isNonEmpty(transactionType)) e.transactionType = "จำเป็น"
+    if (!isNonEmpty(price)) e.price = "จำเป็น"
+    else if (!isPositive(price)) e.price = "ต้องมากกว่า 0"
 
     // Location
-    if (!isNonEmpty(address)) e.address = "Required"
-    if (!isNonEmpty(city)) e.city = "Required"
-    if (!isNonEmpty(province)) e.province = "Required"
-    if (!isNonEmpty(postal)) e.postal = "Required"
+    if (!isNonEmpty(address)) e.address = "จำเป็น"
+    if (!isNonEmpty(city)) e.city = "จำเป็น"
+    if (!isNonEmpty(province)) e.province = "จำเป็น"
+    if (!isNonEmpty(postal)) e.postal = "จำเป็น"
 
     // Specs
-    if (!isNonEmpty(landArea)) e.landArea = "Required"
-    else if (!isPositive(landArea)) e.landArea = "Must be greater than 0"
-    if (!isNonEmpty(usableArea)) e.usableArea = "Required"
-    else if (!isPositive(usableArea)) e.usableArea = "Must be greater than 0"
-    if (!isNonEmpty(bedrooms)) e.bedrooms = "Required"
-    else if (!isPositive(bedrooms)) e.bedrooms = "Must be greater than 0"
-    if (!isNonEmpty(bathrooms)) e.bathrooms = "Required"
-    else if (!isPositive(bathrooms)) e.bathrooms = "Must be greater than 0"
+    if (!isNonEmpty(landArea)) e.landArea = "จำเป็น"
+    else if (!isPositive(landArea)) e.landArea = "ต้องมากกว่า 0"
+    if (!isNonEmpty(usableArea)) e.usableArea = "จำเป็น"
+    else if (!isPositive(usableArea)) e.usableArea = "ต้องมากกว่า 0"
+    if (!isNonEmpty(bedrooms)) e.bedrooms = "จำเป็น"
+    else if (!isPositive(bedrooms)) e.bedrooms = "ต้องมากกว่า 0"
+    if (!isNonEmpty(bathrooms)) e.bathrooms = "จำเป็น"
+    else if (!isPositive(bathrooms)) e.bathrooms = "ต้องมากกว่า 0"
 
     // Description
-    if (!isNonEmpty(description)) e.description = "Required"
-    else if (description.trim().length < 50) e.description = "Minimum 50 characters"
+    if (!isNonEmpty(description)) e.description = "จำเป็น"
+    else if (description.trim().length < 50) e.description = "ขั้นต่ำ 50 ตัวอักษร"
 
     return e
   }
@@ -212,7 +212,7 @@ export default function SellCreatePage() {
 
   const centerOnUser = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser")
+      alert("เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง")
       return
     }
     navigator.geolocation.getCurrentPosition(
@@ -222,7 +222,7 @@ export default function SellCreatePage() {
         gmap.current.setZoom(16)
         placeMarkerAndFill(loc)
       },
-      () => console.error("Unable to retrieve your location")
+      () => console.error("ไม่สามารถรับตำแหน่งของคุณได้")
     )
   }
 
@@ -277,7 +277,7 @@ export default function SellCreatePage() {
       return
     }
     // TODO: ส่งข้อมูลไปบันทึก
-    alert("All good! Ready to submit.")
+    alert("เรียบร้อย! พร้อมส่งข้อมูล")
   }
 
   // convenience: แสดงข้อความผิดพลาดเมื่อ touched + error
@@ -292,17 +292,17 @@ export default function SellCreatePage() {
       <div className="max-w-4xl mx-auto p-4 sm:p-8 space-y-8">
         <header className="space-y-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Post Your Property for Sale</h1>
+            <h1 className="text-3xl font-bold">ลงประกาศขายอสังหาของคุณ</h1>
             <Link href="/sell">
-              <Button variant="outline">Back to My Posts</Button>
+              <Button variant="outline">กลับไปประกาศของฉัน</Button>
             </Link>
           </div>
 
           {/* Progress dynamic */}
           <div>
             <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
-              <span>Progress</span>
-              <span>{progressPct}% Complete</span>
+              <span>ความคืบหน้า</span>
+              <span>{progressPct}% เสร็จสิ้น</span>
             </div>
             <div className="w-full bg-gray-200 h-2 rounded-full">
               <div
@@ -315,36 +315,36 @@ export default function SellCreatePage() {
 
         {/* Seller Information */}
         <Card>
-          <CardHeader><CardTitle>Seller Information</CardTitle></CardHeader>
+          <CardHeader><CardTitle>ข้อมูลผู้ขาย</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="sellerName">Full Name*</Label>
+              <Label htmlFor="sellerName">ชื่อ-นามสกุล*</Label>
               <Input
                 id="sellerName"
                 value={sellerName}
                 onChange={(e) => setSellerName(e.target.value)}
                 onBlur={() => touch("sellerName")}
                 className={inputErrClass("sellerName")}
-                placeholder="Enter your full name"
+                placeholder="กรอกชื่อ-นามสกุล"
                 aria-invalid={!!showErr("sellerName")}
               />
               {showErr("sellerName") && <p className="text-xs text-red-600 mt-1">{errors.sellerName}</p>}
             </div>
             <div>
-              <Label htmlFor="sellerPhone">Phone Number*</Label>
+              <Label htmlFor="sellerPhone">เบอร์โทร*</Label>
               <Input
                 id="sellerPhone"
                 value={sellerPhone}
                 onChange={(e) => setSellerPhone(e.target.value)}
                 onBlur={() => touch("sellerPhone")}
                 className={inputErrClass("sellerPhone")}
-                placeholder="+1 (555) 123-4567"
+                placeholder="081 234 5678"
                 aria-invalid={!!showErr("sellerPhone")}
               />
               {showErr("sellerPhone") && <p className="text-xs text-red-600 mt-1">{errors.sellerPhone}</p>}
             </div>
             <div>
-              <Label htmlFor="sellerEmail">Email Address*</Label>
+              <Label htmlFor="sellerEmail">อีเมล*</Label>
               <Input
                 id="sellerEmail"
                 value={sellerEmail}
@@ -357,17 +357,17 @@ export default function SellCreatePage() {
               {showErr("sellerEmail") && <p className="text-xs text-red-600 mt-1">{errors.sellerEmail}</p>}
             </div>
             <div>
-              <Label htmlFor="sellerRole">Role*</Label>
+              <Label htmlFor="sellerRole">บทบาท*</Label>
               <Select
                 value={sellerRole}
                 onValueChange={(v) => { setSellerRole(v); touch("sellerRole") }}
               >
-                <SelectTrigger id="sellerRole" className={inputErrClass("sellerRole")}>
-                  <SelectValue placeholder="Select your role" />
+                <SelectTrigger id="sellerRole" className={inputErrClass("sellerRole")}> 
+                  <SelectValue placeholder="เลือกบทบาทของคุณ" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="owner">Owner</SelectItem>
-                  <SelectItem value="agent">Agent</SelectItem>
+                  <SelectItem value="owner">เจ้าของ</SelectItem>
+                  <SelectItem value="agent">นายหน้า</SelectItem>
                 </SelectContent>
               </Select>
               {showErr("sellerRole") && <p className="text-xs text-red-600 mt-1">{errors.sellerRole}</p>}
@@ -377,56 +377,56 @@ export default function SellCreatePage() {
 
         {/* Property Basic Details */}
         <Card>
-          <CardHeader><CardTitle>Property Basic Details</CardTitle></CardHeader>
+          <CardHeader><CardTitle>รายละเอียดพื้นฐานของทรัพย์</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Label htmlFor="title">Property Title*</Label>
+              <Label htmlFor="title">ชื่อประกาศ*</Label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={() => touch("title")}
                 className={inputErrClass("title")}
-                placeholder="e.g., Modern 2 Storey House in City Center"
+                placeholder="เช่น บ้านสองชั้นสมัยใหม่ใจกลางเมือง"
                 aria-invalid={!!showErr("title")}
               />
               {showErr("title") && <p className="text-xs text-red-600 mt-1">{errors.title}</p>}
             </div>
             <div>
-              <Label htmlFor="propertyType">Property Type*</Label>
+              <Label htmlFor="propertyType">ประเภททรัพย์สิน*</Label>
               <Select
                 value={propertyType}
                 onValueChange={(v) => { setPropertyType(v); touch("propertyType") }}
               >
-                <SelectTrigger id="propertyType" className={inputErrClass("propertyType")}>
-                  <SelectValue placeholder="Select type" />
+                <SelectTrigger id="propertyType" className={inputErrClass("propertyType")}> 
+                  <SelectValue placeholder="เลือกประเภท" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="house">House</SelectItem>
-                  <SelectItem value="condo">Condo</SelectItem>
-                  <SelectItem value="land">Land</SelectItem>
+                  <SelectItem value="house">บ้าน</SelectItem>
+                  <SelectItem value="condo">คอนโด</SelectItem>
+                  <SelectItem value="land">ที่ดิน</SelectItem>
                 </SelectContent>
               </Select>
               {showErr("propertyType") && <p className="text-xs text-red-600 mt-1">{errors.propertyType}</p>}
             </div>
             <div>
-              <Label htmlFor="transactionType">Transaction Type*</Label>
+              <Label htmlFor="transactionType">ประเภทการทำธุรกรรม*</Label>
               <Select
                 value={transactionType}
                 onValueChange={(v) => { setTransactionType(v); touch("transactionType") }}
               >
-                <SelectTrigger id="transactionType" className={inputErrClass("transactionType")}>
-                  <SelectValue placeholder="Select transaction" />
+                <SelectTrigger id="transactionType" className={inputErrClass("transactionType")}> 
+                  <SelectValue placeholder="เลือกประเภท" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sale">Sale</SelectItem>
-                  <SelectItem value="rent">Rent</SelectItem>
+                  <SelectItem value="sale">ขาย</SelectItem>
+                  <SelectItem value="rent">เช่า</SelectItem>
                 </SelectContent>
               </Select>
               {showErr("transactionType") && <p className="text-xs text-red-600 mt-1">{errors.transactionType}</p>}
             </div>
             <div>
-              <Label htmlFor="price">Price*</Label>
+              <Label htmlFor="price">ราคา*</Label>
               <Input
                 id="price"
                 type="number"
@@ -434,7 +434,7 @@ export default function SellCreatePage() {
                 onChange={(e) => setPrice(e.target.value)}
                 onBlur={() => touch("price")}
                 className={inputErrClass("price")}
-                placeholder="$ 750,000"
+                placeholder="฿ 750,000"
                 aria-invalid={!!showErr("price")}
               />
               {showErr("price") && <p className="text-xs text-red-600 mt-1">{errors.price}</p>}
@@ -444,20 +444,20 @@ export default function SellCreatePage() {
 
         {/* Property Location */}
         <Card>
-          <CardHeader><CardTitle>Property Location</CardTitle></CardHeader>
+          <CardHeader><CardTitle>ที่ตั้งทรัพย์สิน</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="map-search">Search on map</Label>
+              <Label htmlFor="map-search">ค้นหาบนแผนที่</Label>
               <div className="flex gap-2">
                 <Input
                   id="map-search"
                   ref={searchRef}
-                  placeholder="Search address, condo, landmark…"
+                  placeholder="ค้นหาที่อยู่ คอนโด หรือสถานที่สำคัญ..."
                   className="flex-1"
                 />
                 <Button type="button" variant="outline" onClick={centerOnUser}>
                   <LocateFixed className="mr-2 h-4 w-4" />
-                  Use my location
+                  ใช้ตำแหน่งของฉัน
                 </Button>
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -467,53 +467,53 @@ export default function SellCreatePage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <Label htmlFor="address">Address*</Label>
+                <Label htmlFor="address">ที่อยู่*</Label>
                 <Input
                   id="address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   onBlur={() => touch("address")}
                   className={inputErrClass("address")}
-                  placeholder="123 Oak Street"
+                  placeholder="123 ถนนโอ๊ค"
                   aria-invalid={!!showErr("address")}
                 />
                 {showErr("address") && <p className="text-xs text-red-600 mt-1">{errors.address}</p>}
               </div>
               <div>
-                <Label htmlFor="city">City*</Label>
+                <Label htmlFor="city">เขต/อำเภอ*</Label>
                 <Input
                   id="city"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   onBlur={() => touch("city")}
                   className={inputErrClass("city")}
-                  placeholder="Metro City"
+                  placeholder="เขตปทุมวัน"
                   aria-invalid={!!showErr("city")}
                 />
                 {showErr("city") && <p className="text-xs text-red-600 mt-1">{errors.city}</p>}
               </div>
               <div>
-                <Label htmlFor="province">Province/State*</Label>
+                <Label htmlFor="province">จังหวัด*</Label>
                 <Input
                   id="province"
                   value={province}
                   onChange={(e) => setProvince(e.target.value)}
                   onBlur={() => touch("province")}
                   className={inputErrClass("province")}
-                  placeholder="California"
+                  placeholder="กรุงเทพมหานคร"
                   aria-invalid={!!showErr("province")}
                 />
                 {showErr("province") && <p className="text-xs text-red-600 mt-1">{errors.province}</p>}
               </div>
               <div>
-                <Label htmlFor="postal">Postal Code*</Label>
+                <Label htmlFor="postal">รหัสไปรษณีย์*</Label>
                 <Input
                   id="postal"
                   value={postal}
                   onChange={(e) => setPostal(e.target.value)}
                   onBlur={() => touch("postal")}
                   className={inputErrClass("postal")}
-                  placeholder="90210"
+                  placeholder="10110"
                   aria-invalid={!!showErr("postal")}
                 />
                 {showErr("postal") && <p className="text-xs text-red-600 mt-1">{errors.postal}</p>}
@@ -525,7 +525,7 @@ export default function SellCreatePage() {
               {!mapsReady && (
                 <div className="h-72 w-full flex flex-col items-center justify-center text-gray-500">
                   <MapPin className="h-6 w-6 mb-2" />
-                  <p className="text-sm">Loading map…</p>
+                  <p className="text-sm">กำลังโหลดแผนที่...</p>
                   <p className="text-xs">ตรวจ API key และ internet</p>
                 </div>
               )}
@@ -535,10 +535,10 @@ export default function SellCreatePage() {
 
         {/* Property Specifications */}
         <Card>
-          <CardHeader><CardTitle>Property Specifications</CardTitle></CardHeader>
+          <CardHeader><CardTitle>สเปกของทรัพย์</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="landArea">Land Area*</Label>
+              <Label htmlFor="landArea">พื้นที่ดิน*</Label>
               <Input
                 id="landArea"
                 value={landArea}
@@ -551,7 +551,7 @@ export default function SellCreatePage() {
               {showErr("landArea") && <p className="text-xs text-red-600 mt-1">{errors.landArea}</p>}
             </div>
             <div>
-              <Label htmlFor="usableArea">Usable Area*</Label>
+              <Label htmlFor="usableArea">พื้นที่ใช้สอย*</Label>
               <Input
                 id="usableArea"
                 value={usableArea}
@@ -564,7 +564,7 @@ export default function SellCreatePage() {
               {showErr("usableArea") && <p className="text-xs text-red-600 mt-1">{errors.usableArea}</p>}
             </div>
             <div>
-              <Label htmlFor="bedrooms">Bedrooms*</Label>
+              <Label htmlFor="bedrooms">ห้องนอน*</Label>
               <Input
                 id="bedrooms"
                 value={bedrooms}
@@ -577,7 +577,7 @@ export default function SellCreatePage() {
               {showErr("bedrooms") && <p className="text-xs text-red-600 mt-1">{errors.bedrooms}</p>}
             </div>
             <div>
-              <Label htmlFor="bathrooms">Bathrooms*</Label>
+              <Label htmlFor="bathrooms">ห้องน้ำ*</Label>
               <Input
                 id="bathrooms"
                 value={bathrooms}
@@ -590,13 +590,13 @@ export default function SellCreatePage() {
               {showErr("bathrooms") && <p className="text-xs text-red-600 mt-1">{errors.bathrooms}</p>}
             </div>
             <div>
-              <Label htmlFor="parking">Parking Spaces</Label>
+              <Label htmlFor="parking">ที่จอดรถ</Label>
               <Select value={parking} onValueChange={(v) => setParking(v)}>
                 <SelectTrigger id="parking">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder="เลือก" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="none">ไม่มี</SelectItem>
                   <SelectItem value="1">1</SelectItem>
                   <SelectItem value="2">2</SelectItem>
                   <SelectItem value="3">3</SelectItem>
@@ -604,7 +604,7 @@ export default function SellCreatePage() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="yearBuilt">Year Built</Label>
+              <Label htmlFor="yearBuilt">สร้างเมื่อปี</Label>
               <Input
                 id="yearBuilt"
                 value={yearBuilt}
@@ -617,76 +617,76 @@ export default function SellCreatePage() {
 
         {/* Property Description */}
         <Card>
-          <CardHeader><CardTitle>Property Description</CardTitle></CardHeader>
+          <CardHeader><CardTitle>รายละเอียดเพิ่มเติม</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <Label htmlFor="description">Describe your property*</Label>
+            <Label htmlFor="description">บรรยายทรัพย์สินของคุณ*</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={() => touch("description")}
               className={inputErrClass("description")}
-              placeholder="Describe the highlights, condition, and unique selling points of your property..."
+              placeholder="อธิบายจุดเด่น สภาพ และจุดขายของทรัพย์สินของคุณ..."
               rows={5}
               aria-invalid={!!showErr("description")}
             />
             {showErr("description") && <p className="text-xs text-red-600">{errors.description}</p>}
-            <p className="text-xs text-gray-500">Minimum 50 characters. Be descriptive to attract more buyers.</p>
+            <p className="text-xs text-gray-500">ขั้นต่ำ 50 ตัวอักษร โปรดบรรยายเพื่อดึงดูดผู้ซื้อ</p>
           </CardContent>
         </Card>
 
         {/* Property Photos */}
         <Card>
-          <CardHeader><CardTitle>Property Photos (Max 20 photos)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>รูปภาพทรัพย์ (สูงสุด 20 รูป)</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Camera className="mx-auto h-10 w-10 text-gray-400 mb-4" />
-              <p className="text-sm text-gray-500 mb-4">Drag and drop photos here</p>
-              <Button><Upload className="mr-2 h-4 w-4" />Choose Photos</Button>
-              <p className="text-xs text-gray-500 mt-4">Supported formats: JPG, PNG, GIF. Max size 10MB each.</p>
+              <p className="text-sm text-gray-500 mb-4">ลากและวางรูปที่นี่</p>
+              <Button><Upload className="mr-2 h-4 w-4" />เลือกภาพ</Button>
+              <p className="text-xs text-gray-500 mt-4">รองรับ JPG, PNG, GIF ขนาดไม่เกิน 10MB ต่อไฟล์</p>
             </div>
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Video className="mx-auto h-10 w-10 text-gray-400 mb-4" />
-              <p className="text-sm text-gray-500 mb-4">Upload a video or virtual tour</p>
-              <Button variant="outline"><Upload className="mr-2 h-4 w-4" />Choose Video</Button>
-              <p className="text-xs text-gray-500 mt-4">Max 100MB. MP4, MOV formats.</p>
+              <p className="text-sm text-gray-500 mb-4">อัปโหลดวิดีโอหรือทัวร์เสมือน</p>
+              <Button variant="outline"><Upload className="mr-2 h-4 w-4" />เลือกวิดีโอ</Button>
+              <p className="text-xs text-gray-500 mt-4">สูงสุด 100MB รองรับ MP4, MOV</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Additional Options */}
         <Card>
-          <CardHeader><CardTitle>Additional Options</CardTitle></CardHeader>
+          <CardHeader><CardTitle>ตัวเลือกเพิ่มเติม</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start justify-between">
               <div className="flex items-start space-x-2">
                 <Checkbox id="mortgage" />
                 <div className="space-y-1">
-                  <Label htmlFor="mortgage" className="font-medium">Include Mortgage Calculator</Label>
-                  <p className="text-sm text-gray-500">Help buyers estimate monthly payments</p>
+                  <Label htmlFor="mortgage" className="font-medium">เพิ่มเครื่องคำนวณสินเชื่อ</Label>
+                  <p className="text-sm text-gray-500">ช่วยผู้ซื้อประมาณค่างวดรายเดือน</p>
                 </div>
               </div>
-              <span className="text-sm text-gray-500">Free</span>
+              <span className="text-sm text-gray-500">ฟรี</span>
             </div>
             <div className="flex items-start justify-between">
               <div className="flex items-start space-x-2">
                 <Checkbox id="featured" />
                 <div className="space-y-1">
-                  <Label htmlFor="featured" className="font-medium">Featured Listing</Label>
-                  <p className="text-sm text-gray-500">Stand out with premium placement</p>
+                  <Label htmlFor="featured" className="font-medium">ประกาศเด่น</Label>
+                  <p className="text-sm text-gray-500">โดดเด่นด้วยตำแหน่งพรีเมียม</p>
                 </div>
               </div>
-              <span className="text-sm text-gray-500">$25/month</span>
+              <span className="text-sm text-gray-500">25 ดอลลาร์/เดือน</span>
             </div>
           </CardContent>
         </Card>
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-end">
-          <Button variant="outline">Preview Listing</Button>
-          <Button variant="secondary">Save Draft</Button>
+          <Button variant="outline">ดูตัวอย่างประกาศ</Button>
+          <Button variant="secondary">บันทึกร่าง</Button>
           <Button onClick={handleSubmit} className="bg-purple-600 text-white hover:bg-purple-700">
-            Post Property
+            ลงประกาศ
           </Button>
         </div>
       </div>
