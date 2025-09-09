@@ -34,6 +34,7 @@ import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -66,10 +67,7 @@ const Navigation: React.FC = () => {
     return email.substring(0, 2).toUpperCase()
   }
 
-  const handleSignOut = async () => {
-    if (!confirm("แน่ใจว่าจะออกจากระบบหรือไม่?")) {
-      return
-    }
+  const confirmSignOut = async () => {
     setIsSigningOut(true)
     try {
       await signOut()
@@ -87,6 +85,25 @@ const Navigation: React.FC = () => {
     } finally {
       setIsSigningOut(false)
     }
+  }
+
+  const handleSignOut = () => {
+    const { dismiss } = toast({
+      variant: "destructive",
+      title: "ยืนยันการออกจากระบบ",
+      description: "แน่ใจว่าจะออกจากระบบหรือไม่?",
+      action: (
+        <ToastAction
+          altText="confirm sign out"
+          onClick={() => {
+            dismiss()
+            confirmSignOut()
+          }}
+        >
+          ยืนยัน
+        </ToastAction>
+      ),
+    })
   }
 
   // เพิ่ม flag disabled สำหรับ “เช่า”
