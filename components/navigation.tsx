@@ -34,6 +34,7 @@ import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -66,7 +67,7 @@ const Navigation: React.FC = () => {
     return email.substring(0, 2).toUpperCase()
   }
 
-  const handleSignOut = async () => {
+  const confirmSignOut = async () => {
     setIsSigningOut(true)
     try {
       await signOut()
@@ -84,6 +85,25 @@ const Navigation: React.FC = () => {
     } finally {
       setIsSigningOut(false)
     }
+  }
+
+  const handleSignOut = () => {
+    const { dismiss } = toast({
+      variant: "destructive",
+      title: "ยืนยันการออกจากระบบ",
+      description: "แน่ใจว่าจะออกจากระบบหรือไม่?",
+      action: (
+        <ToastAction
+          altText="confirm sign out"
+          onClick={() => {
+            dismiss()
+            confirmSignOut()
+          }}
+        >
+          ยืนยัน
+        </ToastAction>
+      ),
+    })
   }
 
   // เพิ่ม flag disabled สำหรับ “เช่า”
@@ -154,73 +174,94 @@ const Navigation: React.FC = () => {
                   <span className="text-sm text-gray-500 hidden sm:inline">กำลังโหลด...</span>
                 </div>
               ) : user ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="relative h-8 w-8 sm:h-9 sm:w-auto sm:px-3 rounded-full sm:rounded-md"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
-                          <AvatarImage src={user.photoURL || ""} alt={user.email || ""} />
-                          <AvatarFallback className="text-xs sm:text-sm bg-blue-100 text-blue-700">
-                            {getInitials(user.email || "U")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] lg:max-w-[200px]">
-                          <div className="flex items-center space-x-1">
-                            <span className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                              {truncateText(user.displayName || user.email?.split("@")[0] || "ผู้ใช้", 15)}
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="relative h-8 w-8 sm:h-9 sm:w-auto sm:px-3 rounded-full sm:rounded-md"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                            <AvatarImage src={user.photoURL || ""} alt={user.email || ""} />
+                            <AvatarFallback className="text-xs sm:text-sm bg-blue-100 text-blue-700">
+                              {getInitials(user.email || "U")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] lg:max-w-[200px]">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                                {truncateText(
+                                  user.displayName || user.email?.split("@")[0] || "ผู้ใช้",
+                                  15
+                                )}
+                              </span>
+                              {!user.emailVerified && (
+                                <Badge variant="destructive" className="text-xs px-1 py-0 h-4 lg:px-2 lg:h-5">
+                                  <span className="lg:hidden">!</span>
+                                  <span className="hidden lg:inline">ยังไม่ยืนยัน</span>
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500 truncate max-w-full">
+                              {truncateText(user.email || "", 20)}
                             </span>
-                            {!user.emailVerified && (
-                              <Badge variant="destructive" className="text-xs px-1 py-0 h-4 lg:px-2 lg:h-5">
-                                <span className="lg:hidden">!</span>
-                                <span className="hidden lg:inline">ยังไม่ยืนยัน</span>
-                              </Badge>
-                            )}
                           </div>
-                          <span className="text-xs text-gray-500 truncate max-w-full">
-                            {truncateText(user.email || "", 20)}
-                          </span>
                         </div>
-                      </div>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {user.displayName || user.email?.split("@")[0] || "ผู้ใช้"}
-                        </p>
-                        <p className="text-xs leading-none text-muted-foreground break-all">{user.email}</p>
-                        {!user.emailVerified && (
-                          <div className="flex items-center space-x-1 mt-2">
-                            <AlertCircle className="h-3 w-3 text-yellow-600" />
-                            <span className="text-xs text-yellow-600">อีเมลยังไม่ได้รับการยืนยัน</span>
-                          </div>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end" forceMount>
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">
+                            {user.displayName || user.email?.split("@")[0] || "ผู้ใช้"}
+                          </p>
+                          <p className="text-xs leading-none text-muted-foreground break-all">{user.email}</p>
+                          {!user.emailVerified && (
+                            <div className="flex items-center space-x-1 mt-2">
+                              <AlertCircle className="h-3 w-3 text-yellow-600" />
+                              <span className="text-xs text-yellow-600">อีเมลยังไม่ได้รับการยืนยัน</span>
+                            </div>
+                          )}
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>โปรไฟล์</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Mail className="mr-2 h-4 w-4" />
+                        <span>ข้อความ</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
+                        {isSigningOut ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <LogOut className="mr-2 h-4 w-4" />
                         )}
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
-                      <User className="mr-2 h-4 w-4" />
-                      <span>โปรไฟล์</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Mail className="mr-2 h-4 w-4" />
-                      <span>ข้อความ</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
-                      {isSigningOut ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <LogOut className="mr-2 h-4 w-4" />
-                      )}
-                      <span>{isSigningOut ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        <span>{isSigningOut ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                    className="text-xs sm:text-sm"
+                  >
+                    {isSigningOut ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <LogOut className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">ออกจากระบบ</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
               ) : (
                 <div className="flex items-center space-x-2">
                   <Button
