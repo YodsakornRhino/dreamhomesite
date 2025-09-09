@@ -7,13 +7,13 @@ import {
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics"
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBJ7ZhGhalGcNXLkL5jTyY-f6RxmeAX3aY",
-  authDomain: "phoneauth-ea2ba.firebaseapp.com",
-  projectId: "phoneauth-ea2ba",
-  storageBucket: "phoneauth-ea2ba.firebasestorage.app",
-  messagingSenderId: "1056879765097",
-  appId: "1:1056879765097:web:6fdc489c1222e59b23a4f8",
-  measurementId: "G-MYX5GDLKNE"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!,
 }
 
 let firebaseApp: FirebaseApp

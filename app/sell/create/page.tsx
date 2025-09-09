@@ -153,7 +153,7 @@ export default function SellCreatePage() {
 
   // ====== Google Maps: load & wire ======
   useEffect(() => {
-    const key = "AIzaSyCAF_sSQqZ-0rP50vyWmH4qiYEcu1OEw20";
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     if (!key) return
     const loader = new Loader({ apiKey: key, version: "weekly", libraries: ["places"] })
     loader.load().then(() => setMapsReady(true)).catch(() => setMapsReady(false))
