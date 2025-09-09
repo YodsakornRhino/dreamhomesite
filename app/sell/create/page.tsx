@@ -11,7 +11,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import {
-  Upload, Video, Camera, MapPin, TreePine, Building2, Waves, Shield, Dumbbell, Square, Wifi, Flame
+  Upload,
+  Video,
+  Camera,
+  MapPin,
+  TreePine,
+  Building2,
+  Waves,
+  Shield,
+  Dumbbell,
+  Square,
+  Wifi,
+  Flame,
+  LocateFixed,
 } from "lucide-react"
 
 import { useAuthContext } from "@/contexts/AuthContext"
@@ -197,6 +209,22 @@ export default function SellCreatePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapsReady])
+
+  const centerOnUser = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser")
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        if (!gmap.current) return
+        const loc = new google.maps.LatLng(coords.latitude, coords.longitude)
+        gmap.current.setZoom(16)
+        placeMarkerAndFill(loc)
+      },
+      () => console.error("Unable to retrieve your location")
+    )
+  }
 
   const placeMarkerAndFill = (pos: google.maps.LatLng) => {
     marker.current!.setPosition(pos)
@@ -420,11 +448,18 @@ export default function SellCreatePage() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="map-search">Search on map</Label>
-              <Input
-                id="map-search"
-                ref={searchRef}
-                placeholder="Search address, condo, landmark…"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="map-search"
+                  ref={searchRef}
+                  placeholder="Search address, condo, landmark…"
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" onClick={centerOnUser}>
+                  <LocateFixed className="mr-2 h-4 w-4" />
+                  Use my location
+                </Button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">
                 เลือกจากรายการแนะนำ หรือคลิก/ลากหมุดบนแผนที่เพื่อกำหนดตำแหน่ง
               </p>
@@ -494,17 +529,6 @@ export default function SellCreatePage() {
                   <p className="text-xs">ตรวจ API key และ internet</p>
                 </div>
               )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lat">Latitude</Label>
-                <Input id="lat" value={latlng.lat ?? ""} readOnly />
-              </div>
-              <div>
-                <Label htmlFor="lng">Longitude</Label>
-                <Input id="lng" value={latlng.lng ?? ""} readOnly />
-              </div>
             </div>
           </CardContent>
         </Card>
