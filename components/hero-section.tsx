@@ -4,17 +4,17 @@ import { MapPin, Home, DollarSign, Search } from "lucide-react"
 
 export default function HeroSection() {
   const handleSearch = () => {
-    alert("Search functionality would filter properties based on your criteria!")
+    alert("ฟังก์ชันค้นหาจะกรองอสังหาริมทรัพย์ตามเงื่อนไขของคุณ!")
   }
 
   return (
     <section className="bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 text-white py-12 sm:py-16 lg:py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight">
-          Find Your Dream Home
+          ค้นหาบ้านในฝันของคุณ
         </h1>
         <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 opacity-90 max-w-3xl mx-auto">
-          Discover the perfect property in your ideal location
+          ค้นหาอสังหาริมทรัพย์ที่เหมาะสมในทำเลที่คุณต้องการ
         </p>
 
         {/* Search Bar */}
@@ -25,7 +25,7 @@ export default function HeroSection() {
               <MapPin className="absolute left-3 top-3 text-gray-400" size={16} />
               <input
                 type="text"
-                placeholder="Location"
+                placeholder="ทำเล"
                 className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
               />
             </div>
@@ -37,11 +37,11 @@ export default function HeroSection() {
                 className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base appearance-none"
                 defaultValue=""
               >
-                <option value="" disabled>Property Type</option>
-                <option>House</option>
-                <option>Apartment</option>
-                <option>Condo</option>
-                <option>Land</option>
+                <option value="" disabled>ประเภทอสังหาริมทรัพย์</option>
+                <option>บ้าน</option>
+                <option>อพาร์ตเมนต์</option>
+                <option>คอนโด</option>
+                <option>ที่ดิน</option>
               </select>
             </div>
 
@@ -52,7 +52,7 @@ export default function HeroSection() {
                 className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base appearance-none"
                 defaultValue=""
               >
-                <option value="" disabled>Price Range</option>
+                <option value="" disabled>ช่วงราคา</option>
                 <option>$0 - $200,000</option>
                 <option>$200,000 - $500,000</option>
                 <option>$500,000 - $1,000,000</option>
@@ -66,7 +66,7 @@ export default function HeroSection() {
               className="bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center justify-center text-sm sm:text-base"
             >
               <Search className="mr-2" size={16} />
-              Search
+              ค้นหา
             </button>
           </div>
         </div>

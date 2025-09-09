@@ -47,7 +47,7 @@ export default function PropertyCard({
             type === "sale" ? "bg-green-500" : "bg-orange-500"
           } text-white px-3 py-1 rounded-full text-sm font-medium`}
         >
-          {type === "sale" ? "For Sale" : "For Rent"}
+          {type === "sale" ? "ขาย" : "ให้เช่า"}
         </div>
         <button
           onClick={toggleFavorite}
@@ -71,22 +71,22 @@ export default function PropertyCard({
         <div className="flex items-center space-x-4 mb-4 text-gray-600">
           <span className="flex items-center">
             <Bed className="mr-1" size={14} />
-            {beds} Beds
+            {beds} ห้องนอน
           </span>
           <span className="flex items-center">
             <Bath className="mr-1" size={14} />
-            {baths} Baths
+            {baths} ห้องน้ำ
           </span>
           <span className="flex items-center">
             <Square className="mr-1" size={14} />
-            {sqft.toLocaleString()} sqft
+            {sqft.toLocaleString()} ตร.ฟุต
           </span>
         </div>
         <button
           onClick={() => onViewDetails(id)}
           className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium"
         >
-          View Details
+          ดูรายละเอียด
         </button>
       </div>
     </div>

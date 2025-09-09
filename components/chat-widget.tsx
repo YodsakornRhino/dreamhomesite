@@ -43,7 +43,7 @@ export default function ChatWidget() {
         <div className="fixed bottom-20 sm:bottom-24 right-2 sm:right-6 w-72 sm:w-80 bg-white rounded-lg shadow-2xl z-50 max-h-96 sm:max-h-none">
           <div className="bg-blue-600 text-white p-3 sm:p-4 rounded-t-lg">
             <div className="flex justify-between items-center">
-              <h3 className="font-semibold text-sm sm:text-base">Live Chat Support</h3>
+              <h3 className="font-semibold text-sm sm:text-base">แชทสดช่วยเหลือ</h3>
               <button onClick={toggleChat} className="text-white hover:text-gray-200 transition-colors">
                 <X size={18} />
               </button>
@@ -57,7 +57,7 @@ export default function ChatWidget() {
                 </div>
                 <div className="bg-gray-100 p-2 sm:p-3 rounded-lg max-w-xs">
                   <p className="text-xs sm:text-sm text-gray-900 font-medium">
-                    Hello! How can I help you find your dream property today?
+                    สวัสดี! ฉันสามารถช่วยคุณค้นหาอสังหาริมทรัพย์ในฝันได้อย่างไร?
                   </p>
                 </div>
               </div>
@@ -67,7 +67,7 @@ export default function ChatWidget() {
             <div className="flex space-x-2">
               <input
                 type="text"
-                placeholder="Type your message..."
+                placeholder="พิมพ์ข้อความของคุณ..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
