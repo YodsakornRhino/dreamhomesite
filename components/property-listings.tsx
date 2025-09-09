@@ -9,9 +9,9 @@ import MobileFilterDrawer from "./mobile-filter-drawer"
 const allProperties = [
   {
     id: 4,
-    title: "Downtown Loft",
+    title: "ลอฟต์ใจกลางเมือง",
     price: "$380,000",
-    location: "321 Broadway, City Center",
+    location: "321 ถนนบรอดเวย์ ใจกลางเมือง",
     beds: 1,
     baths: 1,
     sqft: 750,
@@ -20,9 +20,9 @@ const allProperties = [
   },
   {
     id: 5,
-    title: "Garden Villa",
+    title: "วิลล่าสวน",
     price: "$3,200/mo",
-    location: "654 Garden Lane, Westside",
+    location: "654 ซอยการ์เดน ย่านฝั่งตะวันตก",
     beds: 4,
     baths: 3,
     sqft: 1800,
@@ -45,7 +45,7 @@ export default function PropertyListings() {
   }
 
   const handleApplyFilters = () => {
-    alert("Filters applied! Properties would be filtered based on your selections.")
+    alert("ใช้ตัวกรองแล้ว! ระบบจะกรองอสังหาริมทรัพย์ตามที่คุณเลือก")
   }
 
   const handleBedroomFilter = (bedrooms: string) => {
@@ -60,22 +60,22 @@ export default function PropertyListings() {
           <div className="lg:w-1/4">
             <div className="bg-gray-50 rounded-lg p-4 sm:p-6 sticky top-24">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Filters</h3>
-                <button className="text-blue-600 hover:text-blue-700 text-sm">Clear All</button>
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-800">ตัวกรอง</h3>
+                <button className="text-blue-600 hover:text-blue-700 text-sm">ล้างทั้งหมด</button>
               </div>
 
               {/* Price Range */}
               <div className="mb-4 sm:mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ช่วงราคา</label>
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="number"
-                    placeholder="Min"
+                    placeholder="ต่ำสุด"
                     className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                   <input
                     type="number"
-                    placeholder="Max"
+                    placeholder="สูงสุด"
                     className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
@@ -83,9 +83,9 @@ export default function PropertyListings() {
 
               {/* Property Type */}
               <div className="mb-4 sm:mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ประเภทอสังหาริมทรัพย์</label>
                 <div className="space-y-2">
-                  {["House", "Apartment", "Condo", "Land"].map((type) => (
+                  {["บ้าน", "อพาร์ตเมนต์", "คอนโด", "ที่ดิน"].map((type) => (
                     <label key={type} className="flex items-center">
                       <input
                         type="checkbox"
@@ -99,7 +99,7 @@ export default function PropertyListings() {
 
               {/* Bedrooms */}
               <div className="mb-4 sm:mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">จำนวนห้องนอน</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {["1+", "2+", "3+", "4+"].map((bedrooms) => (
                     <button
@@ -121,7 +121,7 @@ export default function PropertyListings() {
                 onClick={handleApplyFilters}
                 className="w-full bg-blue-600 text-white py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
               >
-                Apply Filters
+                ใช้ตัวกรอง
               </button>
             </div>
           </div>
@@ -129,13 +129,13 @@ export default function PropertyListings() {
           {/* Listings */}
           <div className="lg:w-3/4">
             <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center mb-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">All Properties</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">อสังหาริมทรัพย์ทั้งหมด</h2>
               <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
                 <select className="px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base">
-                  <option>Sort by: Newest</option>
-                  <option>Price: Low to High</option>
-                  <option>Price: High to Low</option>
-                  <option>Size: Largest First</option>
+                  <option>เรียงโดย: ใหม่ล่าสุด</option>
+                  <option>ราคา: จากต่ำไปสูง</option>
+                  <option>ราคา: จากสูงไปต่ำ</option>
+                  <option>ขนาด: ใหญ่ที่สุดก่อน</option>
                 </select>
                 <div className="flex border rounded-lg self-start sm:self-auto">
                   <button

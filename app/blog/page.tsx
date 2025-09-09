@@ -11,69 +11,69 @@ const inter = Inter({ subsets: ["latin"] })
 export default function BlogPage() {
   const blogPosts = [
     {
-      title: "10 Tips for First-Time Home Buyers",
-      excerpt: "Essential advice for navigating your first home purchase successfully.",
+      title: "10 เคล็ดลับสำหรับผู้ซื้อบ้านครั้งแรก",
+      excerpt: "คำแนะนำสำคัญเพื่อให้การซื้อบ้านครั้งแรกของคุณสำเร็จ",
       author: "Sarah Johnson",
       date: "March 15, 2024",
-      category: "Buying Tips",
-      readTime: "5 min read",
+      category: "เคล็ดลับการซื้อ",
+      readTime: "อ่าน 5 นาที",
       featured: true,
     },
     {
-      title: "Market Trends: What to Expect in 2024",
-      excerpt: "Analysis of current real estate market conditions and future predictions.",
+      title: "แนวโน้มตลาด: ควรคาดหวังอะไรในปี 2024",
+      excerpt: "วิเคราะห์สภาพตลาดอสังหาริมทรัพย์ปัจจุบันและการคาดการณ์ในอนาคต",
       author: "Michael Chen",
       date: "March 12, 2024",
-      category: "Market Analysis",
-      readTime: "8 min read",
+      category: "วิเคราะห์ตลาด",
+      readTime: "อ่าน 8 นาที",
       featured: true,
     },
     {
-      title: "Staging Your Home for Maximum Appeal",
-      excerpt: "Professional staging tips to help your property sell faster and for more money.",
+      title: "จัดบ้านให้ดึงดูดใจสูงสุด",
+      excerpt: "เคล็ดลับการจัดบ้านเพื่อให้ขายได้เร็วและได้ราคาดี",
       author: "Emily Rodriguez",
       date: "March 10, 2024",
-      category: "Selling Tips",
-      readTime: "6 min read",
+      category: "เคล็ดลับการขาย",
+      readTime: "อ่าน 6 นาที",
       featured: false,
     },
     {
-      title: "Investment Properties: A Beginner's Guide",
-      excerpt: "Everything you need to know about investing in real estate.",
+      title: "อสังหาริมทรัพย์เพื่อการลงทุน: คู่มือสำหรับผู้เริ่มต้น",
+      excerpt: "ทุกสิ่งที่คุณต้องรู้เกี่ยวกับการลงทุนในอสังหาริมทรัพย์",
       author: "David Thompson",
       date: "March 8, 2024",
-      category: "Investment",
-      readTime: "10 min read",
+      category: "การลงทุน",
+      readTime: "อ่าน 10 นาที",
       featured: false,
     },
     {
-      title: "Understanding Mortgage Options",
-      excerpt: "A comprehensive guide to different types of mortgages and financing options.",
+      title: "ทำความเข้าใจตัวเลือกสินเชื่อที่อยู่อาศัย",
+      excerpt: "คู่มือครอบคลุมประเภทสินเชื่อและทางเลือกการเงินต่างๆ",
       author: "Lisa Park",
       date: "March 5, 2024",
-      category: "Financing",
-      readTime: "7 min read",
+      category: "การเงิน",
+      readTime: "อ่าน 7 นาที",
       featured: false,
     },
     {
-      title: "Neighborhood Guide: Downtown Living",
-      excerpt: "Explore the benefits and lifestyle of downtown urban living.",
+      title: "คู่มือย่าน: การใช้ชีวิตในย่านใจกลางเมือง",
+      excerpt: "สำรวจประโยชน์และไลฟ์สไตล์ของการใช้ชีวิตในย่านดาวน์ทาวน์",
       author: "Robert Wilson",
       date: "March 3, 2024",
-      category: "Neighborhoods",
-      readTime: "4 min read",
+      category: "ย่านที่อยู่อาศัย",
+      readTime: "อ่าน 4 นาที",
       featured: false,
     },
   ]
 
   const categories = [
-    "All",
-    "Buying Tips",
-    "Selling Tips",
-    "Market Analysis",
-    "Investment",
-    "Financing",
-    "Neighborhoods",
+    "ทั้งหมด",
+    "เคล็ดลับการซื้อ",
+    "เคล็ดลับการขาย",
+    "วิเคราะห์ตลาด",
+    "การลงทุน",
+    "การเงิน",
+    "ย่านที่อยู่อาศัย",
   ]
 
   return (
@@ -82,8 +82,8 @@ export default function BlogPage() {
       <section className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Real Estate Insights</h1>
-            <p className="text-xl opacity-90">Expert advice, market trends, and helpful tips for buyers and sellers</p>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">มุมมองอสังหาริมทรัพย์</h1>
+            <p className="text-xl opacity-90">คำแนะนำจากผู้เชี่ยวชาญ แนวโน้มตลาด และเคล็ดลับสำหรับผู้ซื้อและผู้ขาย</p>
           </div>
 
           {/* Search */}
@@ -91,9 +91,9 @@ export default function BlogPage() {
             <div className="flex gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-                <Input placeholder="Search articles..." className="pl-10" />
+                <Input placeholder="ค้นหาบทความ..." className="pl-10" />
               </div>
-              <Button className="bg-teal-600 hover:bg-teal-700">Search</Button>
+              <Button className="bg-teal-600 hover:bg-teal-700">ค้นหา</Button>
             </div>
           </div>
         </div>
@@ -121,8 +121,8 @@ export default function BlogPage() {
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-12">
-            <h2 className="text-3xl font-bold mb-4">Featured Articles</h2>
-            <p className="text-gray-600">Our most popular and recent insights</p>
+            <h2 className="text-3xl font-bold mb-4">บทความเด่น</h2>
+            <p className="text-gray-600">บทความยอดนิยมและล่าสุดของเรา</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
@@ -152,7 +152,7 @@ export default function BlogPage() {
                         </div>
                       </div>
                       <Button variant="ghost" size="sm">
-                        Read More <ArrowRight size={16} className="ml-1" />
+                        อ่านเพิ่มเติม <ArrowRight size={16} className="ml-1" />
                       </Button>
                     </div>
                   </CardContent>
@@ -162,7 +162,7 @@ export default function BlogPage() {
 
           {/* All Posts */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">All Articles</h2>
+            <h2 className="text-2xl font-bold mb-4">บทความทั้งหมด</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -191,7 +191,7 @@ export default function BlogPage() {
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" className="w-full mt-3">
-                    Read Article <ArrowRight size={14} className="ml-1" />
+                    อ่านบทความ <ArrowRight size={14} className="ml-1" />
                   </Button>
                 </CardContent>
               </Card>

@@ -39,7 +39,7 @@ export default function MobileFilterDrawer({
           {/* Drawer */}
           <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-800">Filters</h3>
+              <h3 className="text-xl font-semibold text-gray-800">ตัวกรอง</h3>
               <button onClick={toggleDrawer} className="text-gray-500 hover:text-gray-700">
                 <X size={24} />
               </button>
@@ -47,16 +47,16 @@ export default function MobileFilterDrawer({
 
             {/* Price Range */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ช่วงราคา</label>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
-                  placeholder="Min"
+                  placeholder="ต่ำสุด"
                   className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900 font-medium"
                 />
                 <input
                   type="number"
-                  placeholder="Max"
+                  placeholder="สูงสุด"
                   className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900 font-medium"
                 />
               </div>
@@ -64,9 +64,9 @@ export default function MobileFilterDrawer({
 
             {/* Property Type */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ประเภทอสังหาริมทรัพย์</label>
               <div className="space-y-3">
-                {["House", "Apartment", "Condo", "Land"].map((type) => (
+                {["บ้าน", "อพาร์ตเมนต์", "คอนโด", "ที่ดิน"].map((type) => (
                   <label key={type} className="flex items-center">
                     <input type="checkbox" className="mr-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                     <span className="text-base text-gray-900 font-medium">{type}</span>
@@ -77,7 +77,7 @@ export default function MobileFilterDrawer({
 
             {/* Bedrooms */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">จำนวนห้องนอน</label>
               <div className="grid grid-cols-2 gap-2">
                 {["1+", "2+", "3+", "4+"].map((bedrooms) => (
                   <button
@@ -100,7 +100,7 @@ export default function MobileFilterDrawer({
                 onClick={toggleDrawer}
                 className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg hover:bg-gray-300 transition font-semibold"
               >
-                Cancel
+                ยกเลิก
               </button>
               <button
                 onClick={() => {
@@ -109,7 +109,7 @@ export default function MobileFilterDrawer({
                 }}
                 className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
               >
-                Apply Filters
+                ใช้ตัวกรอง
               </button>
             </div>
           </div>
