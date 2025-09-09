@@ -1,7 +1,13 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
 import type { User } from "firebase/auth"
 // AuthContext.tsx (ส่วน import เพิ่ม)
 import { updateProfile } from "firebase/auth"
@@ -14,6 +20,7 @@ import {
 } from "@/lib/auth"
 import { sendVerificationEmail } from "@/lib/send-verification"
 import { setDocument } from "@/lib/firestore"
+import { useToast } from "@/hooks/use-toast"
 
 interface AuthContextType {
   user: User | null
@@ -33,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
@@ -146,7 +154,7 @@ const handleSignUp = async (
 }
 
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       setError(null)
       await signOut()
@@ -154,7 +162,7 @@ const handleSignUp = async (
       console.error("Error signing out:", error)
       throw error
     }
-  }
+  }, [])
 
   const handleResetPassword = async (email: string) => {
     try {
@@ -200,6 +208,48 @@ const handleSignUp = async (
       console.error("Error refreshing user:", error)
     }
   }
+
+  // Automatically sign out after 10 minutes of inactivity
+  useEffect(() => {
+    if (!user) return
+
+    const INACTIVITY_LIMIT = 10 * 60 * 1000 // 10 minutes
+    let timeout: ReturnType<typeof setTimeout>
+
+    const resetTimer = () => {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        toast({
+          title: "ออกจากระบบอัตโนมัติ",
+          description: "ไม่มีการใช้งานนานเกิน 10 นาที",
+        })
+        handleSignOut().catch((err) =>
+          console.error("Auto sign out failed:", err),
+        )
+      }, INACTIVITY_LIMIT)
+    }
+
+    const events = [
+      "mousemove",
+      "keydown",
+      "mousedown",
+      "touchstart",
+      "scroll",
+    ]
+
+    events.forEach((event) =>
+      document.addEventListener(event, resetTimer),
+    )
+
+    resetTimer()
+
+    return () => {
+      clearTimeout(timeout)
+      events.forEach((event) =>
+        document.removeEventListener(event, resetTimer),
+      )
+    }
+  }, [user, handleSignOut])
 
   const value = {
     user,
