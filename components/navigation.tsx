@@ -148,20 +148,25 @@ const Navigation: React.FC = () => {
                   <Button
                     key={item.label}
                     variant="ghost"
-                    className="text-sm font-medium opacity-60 cursor-not-allowed"
+                    className="flex items-center text-sm font-medium opacity-60 cursor-not-allowed"
                     aria-disabled="true"
+                    aria-label={item.label}
                     title="ฟีเจอร์นี้จะมาเร็วๆนี้"
                     type="button"
                     onClick={(e) => e.preventDefault()}
                   >
-                    <item.icon className="w-4 h-4 mr-2" />
-                    {item.label}
+                    <item.icon className="w-4 h-4 lg:w-5 lg:h-5" />
+                    <span className="hidden lg:inline ml-2">{item.label}</span>
                   </Button>
                 ) : (
-                  <Link key={item.href} href={item.href}>
-                    <Button variant="ghost" className="text-sm font-medium">
-                      <item.icon className="w-4 h-4 mr-2" />
-                      {item.label}
+                  <Link key={item.href} href={item.href} title={item.label}>
+                    <Button
+                      variant="ghost"
+                      className="flex items-center text-sm font-medium"
+                      aria-label={item.label}
+                    >
+                      <item.icon className="w-4 h-4 lg:w-5 lg:h-5" />
+                      <span className="hidden lg:inline ml-2">{item.label}</span>
                     </Button>
                   </Link>
                 )
