@@ -7,7 +7,7 @@
 
 ## Overview
 
-This repository will stay in sync with your deployments on Visual Studio Code and Vercel
+This repository will stay in sync with your deployments on Visual Studio Code and Vercel.
 Any changes you make to your deployed app will be automatically pushed to this repository from Github in Vs code
 
 ## Deployment
