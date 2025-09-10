@@ -7,6 +7,12 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip"
 import ProfileModal from "./profile-modal"
 import {
   DropdownMenu,
@@ -141,37 +147,47 @@ const Navigation: React.FC = () => {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center justify-center space-x-1">
-              {navItems.map((item) =>
-                item.disabled ? (
-                  // ปุ่ม Disabled (ไม่ลิงก์)
-                  <Button
-                    key={item.label}
-                    variant="ghost"
-                    className="flex items-center text-sm font-medium opacity-60 cursor-not-allowed"
-                    aria-disabled="true"
-                    aria-label={item.label}
-                    title="ฟีเจอร์นี้จะมาเร็วๆนี้"
-                    type="button"
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    <item.icon className="w-4 h-4 lg:w-5 lg:h-5" />
-                    <span className="hidden lg:inline ml-2">{item.label}</span>
-                  </Button>
-                ) : (
-                  <Link key={item.href} href={item.href} title={item.label}>
-                    <Button
-                      variant="ghost"
-                      className="flex items-center text-sm font-medium"
-                      aria-label={item.label}
-                    >
-                      <item.icon className="w-4 h-4 lg:w-5 lg:h-5" />
-                      <span className="hidden lg:inline ml-2">{item.label}</span>
-                    </Button>
-                  </Link>
-                )
-              )}
-            </div>
+            <TooltipProvider delayDuration={0}>
+              <div className="hidden md:flex items-center justify-center space-x-1">
+                {navItems.map((item) =>
+                  item.disabled ? (
+                    <Tooltip key={item.label}>
+                      <TooltipTrigger asChild>
+                        {/* ปุ่ม Disabled (ไม่ลิงก์) */}
+                        <Button
+                          variant="ghost"
+                          className="flex items-center text-sm font-medium opacity-60 cursor-not-allowed"
+                          aria-disabled="true"
+                          aria-label={item.label}
+                          type="button"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          <item.icon className="w-4 h-4 lg:w-5 lg:h-5" />
+                          <span className="hidden lg:inline ml-2">{item.label}</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{item.label}</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <Link href={item.href}>
+                          <Button
+                            variant="ghost"
+                            className="flex items-center text-sm font-medium"
+                            aria-label={item.label}
+                          >
+                            <item.icon className="w-4 h-4 lg:w-5 lg:h-5" />
+                            <span className="hidden lg:inline ml-2">{item.label}</span>
+                          </Button>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{item.label}</TooltipContent>
+                    </Tooltip>
+                  )
+                )}
+              </div>
+            </TooltipProvider>
 
             {/* User Section */}
             <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-3">
