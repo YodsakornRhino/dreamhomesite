@@ -212,7 +212,7 @@ export default function Home() {
             <p className="text-gray-600 max-w-2xl mx-auto">ความไว้วางใจจากลูกค้าหลายพันคนทั่วประเทศ</p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
               <div className="h-16 w-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4">
                 <Building2 className="h-8 w-8" />
