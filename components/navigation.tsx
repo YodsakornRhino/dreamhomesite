@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -16,9 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
-  Menu,
   Home,
   ShoppingCart,
   Building,
@@ -39,24 +36,13 @@ import { ToastAction } from "@/components/ui/toast"
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
-  const pathname = usePathname()
 
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
 
-  // คุมเมนูมือถือ (Sheet)
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
-
-  // ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
-  useEffect(() => {
-    setIsMobileOpen(false)
-  }, [pathname])
-
-  const handleMobileNavClick = () => {
-    setIsMobileOpen(false)
-  }
+  // navigation bar adjustments handled purely with CSS breakpoints
 
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text
@@ -136,12 +122,12 @@ const Navigation: React.FC = () => {
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                   <Home className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <span className="text-lg sm:text-xl font-bold text-gray-900">DreamHome</span>
+                <span className="hidden sm:inline text-lg sm:text-xl font-bold text-gray-900">DreamHome</span>
               </Link>
             </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center justify-center space-x-1">
+            {/* Navigation */}
+            <div className="flex items-center justify-center space-x-1">
               {navItems.map((item) =>
                 item.disabled ? (
                   // ปุ่ม Disabled (ไม่ลิงก์)
@@ -154,14 +140,18 @@ const Navigation: React.FC = () => {
                     type="button"
                     onClick={(e) => e.preventDefault()}
                   >
-                    <item.icon className="w-4 h-4 mr-2" />
-                    {item.label}
+                    <item.icon className="w-4 h-4 lg:mr-2" />
+                    <span className="hidden lg:inline">{item.label}</span>
                   </Button>
                 ) : (
                   <Link key={item.href} href={item.href}>
-                    <Button variant="ghost" className="text-sm font-medium">
-                      <item.icon className="w-4 h-4 mr-2" />
-                      {item.label}
+                    <Button
+                      variant="ghost"
+                      className="text-sm font-medium"
+                      title={item.label}
+                    >
+                      <item.icon className="w-4 h-4 lg:mr-2" />
+                      <span className="hidden lg:inline">{item.label}</span>
                     </Button>
                   </Link>
                 )
@@ -283,47 +273,6 @@ const Navigation: React.FC = () => {
                   </Button>
                 </div>
               )}
-
-              {/* Mobile Menu */}
-              <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="md:hidden">
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                  <div className="flex flex-col space-y-4 mt-6">
-                    {navItems.map((item) =>
-                      item.disabled ? (
-                        // ปุ่ม Disabled บนมือถือ (ไม่ปิดเมนู, ไม่นำทาง)
-                        <Button
-                          key={item.label}
-                          variant="ghost"
-                          className="w-full justify-start text-base opacity-60 cursor-not-allowed"
-                          aria-disabled="true"
-                          title="ฟีเจอร์นี้จะมาเร็วๆนี้"
-                          type="button"
-                          onClick={(e) => e.preventDefault()}
-                        >
-                          <item.icon className="w-5 h-5 mr-3" />
-                          {item.label}
-                        </Button>
-                      ) : (
-                        <Link key={item.href} href={item.href}>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start text-base"
-                            onClick={handleMobileNavClick}
-                          >
-                            <item.icon className="w-5 h-5 mr-3" />
-                            {item.label}
-                          </Button>
-                        </Link>
-                      )
-                    )}
-                  </div>
-                </SheetContent>
-              </Sheet>
             </div>
           </div>
         </div>
