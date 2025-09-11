@@ -710,7 +710,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </DialogHeader>
           {cropSrc && (
             <div
-              className="mx-auto relative border"
+              className="mx-auto relative border overflow-hidden"
               style={{ width: CROP_SIZE, height: CROP_SIZE, cursor: 'move' }}
               onPointerDown={startDrag}
               onPointerMove={onDrag}
