@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { getDocument, setDocument, getDocuments } from "@/lib/firestore"
+import { uploadFile, getDownloadURL } from "@/lib/storage"
 import { useToast } from "@/hooks/use-toast"
 import {
   updateProfile, RecaptchaVerifier, linkWithPhoneNumber,
@@ -64,6 +65,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [saving, setSaving] = useState(false)
   const [sending, setSending] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({ name: "", email: "", photoURL: "" })
@@ -276,6 +278,25 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     }
   }
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !uid) return
+    setUploading(true)
+    setError(null)
+    try {
+      const path = `profilepicture/${uid}/${file.name}`
+      await uploadFile(path, file)
+      const url = await getDownloadURL(path)
+      setForm((p) => ({ ...p, photoURL: url }))
+      toast({ title: "อัปโหลดรูปโปรไฟล์สำเร็จ" })
+    } catch (e: any) {
+      setError(e?.message ?? "อัปโหลดรูปไม่สำเร็จ")
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
   // ---------------- Save profile ----------------
   const handleSaveProfile = async () => {
     if (!uid) return
@@ -453,12 +474,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               </div>
             </div>
 
-            {/* Photo URL */}
+            {/* Photo upload */}
             <div className="space-y-1">
-              <Label htmlFor="photoURL" className="text-xs sm:text-sm font-medium">รูปโปรไฟล์ (URL)</Label>
-              <div className="relative">
-                <ImageIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input id="photoURL" value={form.photoURL} onChange={(e) => setForm(p => ({ ...p, photoURL: e.target.value }))} className="pl-8" placeholder="https://…" />
+              <Label htmlFor="photo" className="text-xs sm:text-sm font-medium">รูปโปรไฟล์</Label>
+              <div className="relative flex items-center">
+                <ImageIcon className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input id="photo" type="file" accept="image/*" onChange={handlePhotoUpload} className="pl-8" disabled={uploading} />
+                {uploading && <Loader2 className="ml-2 h-4 w-4 animate-spin text-gray-400" />}
               </div>
             </div>
 
