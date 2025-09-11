@@ -30,6 +30,7 @@ const CAPTCHA_ID = "recaptcha-container-root"
 
 const OTP_COOLDOWN_MS = 60_000
 const THROTTLE_PENALTY_MS = 10 * 60_000
+const CROP_SIZE = 200
 
 let globalRecaptcha: RecaptchaVerifier | null = null
 let globalRecaptchaInitPromise: Promise<RecaptchaVerifier> | null = null
@@ -69,6 +70,15 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   const [form, setForm] = useState({ name: "", email: "", photoURL: "" })
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropOpen, setCropOpen] = useState(false)
+  const [cropPos, setCropPos] = useState({ x: 0, y: 0 })
+  const [cropZoom, setCropZoom] = useState(1)
+  const [imageDims, setImageDims] = useState({ w: 0, h: 0 })
+  const draggingRef = useRef(false)
+  const dragStartRef = useRef({ x: 0, y: 0 })
+  const imgStartRef = useRef({ x: 0, y: 0 })
   const [phone, setPhone] = useState("")
   const [otp, setOtp] = useState("")
   const [otpSent, setOtpSent] = useState(false)
@@ -278,21 +288,105 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     }
   }
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !uid) return
+    if (!file) return
+    const src = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const initZoom = Math.max(CROP_SIZE / img.width, CROP_SIZE / img.height)
+      const x = (CROP_SIZE - img.width * initZoom) / 2
+      const y = (CROP_SIZE - img.height * initZoom) / 2
+      setCropPos({ x, y })
+      setCropZoom(initZoom)
+      setImageDims({ w: img.width, h: img.height })
+      setSelectedFile(file)
+      setCropSrc(src)
+      setCropOpen(true)
+    }
+    img.src = src
+    e.target.value = ""
+  }
+
+  const handleCropCancel = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc)
+    setCropOpen(false)
+    setSelectedFile(null)
+    setCropSrc(null)
+  }
+
+  const handleCropConfirm = async () => {
+    if (!uid || !selectedFile || !cropSrc) return
     setUploadingPhoto(true); setError(null)
     try {
-      const path = `profilepicture/${uid}/${file.name}`
-      await uploadFile(path, file)
+      const img = new Image()
+      img.src = cropSrc
+      await new Promise((r) => { img.onload = () => r(null) })
+      const canvas = document.createElement('canvas')
+      canvas.width = CROP_SIZE
+      canvas.height = CROP_SIZE
+      const ctx = canvas.getContext('2d')!
+      const sx = -cropPos.x / cropZoom
+      const sy = -cropPos.y / cropZoom
+      const s = CROP_SIZE / cropZoom
+      ctx.drawImage(img, sx, sy, s, s, 0, 0, CROP_SIZE, CROP_SIZE)
+      const blob: Blob = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b as Blob), selectedFile.type || 'image/jpeg')
+      )
+      const path = `profilepicture/${uid}/${selectedFile.name}`
+      await uploadFile(path, blob)
       const url = await getDownloadURL(path)
-      setForm(p => ({ ...p, photoURL: url }))
+      setForm((p) => ({ ...p, photoURL: url }))
       toast({ title: "อัปโหลดรูปโปรไฟล์สำเร็จ" })
+      handleCropCancel()
     } catch (e: any) {
       setError(e?.message ?? "อัปโหลดรูปไม่สำเร็จ")
     } finally {
       setUploadingPhoto(false)
     }
+  }
+
+  const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    draggingRef.current = true
+    dragStartRef.current = { x: e.clientX, y: e.clientY }
+    imgStartRef.current = { ...cropPos }
+  }
+
+  const onDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return
+    const dx = e.clientX - dragStartRef.current.x
+    const dy = e.clientY - dragStartRef.current.y
+    const imgW = imageDims.w * cropZoom
+    const imgH = imageDims.h * cropZoom
+    const minX = CROP_SIZE - imgW
+    const minY = CROP_SIZE - imgH
+    let x = imgStartRef.current.x + dx
+    let y = imgStartRef.current.y + dy
+    if (x > 0) x = 0
+    if (y > 0) y = 0
+    if (x < minX) x = minX
+    if (y < minY) y = minY
+    setCropPos({ x, y })
+  }
+
+  const endDrag = () => {
+    draggingRef.current = false
+  }
+
+  const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const z = parseFloat(e.target.value)
+    const imgW = imageDims.w * z
+    const imgH = imageDims.h * z
+    const minX = CROP_SIZE - imgW
+    const minY = CROP_SIZE - imgH
+    let x = cropPos.x
+    let y = cropPos.y
+    if (x > 0) x = 0
+    if (y > 0) y = 0
+    if (x < minX) x = minX
+    if (y < minY) y = minY
+    setCropPos({ x, y })
+    setCropZoom(z)
   }
 
   // ---------------- Save profile ----------------
@@ -419,8 +513,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     phoneVerified && verifiedPhone && normalizePhoneNumber(phone) === normalizePhoneNumber(verifiedPhone)
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] max-w-[500px] max-h-[95vh] overflow-y-auto bg-white">
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="w-[95vw] max-w-[500px] max-h-[95vh] overflow-y-auto bg-white">
         <DialogHeader className="space-y-2">
           <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-center">โปรไฟล์</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm md:text-base text-center text-gray-600">
@@ -570,6 +665,47 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </form>
         )}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+      <Dialog open={cropOpen} onOpenChange={(open) => !open && handleCropCancel()}>
+        <DialogContent className="w-[90vw] max-w-xs bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-base font-medium">ปรับรูปโปรไฟล์</DialogTitle>
+          </DialogHeader>
+          {cropSrc && (
+            <div
+              className="mx-auto relative border"
+              style={{ width: CROP_SIZE, height: CROP_SIZE, cursor: 'move' }}
+              onPointerDown={startDrag}
+              onPointerMove={onDrag}
+              onPointerUp={endDrag}
+              onPointerLeave={endDrag}
+            >
+              <img
+                src={cropSrc}
+                alt="crop"
+                draggable={false}
+                className="absolute select-none"
+                style={{ width: imageDims.w * cropZoom, height: imageDims.h * cropZoom, top: cropPos.y, left: cropPos.x }}
+              />
+            </div>
+          )}
+          <input
+            type="range"
+            min={Math.max(CROP_SIZE / imageDims.w, CROP_SIZE / imageDims.h, 1)}
+            max={3}
+            step={0.01}
+            value={cropZoom}
+            onChange={handleZoomChange}
+            className="w-full mt-4"
+          />
+          <div className="flex justify-end gap-2 mt-4">
+            <Button type="button" variant="outline" onClick={handleCropCancel}>ยกเลิก</Button>
+            <Button type="button" onClick={handleCropConfirm} disabled={uploadingPhoto}>
+              {uploadingPhoto ? (<><Loader2 className="h-4 w-4 mr-1 animate-spin" />บันทึก...</>) : ("บันทึก")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
