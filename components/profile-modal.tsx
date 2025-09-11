@@ -10,7 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Loader2, Mail, IdCard, Image as ImageIcon, Save, X, User as UserIcon,
-  Phone as PhoneIcon, Send, CheckCheck, RotateCw, CheckCircle
+  Phone as PhoneIcon, Send, CheckCheck, RotateCw, CheckCircle,
+  RotateCcw, FlipHorizontal, FlipVertical
 } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { getDocument, setDocument, getDocuments } from "@/lib/firestore"
@@ -313,6 +314,42 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     setCropOpen(false)
     setSelectedFile(null)
     setCropSrc(null)
+    setCropPos({ x: 0, y: 0 })
+    setCropZoom(1)
+  }
+
+  const transformImage = async (type: 'rotate-cw' | 'rotate-ccw' | 'flip-h' | 'flip-v') => {
+    if (!cropSrc) return
+    const img = new Image()
+    img.src = cropSrc
+    await new Promise((r) => { img.onload = () => r(null) })
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')!
+    if (type === 'rotate-cw' || type === 'rotate-ccw') {
+      canvas.width = img.height
+      canvas.height = img.width
+      ctx.translate(canvas.width / 2, canvas.height / 2)
+      ctx.rotate((type === 'rotate-cw' ? 90 : -90) * Math.PI / 180)
+      ctx.drawImage(img, -img.width / 2, -img.height / 2)
+    } else {
+      canvas.width = img.width
+      canvas.height = img.height
+      ctx.translate(canvas.width / 2, canvas.height / 2)
+      ctx.scale(type === 'flip-h' ? -1 : 1, type === 'flip-v' ? -1 : 1)
+      ctx.drawImage(img, -img.width / 2, -img.height / 2)
+    }
+    const blob: Blob = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b as Blob), selectedFile?.type || 'image/png')
+    )
+    const url = URL.createObjectURL(blob)
+    if (cropSrc.startsWith('blob:')) URL.revokeObjectURL(cropSrc)
+    const initZoom = Math.max(CROP_SIZE / canvas.width, CROP_SIZE / canvas.height, 1)
+    const x = (CROP_SIZE - canvas.width * initZoom) / 2
+    const y = (CROP_SIZE - canvas.height * initZoom) / 2
+    setCropSrc(url)
+    setImageDims({ w: canvas.width, h: canvas.height })
+    setCropPos({ x, y })
+    setCropZoom(initZoom)
   }
 
   const handleCropConfirm = async () => {
@@ -698,6 +735,20 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             onChange={handleZoomChange}
             className="w-full mt-4"
           />
+          <div className="flex justify-center gap-2 mt-2">
+            <Button type="button" size="icon" variant="outline" onClick={() => transformImage('rotate-ccw')}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button type="button" size="icon" variant="outline" onClick={() => transformImage('rotate-cw')}>
+              <RotateCw className="h-4 w-4" />
+            </Button>
+            <Button type="button" size="icon" variant="outline" onClick={() => transformImage('flip-h')}>
+              <FlipHorizontal className="h-4 w-4" />
+            </Button>
+            <Button type="button" size="icon" variant="outline" onClick={() => transformImage('flip-v')}>
+              <FlipVertical className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button type="button" variant="outline" onClick={handleCropCancel}>ยกเลิก</Button>
             <Button type="button" onClick={handleCropConfirm} disabled={uploadingPhoto}>
