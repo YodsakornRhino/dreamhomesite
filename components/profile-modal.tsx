@@ -2,6 +2,8 @@
 "use client"
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
+import Cropper, { type ReactCropperElement } from "react-cropper"
+import "cropperjs/dist/cropper.css"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -67,6 +69,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [verifying, setVerifying] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const cropperRef = useRef<ReactCropperElement>(null)
 
   const [form, setForm] = useState({ name: "", email: "", photoURL: "" })
   const [phone, setPhone] = useState("")
@@ -278,22 +283,41 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     }
   }
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !uid) return
+    if (!file) return
+    if (cropSrc) URL.revokeObjectURL(cropSrc)
+    setCropSrc(URL.createObjectURL(file))
+    e.target.value = ""
+  }
+
+  const handleCropCancel = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc)
+    setCropSrc(null)
+  }
+
+  const handleCropUpload = async () => {
+    if (!uid || !cropperRef.current) return
     setUploading(true)
     setError(null)
     try {
-      const path = `profilepicture/${uid}/${file.name}`
+      const cropper = cropperRef.current.cropper
+      const canvas = cropper.getCroppedCanvas({ width: 512, height: 512, imageSmoothingQuality: "high" })
+      const blob: Blob = await new Promise((resolve, reject) =>
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("crop failed"))), "image/jpeg")
+      )
+      const fileName = `avatar-${Date.now()}.jpg`
+      const file = new File([blob], fileName, { type: "image/jpeg" })
+      const path = `profilepicture/${uid}/${fileName}`
       await uploadFile(path, file)
       const url = await getDownloadURL(path)
       setForm((p) => ({ ...p, photoURL: url }))
       toast({ title: "อัปโหลดรูปโปรไฟล์สำเร็จ" })
+      handleCropCancel()
     } catch (e: any) {
       setError(e?.message ?? "อัปโหลดรูปไม่สำเร็จ")
     } finally {
       setUploading(false)
-      e.target.value = ""
     }
   }
 
@@ -421,8 +445,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     phoneVerified && verifiedPhone && normalizePhoneNumber(phone) === normalizePhoneNumber(verifiedPhone)
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] max-w-[500px] max-h-[95vh] overflow-y-auto bg-white">
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="w-[95vw] max-w-[500px] max-h-[95vh] overflow-y-auto bg-white">
         <DialogHeader className="space-y-2">
           <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-center">โปรไฟล์</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm md:text-base text-center text-gray-600">
@@ -479,7 +504,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <Label htmlFor="photo" className="text-xs sm:text-sm font-medium">รูปโปรไฟล์</Label>
               <div className="relative flex items-center">
                 <ImageIcon className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input id="photo" type="file" accept="image/*" onChange={handlePhotoUpload} className="pl-8" disabled={uploading} />
+                <Input id="photo" type="file" accept="image/*" onChange={handlePhotoSelect} className="pl-8" disabled={uploading} />
                 {uploading && <Loader2 className="ml-2 h-4 w-4 animate-spin text-gray-400" />}
               </div>
             </div>
@@ -569,7 +594,45 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             </div>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(cropSrc)} onOpenChange={(open) => !open && handleCropCancel()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>ปรับรูปโปรไฟล์</DialogTitle>
+          </DialogHeader>
+          {cropSrc && (
+            <Cropper
+              src={cropSrc}
+              aspectRatio={1}
+              guides={false}
+              viewMode={1}
+              ref={cropperRef}
+              className="h-64 w-full"
+            />
+          )}
+          <div className="flex justify-end gap-2 mt-4">
+            <Button type="button" variant="secondary" onClick={handleCropCancel} disabled={uploading}>
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCropUpload}
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={uploading}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />กำลังอัปโหลด...
+                </>
+              ) : (
+                "บันทึก"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
