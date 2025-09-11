@@ -15,6 +15,7 @@ import {
 import { useAuthContext } from "@/contexts/AuthContext"
 import { getDocument, setDocument, getDocuments } from "@/lib/firestore"
 import { useToast } from "@/hooks/use-toast"
+import { uploadFile, getDownloadURL } from "@/lib/storage"
 import {
   updateProfile, RecaptchaVerifier, linkWithPhoneNumber,
   PhoneAuthProvider, updatePhoneNumber, type ConfirmationResult,
@@ -67,6 +68,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({ name: "", email: "", photoURL: "" })
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [phone, setPhone] = useState("")
   const [otp, setOtp] = useState("")
   const [otpSent, setOtpSent] = useState(false)
@@ -101,6 +103,15 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const n = form.name?.trim() || user?.displayName || user?.email || "U"
     return n.slice(0, 2).toUpperCase()
   }, [form.name, user])
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setPhotoFile(file)
+      const preview = URL.createObjectURL(file)
+      setForm((p) => ({ ...p, photoURL: preview }))
+    }
+  }
 
   // ---------------- helper: error ----------------
   const explainFirebaseError = (e: any) => {
@@ -277,30 +288,39 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   }
 
   // ---------------- Save profile ----------------
-  const handleSaveProfile = async () => {
-    if (!uid) return
-    if (!form.name.trim()) { setError("กรุณากรอกชื่อ"); return }
-    setSaving(true); setError(null)
-    try {
-      const { serverTimestamp } = await import("firebase/firestore")
-      await setDocument("users", uid, {
-        uid,
-        name: form.name.trim(),
-        email: form.email || user?.email || null,
-        photoURL: form.photoURL || null,
-        phoneNumber: verifiedPhone || null,
-        phoneVerified: phoneVerified,
-        updatedAt: serverTimestamp(),
-      })
-      try { await updateProfile(user!, { displayName: form.name.trim(), photoURL: form.photoURL || null }) } catch {}
-      toast({ title: "บันทึกโปรไฟล์สำเร็จ" })
-      onClose()
-    } catch (e: any) {
-      setError(e?.message ?? "บันทึกไม่สำเร็จ")
-    } finally {
-      setSaving(false)
+    const handleSaveProfile = async () => {
+      if (!uid) return
+      if (!form.name.trim()) { setError("กรุณากรอกชื่อ"); return }
+      setSaving(true); setError(null)
+      try {
+        let photoURL: string | null = form.photoURL || null
+        if (photoFile) {
+          const path = `profilepicture/${uid}/${Date.now()}-${photoFile.name}`
+          await uploadFile(path, photoFile)
+          photoURL = await getDownloadURL(path)
+          setForm((p) => ({ ...p, photoURL }))
+          setPhotoFile(null)
+        }
+
+        const { serverTimestamp } = await import("firebase/firestore")
+        await setDocument("users", uid, {
+          uid,
+          name: form.name.trim(),
+          email: form.email || user?.email || null,
+          photoURL: photoURL,
+          phoneNumber: verifiedPhone || null,
+          phoneVerified: phoneVerified,
+          updatedAt: serverTimestamp(),
+        })
+        try { await updateProfile(user!, { displayName: form.name.trim(), photoURL: photoURL || null }) } catch {}
+        toast({ title: "บันทึกโปรไฟล์สำเร็จ" })
+        onClose()
+      } catch (e: any) {
+        setError(e?.message ?? "บันทึกไม่สำเร็จ")
+      } finally {
+        setSaving(false)
+      }
     }
-  }
 
   // ---------------- Send OTP ----------------
   const handleSendOtp = async () => {
@@ -453,12 +473,12 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               </div>
             </div>
 
-            {/* Photo URL */}
+            {/* Photo */}
             <div className="space-y-1">
-              <Label htmlFor="photoURL" className="text-xs sm:text-sm font-medium">รูปโปรไฟล์ (URL)</Label>
+              <Label htmlFor="photo" className="text-xs sm:text-sm font-medium">รูปโปรไฟล์</Label>
               <div className="relative">
                 <ImageIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input id="photoURL" value={form.photoURL} onChange={(e) => setForm(p => ({ ...p, photoURL: e.target.value }))} className="pl-8" placeholder="https://…" />
+                <Input id="photo" type="file" accept="image/*" onChange={handlePhotoChange} className="pl-8" />
               </div>
             </div>
 
