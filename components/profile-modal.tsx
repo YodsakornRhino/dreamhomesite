@@ -25,9 +25,8 @@ import { normalizePhoneNumber } from "@/lib/utils"
 
 
 
-// ✅ เพิ่ม React Cropper
-import Cropper, { type ReactCropperElement } from "react-cropper"
-import "cropperjs/dist/cropper.css"
+// ✅ ใช้ react-easy-crop
+import Cropper, { type Area } from "react-easy-crop"
 
 type ProfileModalProps = { isOpen: boolean; onClose: () => void }
 
@@ -60,6 +59,58 @@ const createFreshSlot = (): HTMLElement => {
   slot.setAttribute("data-recaptcha-slot", "1")
   root.appendChild(slot)
   return slot
+}
+
+const createImage = (url: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image()
+    image.addEventListener("load", () => resolve(image))
+    image.addEventListener("error", (e) => reject(e))
+    image.setAttribute("crossOrigin", "anonymous")
+    image.src = url
+  })
+
+async function getCroppedFile(
+  src: string,
+  pixelCrop: Area,
+  rotation: number,
+  flipX: number,
+  flipY: number,
+): Promise<File> {
+  const image = await createImage(src)
+  const canvas = document.createElement("canvas")
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("ไม่สามารถสร้าง canvas ได้")
+
+  const rotRad = (rotation * Math.PI) / 180
+  const width = image.width
+  const height = image.height
+  const bBoxWidth = Math.abs(Math.cos(rotRad) * width) + Math.abs(Math.sin(rotRad) * height)
+  const bBoxHeight = Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height)
+  canvas.width = bBoxWidth
+  canvas.height = bBoxHeight
+  ctx.translate(bBoxWidth / 2, bBoxHeight / 2)
+  ctx.rotate(rotRad)
+  ctx.scale(flipX, flipY)
+  ctx.drawImage(image, -width / 2, -height / 2)
+
+  const data = ctx.getImageData(pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height)
+  const tmpCanvas = document.createElement("canvas")
+  tmpCanvas.width = pixelCrop.width
+  tmpCanvas.height = pixelCrop.height
+  tmpCanvas.getContext("2d")?.putImageData(data, 0, 0)
+
+  const outCanvas = document.createElement("canvas")
+  outCanvas.width = 512
+  outCanvas.height = 512
+  outCanvas.getContext("2d")?.drawImage(tmpCanvas, 0, 0, 512, 512)
+
+  return await new Promise((resolve) => {
+    outCanvas.toBlob((blob) => {
+      if (!blob) return
+      resolve(new File([blob], `avatar-${Date.now()}.jpeg`, { type: "image/jpeg" }))
+    }, "image/jpeg", 0.92)
+  })
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
@@ -113,73 +164,62 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   // -------------------- CROP STATES (ใหม่) --------------------
   const [isCropOpen, setIsCropOpen] = useState(false)
   const [cropSrc, setCropSrc] = useState<string>("")
-  const cropperRef = useRef<ReactCropperElement>(null)
-  const scaleXRef = useRef(1)
-  const scaleYRef = useRef(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [rawPhotoName, setRawPhotoName] = useState<string>("")
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [rotation, setRotation] = useState(0)
+  const [flipX, setFlipX] = useState(1)
+  const [flipY, setFlipY] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
 
   // เปลี่ยนรูป → เปิด Crop dialog (ใหม่)
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setRawPhotoName(file.name)
     const src = URL.createObjectURL(file)
     setCropSrc(src)
     setIsCropOpen(true)
   }
 
+  const resetCropState = () => {
+    setIsCropOpen(false)
+    setCropSrc("")
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setRotation(0)
+    setFlipX(1)
+    setFlipY(1)
+    setCroppedAreaPixels(null)
+  }
+
   // ยืนยันการครอป → ได้ไฟล์ใหม่ (ใหม่)
   const handleCropConfirm = async () => {
-    const cropper = cropperRef.current?.cropper
-    if (!cropper) return
-
-    const canvas = cropper.getCroppedCanvas({
-      width: 512,
-      height: 512,
-      imageSmoothingEnabled: true,
-      imageSmoothingQuality: "high",
-    })
-    if (!canvas) return
-
-    canvas.toBlob((blob) => {
-      if (!blob) return
-      const file = new File([blob], `avatar-${Date.now()}.jpeg`, { type: "image/jpeg" })
-      setPhotoFile(file)
-      const preview = URL.createObjectURL(file)
-      setForm((p) => ({ ...p, photoURL: preview }))
-      setIsCropOpen(false)
-      setCropSrc("")
-    }, "image/jpeg", 0.92)
+    if (!cropSrc || !croppedAreaPixels) return
+    const file = await getCroppedFile(cropSrc, croppedAreaPixels, rotation, flipX, flipY)
+    setPhotoFile(file)
+    const preview = URL.createObjectURL(file)
+    setForm((p) => ({ ...p, photoURL: preview }))
+    resetCropState()
   }
 
   const handleCropCancel = () => {
-    setIsCropOpen(false)
-    setCropSrc("")
-    scaleXRef.current = 1
-    scaleYRef.current = 1
+    resetCropState()
   }
 
   const handleFlipX = () => {
-    const cropper = cropperRef.current?.cropper
-    if (!cropper) return
-    scaleXRef.current = -scaleXRef.current
-    cropper.scaleX(scaleXRef.current)
+    setFlipX((x) => -x)
   }
 
   const handleFlipY = () => {
-    const cropper = cropperRef.current?.cropper
-    if (!cropper) return
-    scaleYRef.current = -scaleYRef.current
-    cropper.scaleY(scaleYRef.current)
+    setFlipY((y) => -y)
   }
 
   const handleReset = () => {
-    const cropper = cropperRef.current?.cropper
-    if (!cropper) return
-    scaleXRef.current = 1
-    scaleYRef.current = 1
-    cropper.reset()
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setRotation(0)
+    setFlipX(1)
+    setFlipY(1)
   }
 
   // ---------------- helper: error ----------------
@@ -658,35 +698,30 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           <div className="space-y-3">
             {cropSrc ? (
               <Cropper
-                src={cropSrc}
-                ref={cropperRef}
-                aspectRatio={1}               // ครอปสี่เหลี่ยมจัตุรัส
-                viewMode={1}                  // จำกัดกรอบให้อยู่ในภาพ
-                guides={true}
-                zoomOnWheel={true}
-                autoCropArea={1}
-                background={false}
-                responsive={true}
-                checkOrientation={true}
-                style={{ width: "100%", height: 360 }}
+                image={cropSrc}
+                crop={crop}
+                zoom={zoom}
+                rotation={rotation}
+                aspect={1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onRotationChange={setRotation}
+                onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
+                zoomWithScroll
+                style={{
+                  containerStyle: { width: "100%", height: 360 },
+                  mediaStyle: { transform: `scaleX(${flipX}) scaleY(${flipY})` },
+                }}
               />
             ) : (
               <div className="text-sm text-gray-500">ไม่มีภาพ</div>
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => cropperRef.current?.cropper?.rotate(-90)}
-              >
+              <Button type="button" variant="outline" onClick={() => setRotation((r) => r - 90)}>
                 หมุนซ้าย 90°
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => cropperRef.current?.cropper?.rotate(90)}
-              >
+              <Button type="button" variant="outline" onClick={() => setRotation((r) => r + 90)}>
                 หมุนขวา 90°
               </Button>
               <Button type="button" variant="outline" onClick={handleFlipX}>
