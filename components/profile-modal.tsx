@@ -471,28 +471,25 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 <AvatarImage src={form.photoURL} alt={form.name} />
                 <AvatarFallback className="bg-blue-100 text-blue-700">{initials}</AvatarFallback>
               </Avatar>
-              <div>
+              <div className="flex-1">
                 <div className="text-sm font-medium text-gray-900">{form.name || "—"}</div>
-                <div className="text-xs text-gray-500 flex items-center gap-2">
-                  {form.email || "—"}
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="p-0 h-auto text-xs"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    เปลี่ยน
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    id="photo"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handlePhotoChange}
-                  />
-                </div>
+                <div className="text-xs text-gray-500">{form.email || "—"}</div>
               </div>
+              <Button
+                type="button"
+                className="ml-auto bg-blue-600 hover:bg-blue-700"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                เปลี่ยน
+              </Button>
+              <input
+                ref={fileInputRef}
+                id="photo"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
             </div>
 
             {/* Name */}

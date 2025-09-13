@@ -172,7 +172,7 @@ export default function ProfilePhotoModal({ open, src, onCancel, onComplete }: P
               รีเซ็ต
             </Button>
 
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex w-full justify-end gap-2 sm:w-auto">
               <Button variant="ghost" onClick={handleCancel}>ยกเลิก</Button>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleConfirm}>
                 ใช้รูปนี้
