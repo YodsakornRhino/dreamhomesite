@@ -178,11 +178,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const img = new Image()
     img.onload = () => {
       const maxW = Math.min(window.innerWidth * 0.95, 640)
-      const maxH = Math.min(window.innerHeight * 0.7, 512)
+      const maxDialogH = window.innerHeight * 0.9
+      const reservedH = 200
+      const maxCropH = Math.min(Math.max(100, maxDialogH - reservedH), 512)
       let w = maxW
       let h = (img.height / img.width) * w
-      if (h > maxH) {
-        h = maxH
+      if (h > maxCropH) {
+        h = maxCropH
         w = (img.width / img.height) * h
       }
       setCropSize({ width: w, height: h })
@@ -707,7 +709,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       {/* ===== CROP DIALOG (ใหม่) ===== */}
       <Dialog open={isCropOpen} onOpenChange={(open) => !open && handleCropCancel()}>
-        <DialogContent className="max-w-[95vw]" style={{ width: cropSize.width }}>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto" style={{ width: cropSize.width }}>
           <DialogHeader>
             <DialogTitle>ครอปรูปโปรไฟล์</DialogTitle>
             <DialogDescription>ปรับกรอบให้พอดีแล้วกดยืนยัน</DialogDescription>
