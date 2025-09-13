@@ -74,12 +74,13 @@ export default function ProfilePhotoModal({ open, src, onCancel, onComplete }: P
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [cropSize, setCropSize] = useState({ width: 640, height: 360 })
   const controlsH = 240
+  const paddingX = 48 // DialogContent has p-6 (24px) on each side
 
   useEffect(() => {
     if (!src) return
     const img = new Image()
     img.onload = () => {
-      const maxW = Math.min(window.innerWidth * 0.9, 768)
+      const maxW = Math.min(window.innerWidth * 0.9, 768) - paddingX
       const maxDialogH = window.innerHeight * 0.95
       const maxCropH = Math.max(100, maxDialogH - controlsH)
       let w = maxW
@@ -120,8 +121,8 @@ export default function ProfilePhotoModal({ open, src, onCancel, onComplete }: P
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleCancel()}>
       <DialogContent
-        className="max-w-[90vw] max-h-[95vh] overflow-hidden"
-        style={{ width: cropSize.width, height: cropSize.height + controlsH }}
+        className="max-w-[90vw] max-h-[95vh] overflow-auto"
+        style={{ width: cropSize.width + paddingX }}
       >
         <DialogHeader>
           <DialogTitle>ครอปรูปโปรไฟล์</DialogTitle>
