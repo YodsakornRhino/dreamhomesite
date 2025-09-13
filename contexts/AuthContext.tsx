@@ -223,9 +223,21 @@ const handleSignUp = async (
           title: "ออกจากระบบอัตโนมัติ",
           description: "ไม่มีการใช้งานนานเกิน 10 นาที",
         })
-        handleSignOut().catch((err) =>
-          console.error("Auto sign out failed:", err),
-        )
+        handleSignOut()
+          .catch((err) =>
+            console.error("Auto sign out failed:", err),
+          )
+          .finally(() => {
+            try {
+              localStorage.setItem(
+                "session-timeout",
+                Date.now().toString(),
+              )
+            } catch (e) {
+              console.error("Failed to access localStorage:", e)
+            }
+            window.location.reload()
+          })
       }, INACTIVITY_LIMIT)
     }
 
@@ -249,7 +261,19 @@ const handleSignUp = async (
         document.removeEventListener(event, resetTimer),
       )
     }
-  }, [user, handleSignOut])
+  }, [user, handleSignOut, toast])
+
+  // Refresh the page in all tabs when session timeout occurs
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "session-timeout") {
+        window.location.reload()
+      }
+    }
+
+    window.addEventListener("storage", handleStorage)
+    return () => window.removeEventListener("storage", handleStorage)
+  }, [])
 
   const value = {
     user,
