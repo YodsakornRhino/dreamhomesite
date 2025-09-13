@@ -25,8 +25,8 @@ import { normalizePhoneNumber } from "@/lib/utils"
 
 
 
-// ✅ ใช้ react-easy-crop
-import Cropper, { type Area } from "react-easy-crop"
+// ✅ ใช้ react-easy-crop (แยกใน ProfilePhotoModal)
+import ProfilePhotoModal from "@/components/profile-photo-modal"
 
 type ProfileModalProps = { isOpen: boolean; onClose: () => void }
 
@@ -59,58 +59,6 @@ const createFreshSlot = (): HTMLElement => {
   slot.setAttribute("data-recaptcha-slot", "1")
   root.appendChild(slot)
   return slot
-}
-
-const createImage = (url: string): Promise<HTMLImageElement> =>
-  new Promise((resolve, reject) => {
-    const image = new Image()
-    image.addEventListener("load", () => resolve(image))
-    image.addEventListener("error", (e) => reject(e))
-    image.setAttribute("crossOrigin", "anonymous")
-    image.src = url
-  })
-
-async function getCroppedFile(
-  src: string,
-  pixelCrop: Area,
-  rotation: number,
-  flipX: number,
-  flipY: number,
-): Promise<File> {
-  const image = await createImage(src)
-  const canvas = document.createElement("canvas")
-  const ctx = canvas.getContext("2d")
-  if (!ctx) throw new Error("ไม่สามารถสร้าง canvas ได้")
-
-  const rotRad = (rotation * Math.PI) / 180
-  const width = image.width
-  const height = image.height
-  const bBoxWidth = Math.abs(Math.cos(rotRad) * width) + Math.abs(Math.sin(rotRad) * height)
-  const bBoxHeight = Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height)
-  canvas.width = bBoxWidth
-  canvas.height = bBoxHeight
-  ctx.translate(bBoxWidth / 2, bBoxHeight / 2)
-  ctx.rotate(rotRad)
-  ctx.scale(flipX, flipY)
-  ctx.drawImage(image, -width / 2, -height / 2)
-
-  const data = ctx.getImageData(pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height)
-  const tmpCanvas = document.createElement("canvas")
-  tmpCanvas.width = pixelCrop.width
-  tmpCanvas.height = pixelCrop.height
-  tmpCanvas.getContext("2d")?.putImageData(data, 0, 0)
-
-  const outCanvas = document.createElement("canvas")
-  outCanvas.width = 512
-  outCanvas.height = 512
-  outCanvas.getContext("2d")?.drawImage(tmpCanvas, 0, 0, 512, 512)
-
-  return await new Promise((resolve) => {
-    outCanvas.toBlob((blob) => {
-      if (!blob) return
-      resolve(new File([blob], `avatar-${Date.now()}.jpeg`, { type: "image/jpeg" }))
-    }, "image/jpeg", 0.92)
-  })
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
@@ -161,18 +109,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     return n.slice(0, 2).toUpperCase()
   }, [form.name, user])
 
-  // -------------------- CROP STATES (ใหม่) --------------------
+  // -------------------- PHOTO CROP --------------------
   const [isCropOpen, setIsCropOpen] = useState(false)
   const [cropSrc, setCropSrc] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [crop, setCrop] = useState({ x: 0, y: 0 })
-  const [zoom, setZoom] = useState(1)
-  const [rotation, setRotation] = useState(0)
-  const [flipX, setFlipX] = useState(1)
-  const [flipY, setFlipY] = useState(1)
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
 
-  // เปลี่ยนรูป → เปิด Crop dialog (ใหม่)
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -181,45 +122,17 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     setIsCropOpen(true)
   }
 
-  const resetCropState = () => {
-    setIsCropOpen(false)
-    setCropSrc("")
-    setCrop({ x: 0, y: 0 })
-    setZoom(1)
-    setRotation(0)
-    setFlipX(1)
-    setFlipY(1)
-    setCroppedAreaPixels(null)
-  }
-
-  // ยืนยันการครอป → ได้ไฟล์ใหม่ (ใหม่)
-  const handleCropConfirm = async () => {
-    if (!cropSrc || !croppedAreaPixels) return
-    const file = await getCroppedFile(cropSrc, croppedAreaPixels, rotation, flipX, flipY)
+  const handleCropComplete = (file: File) => {
     setPhotoFile(file)
     const preview = URL.createObjectURL(file)
     setForm((p) => ({ ...p, photoURL: preview }))
-    resetCropState()
+    setIsCropOpen(false)
+    setCropSrc("")
   }
 
   const handleCropCancel = () => {
-    resetCropState()
-  }
-
-  const handleFlipX = () => {
-    setFlipX((x) => -x)
-  }
-
-  const handleFlipY = () => {
-    setFlipY((y) => -y)
-  }
-
-  const handleReset = () => {
-    setCrop({ x: 0, y: 0 })
-    setZoom(1)
-    setRotation(0)
-    setFlipX(1)
-    setFlipY(1)
+    setIsCropOpen(false)
+    setCropSrc("")
   }
 
   // ---------------- helper: error ----------------
@@ -558,28 +471,25 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 <AvatarImage src={form.photoURL} alt={form.name} />
                 <AvatarFallback className="bg-blue-100 text-blue-700">{initials}</AvatarFallback>
               </Avatar>
-              <div>
+              <div className="flex-1">
                 <div className="text-sm font-medium text-gray-900">{form.name || "—"}</div>
-                <div className="text-xs text-gray-500 flex items-center gap-2">
-                  {form.email || "—"}
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="p-0 h-auto text-xs"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    เปลี่ยน
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    id="photo"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handlePhotoChange}
-                  />
-                </div>
+                <div className="text-xs text-gray-500">{form.email || "—"}</div>
               </div>
+              <Button
+                type="button"
+                className="ml-auto bg-blue-600 hover:bg-blue-700"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                เปลี่ยน
+              </Button>
+              <input
+                ref={fileInputRef}
+                id="photo"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
             </div>
 
             {/* Name */}
@@ -687,63 +597,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         )}
       </DialogContent>
 
-      {/* ===== CROP DIALOG (ใหม่) ===== */}
-      <Dialog open={isCropOpen} onOpenChange={(open) => !open && handleCropCancel()}>
-        <DialogContent className="max-w-[95vw] w-[640px]">
-          <DialogHeader>
-            <DialogTitle>ครอปรูปโปรไฟล์</DialogTitle>
-            <DialogDescription>ปรับกรอบให้พอดีแล้วกดยืนยัน</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            {cropSrc ? (
-              <Cropper
-                image={cropSrc}
-                crop={crop}
-                zoom={zoom}
-                rotation={rotation}
-                aspect={1}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onRotationChange={setRotation}
-                onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
-                zoomWithScroll
-                style={{
-                  containerStyle: { width: "100%", height: 360 },
-                  mediaStyle: { transform: `scaleX(${flipX}) scaleY(${flipY})` },
-                }}
-              />
-            ) : (
-              <div className="text-sm text-gray-500">ไม่มีภาพ</div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => setRotation((r) => r - 90)}>
-                หมุนซ้าย 90°
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setRotation((r) => r + 90)}>
-                หมุนขวา 90°
-              </Button>
-              <Button type="button" variant="outline" onClick={handleFlipX}>
-                กลับซ้าย-ขวา
-              </Button>
-              <Button type="button" variant="outline" onClick={handleFlipY}>
-                กลับบน-ล่าง
-              </Button>
-              <Button type="button" variant="outline" onClick={handleReset}>
-                รีเซ็ต
-              </Button>
-
-              <div className="ml-auto flex gap-2">
-                <Button variant="ghost" onClick={handleCropCancel}>ยกเลิก</Button>
-                <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCropConfirm}>
-                  ใช้รูปนี้
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ===== CROP DIALOG ===== */}
+      <ProfilePhotoModal
+        open={isCropOpen}
+        src={cropSrc}
+        onCancel={handleCropCancel}
+        onComplete={handleCropComplete}
+      />
       {/* ===== END CROP DIALOG ===== */}
     </Dialog>
   )
