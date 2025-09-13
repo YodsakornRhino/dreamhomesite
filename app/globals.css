@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 /* app/globals.css */
-@import url("https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css");
+@import "cropperjs/dist/cropper.css";
 
 
 

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Loader2, Mail, IdCard, Image as ImageIcon, Save, X, User as UserIcon,
+  Loader2, Mail, IdCard, Save, X, User as UserIcon,
   Phone as PhoneIcon, Send, CheckCheck, RotateCw, CheckCircle
 } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
@@ -27,6 +27,7 @@ import { normalizePhoneNumber } from "@/lib/utils"
 
 // ✅ เพิ่ม React Cropper
 import Cropper, { type ReactCropperElement } from "react-cropper"
+import "cropperjs/dist/cropper.css"
 
 type ProfileModalProps = { isOpen: boolean; onClose: () => void }
 
@@ -113,6 +114,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [isCropOpen, setIsCropOpen] = useState(false)
   const [cropSrc, setCropSrc] = useState<string>("")
   const cropperRef = useRef<ReactCropperElement>(null)
+  const scaleXRef = useRef(1)
+  const scaleYRef = useRef(1)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [rawPhotoName, setRawPhotoName] = useState<string>("")
 
   // เปลี่ยนรูป → เปิด Crop dialog (ใหม่)
@@ -152,6 +156,30 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const handleCropCancel = () => {
     setIsCropOpen(false)
     setCropSrc("")
+    scaleXRef.current = 1
+    scaleYRef.current = 1
+  }
+
+  const handleFlipX = () => {
+    const cropper = cropperRef.current?.cropper
+    if (!cropper) return
+    scaleXRef.current = -scaleXRef.current
+    cropper.scaleX(scaleXRef.current)
+  }
+
+  const handleFlipY = () => {
+    const cropper = cropperRef.current?.cropper
+    if (!cropper) return
+    scaleYRef.current = -scaleYRef.current
+    cropper.scaleY(scaleYRef.current)
+  }
+
+  const handleReset = () => {
+    const cropper = cropperRef.current?.cropper
+    if (!cropper) return
+    scaleXRef.current = 1
+    scaleYRef.current = 1
+    cropper.reset()
   }
 
   // ---------------- helper: error ----------------
@@ -492,7 +520,25 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               </Avatar>
               <div>
                 <div className="text-sm font-medium text-gray-900">{form.name || "—"}</div>
-                <div className="text-xs text-gray-500">{form.email || "—"}</div>
+                <div className="text-xs text-gray-500 flex items-center gap-2">
+                  {form.email || "—"}
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="p-0 h-auto text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    เปลี่ยน
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    id="photo"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
+                </div>
               </div>
             </div>
 
@@ -511,15 +557,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <div className="relative">
                 <Mail className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input id="email" value={form.email} disabled className="pl-8 bg-gray-50" />
-              </div>
-            </div>
-
-            {/* Photo */}
-            <div className="space-y-1">
-              <Label htmlFor="photo" className="text-xs sm:text-sm font-medium">รูปโปรไฟล์</Label>
-              <div className="relative">
-                <ImageIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input id="photo" type="file" accept="image/*" onChange={handlePhotoChange} className="pl-8" />
               </div>
             </div>
 
@@ -652,11 +689,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               >
                 หมุนขวา 90°
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => cropperRef.current?.cropper?.reset()}
-              >
+              <Button type="button" variant="outline" onClick={handleFlipX}>
+                กลับซ้าย-ขวา
+              </Button>
+              <Button type="button" variant="outline" onClick={handleFlipY}>
+                กลับบน-ล่าง
+              </Button>
+              <Button type="button" variant="outline" onClick={handleReset}>
                 รีเซ็ต
               </Button>
 
