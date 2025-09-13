@@ -73,15 +73,15 @@ export default function ProfilePhotoModal({ open, src, onCancel, onComplete }: P
   const [flipY, setFlipY] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [cropSize, setCropSize] = useState({ width: 640, height: 360 })
+  const controlsH = 240
 
   useEffect(() => {
     if (!src) return
     const img = new Image()
     img.onload = () => {
-      const maxW = Math.min(window.innerWidth * 0.95, 640)
-      const maxDialogH = window.innerHeight * 0.9
-      const reservedH = 200
-      const maxCropH = Math.min(Math.max(100, maxDialogH - reservedH), 512)
+      const maxW = Math.min(window.innerWidth * 0.9, 768)
+      const maxDialogH = window.innerHeight * 0.95
+      const maxCropH = Math.max(100, maxDialogH - controlsH)
       let w = maxW
       let h = (img.height / img.width) * w
       if (h > maxCropH) {
@@ -119,7 +119,10 @@ export default function ProfilePhotoModal({ open, src, onCancel, onComplete }: P
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleCancel()}>
-      <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto" style={{ width: cropSize.width }}>
+      <DialogContent
+        className="max-w-[90vw] max-h-[95vh] overflow-hidden"
+        style={{ width: cropSize.width, height: cropSize.height + controlsH }}
+      >
         <DialogHeader>
           <DialogTitle>ครอปรูปโปรไฟล์</DialogTitle>
           <DialogDescription>ปรับกรอบให้พอดีแล้วกดยืนยัน</DialogDescription>
@@ -127,22 +130,27 @@ export default function ProfilePhotoModal({ open, src, onCancel, onComplete }: P
 
         <div className="space-y-3">
           {src ? (
-            <Cropper
-              image={src}
-              crop={crop}
-              zoom={zoom}
-              rotation={rotation}
-              aspect={1}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onRotationChange={setRotation}
-              onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
-              zoomWithScroll
-              style={{
-                containerStyle: { width: "100%", height: cropSize.height },
-                mediaStyle: { transform: `scaleX(${flipX}) scaleY(${flipY})` },
-              }}
-            />
+            <div
+              className="relative mx-auto overflow-hidden rounded-md"
+              style={{ width: cropSize.width, height: cropSize.height }}
+            >
+              <Cropper
+                image={src}
+                crop={crop}
+                zoom={zoom}
+                rotation={rotation}
+                aspect={1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onRotationChange={setRotation}
+                onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
+                zoomWithScroll
+                style={{
+                  containerStyle: { width: "100%", height: "100%" },
+                  mediaStyle: { transform: `scaleX(${flipX}) scaleY(${flipY})` },
+                }}
+              />
+            </div>
           ) : (
             <div className="text-sm text-gray-500">ไม่มีภาพ</div>
           )}
