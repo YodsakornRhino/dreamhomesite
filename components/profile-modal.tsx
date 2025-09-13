@@ -23,6 +23,11 @@ import {
 import { getAuthInstance } from "@/lib/auth"
 import { normalizePhoneNumber } from "@/lib/utils"
 
+
+
+// ✅ เพิ่ม React Cropper
+import Cropper, { type ReactCropperElement } from "react-cropper"
+
 type ProfileModalProps = { isOpen: boolean; onClose: () => void }
 
 // ต้องมี <div id="recaptcha-container-root" /> ใน layout.tsx
@@ -104,13 +109,49 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     return n.slice(0, 2).toUpperCase()
   }, [form.name, user])
 
+  // -------------------- CROP STATES (ใหม่) --------------------
+  const [isCropOpen, setIsCropOpen] = useState(false)
+  const [cropSrc, setCropSrc] = useState<string>("")
+  const cropperRef = useRef<ReactCropperElement>(null)
+  const [rawPhotoName, setRawPhotoName] = useState<string>("")
+
+  // เปลี่ยนรูป → เปิด Crop dialog (ใหม่)
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
+    if (!file) return
+    setRawPhotoName(file.name)
+    const src = URL.createObjectURL(file)
+    setCropSrc(src)
+    setIsCropOpen(true)
+  }
+
+  // ยืนยันการครอป → ได้ไฟล์ใหม่ (ใหม่)
+  const handleCropConfirm = async () => {
+    const cropper = cropperRef.current?.cropper
+    if (!cropper) return
+
+    const canvas = cropper.getCroppedCanvas({
+      width: 512,
+      height: 512,
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: "high",
+    })
+    if (!canvas) return
+
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const file = new File([blob], `avatar-${Date.now()}.jpeg`, { type: "image/jpeg" })
       setPhotoFile(file)
       const preview = URL.createObjectURL(file)
       setForm((p) => ({ ...p, photoURL: preview }))
-    }
+      setIsCropOpen(false)
+      setCropSrc("")
+    }, "image/jpeg", 0.92)
+  }
+
+  const handleCropCancel = () => {
+    setIsCropOpen(false)
+    setCropSrc("")
   }
 
   // ---------------- helper: error ----------------
@@ -288,39 +329,39 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   }
 
   // ---------------- Save profile ----------------
-    const handleSaveProfile = async () => {
-      if (!uid) return
-      if (!form.name.trim()) { setError("กรุณากรอกชื่อ"); return }
-      setSaving(true); setError(null)
-      try {
-        let photoURL: string | null = form.photoURL || null
-        if (photoFile) {
-          const path = `profilepicture/${uid}/${Date.now()}-${photoFile.name}`
-          await uploadFile(path, photoFile)
-          photoURL = await getDownloadURL(path)
-          setForm((p) => ({ ...p, photoURL }))
-          setPhotoFile(null)
-        }
-
-        const { serverTimestamp } = await import("firebase/firestore")
-        await setDocument("users", uid, {
-          uid,
-          name: form.name.trim(),
-          email: form.email || user?.email || null,
-          photoURL: photoURL,
-          phoneNumber: verifiedPhone || null,
-          phoneVerified: phoneVerified,
-          updatedAt: serverTimestamp(),
-        })
-        try { await updateProfile(user!, { displayName: form.name.trim(), photoURL: photoURL || null }) } catch {}
-        toast({ title: "บันทึกโปรไฟล์สำเร็จ" })
-        onClose()
-      } catch (e: any) {
-        setError(e?.message ?? "บันทึกไม่สำเร็จ")
-      } finally {
-        setSaving(false)
+  const handleSaveProfile = async () => {
+    if (!uid) return
+    if (!form.name.trim()) { setError("กรุณากรอกชื่อ"); return }
+    setSaving(true); setError(null)
+    try {
+      let photoURL: string | null = form.photoURL || null
+      if (photoFile) {
+        const path = `profilepicture/${uid}/${Date.now()}-${photoFile.name}`
+        await uploadFile(path, photoFile)
+        photoURL = await getDownloadURL(path)
+        setForm((p) => ({ ...p, photoURL }))
+        setPhotoFile(null)
       }
+
+      const { serverTimestamp } = await import("firebase/firestore")
+      await setDocument("users", uid, {
+        uid,
+        name: form.name.trim(),
+        email: form.email || user?.email || null,
+        photoURL: photoURL,
+        phoneNumber: verifiedPhone || null,
+        phoneVerified: phoneVerified,
+        updatedAt: serverTimestamp(),
+      })
+      try { await updateProfile(user!, { displayName: form.name.trim(), photoURL: photoURL || null }) } catch {}
+      toast({ title: "บันทึกโปรไฟล์สำเร็จ" })
+      onClose()
+    } catch (e: any) {
+      setError(e?.message ?? "บันทึกไม่สำเร็จ")
+    } finally {
+      setSaving(false)
     }
+  }
 
   // ---------------- Send OTP ----------------
   const handleSendOtp = async () => {
@@ -568,6 +609,68 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </form>
         )}
       </DialogContent>
+
+      {/* ===== CROP DIALOG (ใหม่) ===== */}
+      <Dialog open={isCropOpen} onOpenChange={(open) => !open && handleCropCancel()}>
+        <DialogContent className="max-w-[95vw] w-[640px]">
+          <DialogHeader>
+            <DialogTitle>ครอปรูปโปรไฟล์</DialogTitle>
+            <DialogDescription>ปรับกรอบให้พอดีแล้วกดยืนยัน</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {cropSrc ? (
+              <Cropper
+                src={cropSrc}
+                ref={cropperRef}
+                aspectRatio={1}               // ครอปสี่เหลี่ยมจัตุรัส
+                viewMode={1}                  // จำกัดกรอบให้อยู่ในภาพ
+                guides={true}
+                zoomOnWheel={true}
+                autoCropArea={1}
+                background={false}
+                responsive={true}
+                checkOrientation={true}
+                style={{ width: "100%", height: 360 }}
+              />
+            ) : (
+              <div className="text-sm text-gray-500">ไม่มีภาพ</div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => cropperRef.current?.cropper?.rotate(-90)}
+              >
+                หมุนซ้าย 90°
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => cropperRef.current?.cropper?.rotate(90)}
+              >
+                หมุนขวา 90°
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => cropperRef.current?.cropper?.reset()}
+              >
+                รีเซ็ต
+              </Button>
+
+              <div className="ml-auto flex gap-2">
+                <Button variant="ghost" onClick={handleCropCancel}>ยกเลิก</Button>
+                <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCropConfirm}>
+                  ใช้รูปนี้
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* ===== END CROP DIALOG ===== */}
     </Dialog>
   )
 }

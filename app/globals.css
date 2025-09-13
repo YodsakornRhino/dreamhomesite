@@ -1,6 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* app/globals.css */
+@import url("https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css");
+
+
 
 body {
   font-family: Arial, Helvetica, sans-serif;
