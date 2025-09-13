@@ -171,6 +171,24 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [flipX, setFlipX] = useState(1)
   const [flipY, setFlipY] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
+  const [cropSize, setCropSize] = useState({ width: 640, height: 360 })
+
+  useEffect(() => {
+    if (!cropSrc) return
+    const img = new Image()
+    img.onload = () => {
+      const maxW = Math.min(window.innerWidth * 0.95, 640)
+      const maxH = Math.min(window.innerHeight * 0.7, 512)
+      let w = maxW
+      let h = (img.height / img.width) * w
+      if (h > maxH) {
+        h = maxH
+        w = (img.width / img.height) * h
+      }
+      setCropSize({ width: w, height: h })
+    }
+    img.src = cropSrc
+  }, [cropSrc])
 
   // เปลี่ยนรูป → เปิด Crop dialog (ใหม่)
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -689,7 +707,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       {/* ===== CROP DIALOG (ใหม่) ===== */}
       <Dialog open={isCropOpen} onOpenChange={(open) => !open && handleCropCancel()}>
-        <DialogContent className="max-w-[95vw] w-[640px]">
+        <DialogContent className="max-w-[95vw]" style={{ width: cropSize.width }}>
           <DialogHeader>
             <DialogTitle>ครอปรูปโปรไฟล์</DialogTitle>
             <DialogDescription>ปรับกรอบให้พอดีแล้วกดยืนยัน</DialogDescription>
@@ -709,7 +727,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
                 zoomWithScroll
                 style={{
-                  containerStyle: { width: "100%", height: 360 },
+                  containerStyle: { width: "100%", height: cropSize.height },
                   mediaStyle: { transform: `scaleX(${flipX}) scaleY(${flipY})` },
                 }}
               />
