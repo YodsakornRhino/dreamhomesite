@@ -82,6 +82,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({ name: "", email: "", photoURL: "" })
+  const [originalPhotoURL, setOriginalPhotoURL] = useState("")
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [phone, setPhone] = useState("")
   const [otp, setOtp] = useState("")
@@ -204,6 +205,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         const pv = data?.phoneVerified ?? Boolean(phoneNumber)
 
         setForm({ name, email, photoURL })
+        setOriginalPhotoURL(photoURL)
         setPhone(phoneNumber || "")
         setVerifiedPhone(phoneNumber || "")
         setPhoneVerified(Boolean(pv))
@@ -326,14 +328,16 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     try {
       let photoURL: string | null = form.photoURL || null
       if (photoFile) {
-        const oldPath = getStoragePathFromUrl(form.photoURL)
+        const oldPath = getStoragePathFromUrl(originalPhotoURL)
         if (oldPath) {
           try { await deleteFile(oldPath) } catch (e) { console.warn("Delete old photo failed:", e) }
         }
         const path = `user/${uid}/profile pic/${Date.now()}-${photoFile.name}`
         await uploadFile(path, photoFile)
-        photoURL = await getDownloadURL(path)
-        setForm((p) => ({ ...p, photoURL }))
+        const newURL = await getDownloadURL(path)
+        photoURL = newURL
+        setForm((p) => ({ ...p, photoURL: newURL }))
+        setOriginalPhotoURL(newURL)
         setPhotoFile(null)
       }
 
