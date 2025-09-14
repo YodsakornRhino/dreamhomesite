@@ -15,7 +15,7 @@ import {
 import { useAuthContext } from "@/contexts/AuthContext"
 import { getDocument, setDocument, getDocuments } from "@/lib/firestore"
 import { useToast } from "@/hooks/use-toast"
-import { uploadFile, getDownloadURL } from "@/lib/storage"
+import { uploadFile, getDownloadURL, deleteFile } from "@/lib/storage"
 import {
   updateProfile, RecaptchaVerifier, linkWithPhoneNumber,
   PhoneAuthProvider, updatePhoneNumber, type ConfirmationResult,
@@ -59,6 +59,15 @@ const createFreshSlot = (): HTMLElement => {
   slot.setAttribute("data-recaptcha-slot", "1")
   root.appendChild(slot)
   return slot
+}
+
+const getStoragePathFromUrl = (url: string): string | null => {
+  try {
+    const match = url.match(/\/o\/([^?]+)/)
+    return match ? decodeURIComponent(match[1]) : null
+  } catch {
+    return null
+  }
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
@@ -317,7 +326,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     try {
       let photoURL: string | null = form.photoURL || null
       if (photoFile) {
-        const path = `profilepicture/${uid}/${Date.now()}-${photoFile.name}`
+        const oldPath = getStoragePathFromUrl(form.photoURL)
+        if (oldPath) {
+          try { await deleteFile(oldPath) } catch (e) { console.warn("Delete old photo failed:", e) }
+        }
+        const path = `user/${uid}/profile pic/${Date.now()}-${photoFile.name}`
         await uploadFile(path, photoFile)
         photoURL = await getDownloadURL(path)
         setForm((p) => ({ ...p, photoURL }))
