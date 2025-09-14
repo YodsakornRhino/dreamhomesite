@@ -177,7 +177,7 @@ export default function SellCreatePage() {
 
     gmap.current = new google.maps.Map(mapRef.current, {
       center: start, zoom: 12,
-      mapTypeControl: false, streetViewControl: false, fullscreenControl: true,
+      mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
     })
     marker.current = new google.maps.Marker({ map: gmap.current, position: start, draggable: true })
     geocoder.current = new google.maps.Geocoder()
@@ -520,7 +520,7 @@ export default function SellCreatePage() {
               </div>
             </div>
 
-            <div className="rounded-lg border overflow-hidden">
+            <div className="rounded-lg border overflow-hidden max-w-3xl mx-auto">
               <div ref={mapRef} className="h-72 w-full" />
               {!mapsReady && (
                 <div className="h-72 w-full flex flex-col items-center justify-center text-gray-500">
