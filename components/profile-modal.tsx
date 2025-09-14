@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Loader2, Mail, IdCard, Save, X, User as UserIcon,
+  Loader2, Mail, Save, X, User as UserIcon,
   Phone as PhoneIcon, Send, CheckCheck, RotateCw, CheckCircle
 } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
@@ -590,15 +590,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   </Button>
                 </div>
               )}
-            </div>
-
-            {/* UID */}
-            <div className="space-y-1">
-              <Label htmlFor="uid" className="text-xs sm:text-sm font-medium">UID</Label>
-              <div className="relative">
-                <IdCard className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input id="uid" value={uid ?? ""} disabled className="pl-8 bg-gray-50" />
-              </div>
             </div>
 
             {/* Actions */}
