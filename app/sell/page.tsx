@@ -4,10 +4,10 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import ChatWidget from "@/components/chat-widget"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuthContext } from "@/contexts/AuthContext"
 import SellAuthPrompt from "@/components/sell-auth-prompt"
 import { getDocuments } from "@/lib/firestore"
+import UserPropertyCard from "@/components/user-property-card"
 
 export default function SellDashboardPage() {
   const { user, loading } = useAuthContext()
@@ -42,44 +42,15 @@ export default function SellDashboardPage() {
       </header>
 
       {properties.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>ประกาศของคุณ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-500">คุณยังไม่ได้สร้างประกาศขายใดๆ</p>
-          </CardContent>
-        </Card>
+        <p className="text-gray-500">คุณยังไม่ได้สร้างประกาศขายใดๆ</p>
       ) : (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {properties.map((property) => (
-            <Card key={property.id}>
-              <CardHeader>
-                <CardTitle>{property.title || "(ไม่มีชื่อ)"}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {Array.isArray(property.photos) && property.photos.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {property.photos.map((url: string, idx: number) => (
-                      <img
-                        key={idx}
-                        src={url}
-                        alt={property.title || `photo-${idx}`}
-                        className="w-full h-32 object-cover rounded"
-                      />
-                    ))}
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Link href={`/sell/${user.uid}/${property.id}`}>
-                    <Button variant="outline">ดูรายละเอียด</Button>
-                  </Link>
-                  <Link href={`/sell/${user.uid}/${property.id}/edit`}>
-                    <Button>แก้ไข</Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+            <UserPropertyCard
+              key={property.id}
+              property={property}
+              ownerUid={user.uid}
+            />
           ))}
         </div>
       )}
