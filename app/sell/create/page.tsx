@@ -32,7 +32,7 @@ import SellAuthPrompt from "@/components/sell-auth-prompt"
 import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { Loader } from "@googlemaps/js-api-loader"
 import { uploadFile, uploadFiles, getDownloadURL } from "@/lib/storage"
-import { setDocument } from "@/lib/firestore"
+import { setDocument, addDocument } from "@/lib/firestore"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -319,25 +319,10 @@ export default function SellCreatePage() {
     if (!user) return
 
     try {
-      const propertyId = crypto.randomUUID()
+      // Ensure parent user document exists so subcollection can be created
+      await setDocument("users", user.uid, { uid: user.uid })
 
-      const imageData = photos.map((file, idx) => ({
-        path: `users/${user.uid}/property/${propertyId}/images/${idx}-${file.name}`,
-        file,
-      }))
-      await uploadFiles(imageData)
-      const photoUrls = await Promise.all(
-        imageData.map(({ path }) => getDownloadURL(path))
-      )
-
-      let videoUrl: string | null = null
-      if (video) {
-        const videoPath = `users/${user.uid}/property/${propertyId}/videos/${video.name}`
-        await uploadFile(videoPath, video)
-        videoUrl = await getDownloadURL(videoPath)
-      }
-
-      await setDocument(`users/${user.uid}/user_property`, propertyId, {
+      const propertyBase = {
         sellerName,
         sellerPhone,
         sellerEmail,
@@ -359,9 +344,36 @@ export default function SellCreatePage() {
         parking,
         yearBuilt,
         description,
+        photos: [] as string[],
+        video: null as string | null,
+        createdAt: new Date().toISOString(),
+      }
+
+      const docRef = await addDocument(
+        `users/${user.uid}/user_property`,
+        propertyBase,
+      )
+      const propertyId = docRef.id
+
+      const imageData = photos.map((file, idx) => ({
+        path: `users/${user.uid}/property/${propertyId}/images/${idx}-${file.name}`,
+        file,
+      }))
+      await uploadFiles(imageData)
+      const photoUrls = await Promise.all(
+        imageData.map(({ path }) => getDownloadURL(path))
+      )
+
+      let videoUrl: string | null = null
+      if (video) {
+        const videoPath = `users/${user.uid}/property/${propertyId}/videos/${video.name}`
+        await uploadFile(videoPath, video)
+        videoUrl = await getDownloadURL(videoPath)
+      }
+
+      await setDocument(`users/${user.uid}/user_property`, propertyId, {
         photos: photoUrls,
         video: videoUrl,
-        createdAt: new Date().toISOString(),
       })
 
       alert("บันทึกเรียบร้อย!")
