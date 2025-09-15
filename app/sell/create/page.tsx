@@ -356,7 +356,7 @@ export default function SellCreatePage() {
       const propertyId = docRef.id
 
       const imageData = photos.map((file, idx) => ({
-        path: `users/${user.uid}/property/${propertyId}/images/${idx}-${file.name}`,
+        path: `user/${user.uid}/property/${propertyId}/images/${idx}-${file.name}`,
         file,
       }))
       await uploadFiles(imageData)
@@ -366,7 +366,7 @@ export default function SellCreatePage() {
 
       let videoUrl: string | null = null
       if (video) {
-        const videoPath = `users/${user.uid}/property/${propertyId}/videos/${video.name}`
+        const videoPath = `user/${user.uid}/property/${propertyId}/videos/${video.name}`
         await uploadFile(videoPath, video)
         videoUrl = await getDownloadURL(videoPath)
       }
