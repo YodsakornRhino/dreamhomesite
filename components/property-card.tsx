@@ -4,7 +4,7 @@ import { useState } from "react"
 import { MapPin, Bed, Bath, Square, Heart } from "lucide-react"
 
 interface PropertyCardProps {
-  id: number
+  id?: number
   title: string
   price: string
   location: string
@@ -13,7 +13,8 @@ interface PropertyCardProps {
   sqft: number
   type: "sale" | "rent"
   gradient: string
-  onViewDetails: (id: number) => void
+  image?: string
+  onViewDetails: () => void
 }
 
 export default function PropertyCard({
@@ -26,6 +27,7 @@ export default function PropertyCard({
   sqft,
   type,
   gradient,
+  image,
   onViewDetails,
 }: PropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
@@ -37,11 +39,15 @@ export default function PropertyCard({
   return (
     <div className="property-card bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-xl">
       <div className="relative">
-        <div className={`h-48 ${gradient} flex items-center justify-center`}>
-          <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-            <div className="w-8 h-8 bg-white bg-opacity-40 rounded"></div>
+        {image ? (
+          <img src={image} alt={title} className="h-48 w-full object-cover" />
+        ) : (
+          <div className={`h-48 ${gradient} flex items-center justify-center`}>
+            <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-white bg-opacity-40 rounded"></div>
+            </div>
           </div>
-        </div>
+        )}
         <div
           className={`absolute top-4 left-4 ${
             type === "sale" ? "bg-green-500" : "bg-orange-500"
@@ -83,7 +89,7 @@ export default function PropertyCard({
           </span>
         </div>
         <button
-          onClick={() => onViewDetails(id)}
+          onClick={onViewDetails}
           className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium"
         >
           ดูรายละเอียด

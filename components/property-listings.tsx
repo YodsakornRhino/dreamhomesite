@@ -1,43 +1,49 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import PropertyCard from "./property-card"
 import PropertyModal from "./property-modal"
 import { Grid, List, ChevronLeft, ChevronRight } from "lucide-react"
 import MobileFilterDrawer from "./mobile-filter-drawer"
+import { getDocuments } from "@/lib/firestore"
 
-const allProperties = [
-  {
-    id: 4,
-    title: "ลอฟต์ใจกลางเมือง",
-    price: "$380,000",
-    location: "321 ถนนบรอดเวย์ ใจกลางเมือง",
-    beds: 1,
-    baths: 1,
-    sqft: 750,
-    type: "sale" as const,
-    gradient: "bg-gradient-to-r from-yellow-400 to-orange-500",
-  },
-  {
-    id: 5,
-    title: "วิลล่าสวน",
-    price: "$3,200/mo",
-    location: "654 ซอยการ์เดน ย่านฝั่งตะวันตก",
-    beds: 4,
-    baths: 3,
-    sqft: 1800,
-    type: "rent" as const,
-    gradient: "bg-gradient-to-r from-teal-400 to-blue-500",
-  },
-]
+interface PropertyData {
+  id: string
+  title?: string
+  price?: string
+  address?: string
+  city?: string
+  province?: string
+  bedrooms?: number
+  bathrooms?: number
+  usableArea?: number
+  photos?: string[]
+  features?: string[]
+  description?: string
+  ownerId?: string
+}
 
 export default function PropertyListings() {
-  const [selectedProperty, setSelectedProperty] = useState<number | null>(null)
+  const [properties, setProperties] = useState<PropertyData[]>([])
+  const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [selectedBedrooms, setSelectedBedrooms] = useState<string | null>(null)
 
-  const handleViewDetails = (id: number) => {
-    setSelectedProperty(id)
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const docs = await getDocuments("user_property")
+        const data = docs.map((d) => ({ id: d.id, ...d.data() })) as PropertyData[]
+        setProperties(data)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    fetch()
+  }, [])
+
+  const handleViewDetails = (property: PropertyData) => {
+    setSelectedProperty(property)
   }
 
   const handleCloseModal = () => {
@@ -161,8 +167,21 @@ export default function PropertyListings() {
             <div
               className={`grid gap-4 sm:gap-6 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
             >
-              {allProperties.map((property) => (
-                <PropertyCard key={property.id} {...property} onViewDetails={handleViewDetails} />
+              {properties.map((property, index) => (
+                <PropertyCard
+                  key={property.id}
+                  id={index}
+                  title={property.title || "(ไม่มีชื่อ)"}
+                  price={property.price || ""}
+                  location={[property.address, property.city, property.province].filter(Boolean).join(", ")}
+                  beds={property.bedrooms || 0}
+                  baths={property.bathrooms || 0}
+                  sqft={property.usableArea || 0}
+                  type="sale"
+                  gradient="bg-gray-200"
+                  image={Array.isArray(property.photos) ? property.photos[0] : undefined}
+                  onViewDetails={() => handleViewDetails(property)}
+                />
               ))}
             </div>
 
@@ -184,7 +203,7 @@ export default function PropertyListings() {
         </div>
       </div>
 
-      {selectedProperty && <PropertyModal propertyId={selectedProperty} onClose={handleCloseModal} />}
+      {selectedProperty && <PropertyModal property={selectedProperty} onClose={handleCloseModal} />}
 
       <MobileFilterDrawer
         selectedBedrooms={selectedBedrooms}
@@ -194,3 +213,4 @@ export default function PropertyListings() {
     </section>
   )
 }
+

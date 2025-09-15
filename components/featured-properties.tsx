@@ -15,6 +15,8 @@ const featuredProperties = [
     sqft: 1200,
     type: "sale" as const,
     gradient: "bg-gradient-to-r from-blue-400 to-purple-500",
+    photos: [],
+    ownerId: ""
   },
   {
     id: 2,
@@ -26,6 +28,8 @@ const featuredProperties = [
     sqft: 950,
     type: "rent" as const,
     gradient: "bg-gradient-to-r from-green-400 to-blue-500",
+    photos: [],
+    ownerId: ""
   },
   {
     id: 3,
@@ -37,14 +41,16 @@ const featuredProperties = [
     sqft: 800,
     type: "sale" as const,
     gradient: "bg-gradient-to-r from-purple-400 to-pink-500",
+    photos: [],
+    ownerId: ""
   },
 ]
 
 export default function FeaturedProperties() {
-  const [selectedProperty, setSelectedProperty] = useState<number | null>(null)
+  const [selectedProperty, setSelectedProperty] = useState<any | null>(null)
 
-  const handleViewDetails = (id: number) => {
-    setSelectedProperty(id)
+  const handleViewDetails = (property: any) => {
+    setSelectedProperty(property)
   }
 
   const handleCloseModal = () => {
@@ -61,12 +67,16 @@ export default function FeaturedProperties() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {featuredProperties.map((property) => (
-            <PropertyCard key={property.id} {...property} onViewDetails={handleViewDetails} />
+            <PropertyCard
+              key={property.id}
+              {...property}
+              onViewDetails={() => handleViewDetails(property)}
+            />
           ))}
         </div>
       </div>
 
-      {selectedProperty && <PropertyModal propertyId={selectedProperty} onClose={handleCloseModal} />}
+      {selectedProperty && <PropertyModal property={selectedProperty} onClose={handleCloseModal} />}
     </section>
   )
 }

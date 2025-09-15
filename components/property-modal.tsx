@@ -1,16 +1,23 @@
 "use client"
 
-import type React from "react"
-
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { X, Bed, Bath, Square, Check, MapPin } from "lucide-react"
-import { useEffect } from "react"
+
+import { Button } from "@/components/ui/button"
+import { useAuthContext } from "@/contexts/AuthContext"
 
 interface PropertyModalProps {
-  propertyId: number
+  property: any
   onClose: () => void
 }
 
-export default function PropertyModal({ propertyId, onClose }: PropertyModalProps) {
+export default function PropertyModal({ property, onClose }: PropertyModalProps) {
+  const { user } = useAuthContext()
+  const isOwner = user?.uid === property.ownerId
+  const [activePhoto, setActivePhoto] = useState(0)
+  const photos: string[] = Array.isArray(property.photos) ? property.photos : []
+
   useEffect(() => {
     document.body.style.overflow = "hidden"
     return () => {
@@ -18,11 +25,13 @@ export default function PropertyModal({ propertyId, onClose }: PropertyModalProp
     }
   }, [])
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
       onClose()
     }
   }
+
+  const location = [property.address, property.city, property.province].filter(Boolean).join(", ")
 
   return (
     <div
@@ -32,92 +41,106 @@ export default function PropertyModal({ propertyId, onClose }: PropertyModalProp
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto mx-2 sm:mx-4">
         <div className="p-4 sm:p-6">
           <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">รายละเอียดอสังหาริมทรัพย์</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+              {property.title || "รายละเอียดอสังหาริมทรัพย์"}
+            </h2>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700 transition-colors p-1">
               <X size={24} />
             </button>
           </div>
 
-          {/* Image Gallery */}
-          <div className="mb-4 sm:mb-6">
-            <div className="h-48 sm:h-64 md:h-96 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg flex items-center justify-center mb-4">
-              <div className="w-16 sm:w-20 h-16 sm:h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <div className="w-8 sm:w-10 h-8 sm:h-10 bg-white bg-opacity-40 rounded"></div>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 gap-1 sm:gap-2">
-              {[
-                "bg-gradient-to-r from-green-400 to-blue-500",
-                "bg-gradient-to-r from-purple-400 to-pink-500",
-                "bg-gradient-to-r from-yellow-400 to-orange-500",
-                "bg-gradient-to-r from-teal-400 to-blue-500",
-              ].map((gradient, index) => (
-                <div
-                  key={index}
-                  className={`h-16 sm:h-20 ${gradient} rounded flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity`}
-                >
-                  <div className="w-4 sm:w-6 h-4 sm:h-6 bg-white bg-opacity-30 rounded"></div>
+          {photos.length > 0 && (
+            <div className="mb-4 sm:mb-6">
+              <img
+                src={photos[activePhoto]}
+                alt={property.title || "property-photo"}
+                className="h-48 sm:h-64 md:h-96 w-full object-cover rounded-lg mb-4"
+              />
+              {photos.length > 1 && (
+                <div className="grid grid-cols-4 gap-1 sm:gap-2">
+                  {photos.map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={property.title || `thumb-${idx}`}
+                      onClick={() => setActivePhoto(idx)}
+                      className={`h-16 sm:h-20 w-full object-cover rounded cursor-pointer ${idx === activePhoto ? "ring-2 ring-blue-500" : ""}`}
+                    />
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             <div>
-              <h3 className="text-lg sm:text-xl font-semibold mb-2">บ้านครอบครัวสมัยใหม่</h3>
-              <p className="text-gray-600 mb-4 flex items-center text-sm sm:text-base">
-                <MapPin className="mr-1" size={16} />
-                123 ถนนโอ๊ค ใจกลางเมือง
-              </p>
-              <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-4 sm:mb-6">$450,000</div>
+              {location && (
+                <p className="text-gray-600 mb-4 flex items-center text-sm sm:text-base">
+                  <MapPin className="mr-1" size={16} />
+                  {location}
+                </p>
+              )}
+              {property.price && (
+                <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-4 sm:mb-6">
+                  {property.price}
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
-                <div className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <Bed className="mx-auto text-blue-600 mb-2" size={20} />
-                  <div className="font-semibold text-sm sm:text-base">3</div>
-                  <div className="text-xs sm:text-sm text-gray-600">ห้องนอน</div>
-                </div>
-                <div className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <Bath className="mx-auto text-blue-600 mb-2" size={20} />
-                  <div className="font-semibold text-sm sm:text-base">2</div>
-                  <div className="text-xs sm:text-sm text-gray-600">ห้องน้ำ</div>
-                </div>
-                <div className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <Square className="mx-auto text-blue-600 mb-2" size={20} />
-                  <div className="font-semibold text-sm sm:text-base">1,200</div>
-                  <div className="text-xs sm:text-sm text-gray-600">ตร.ฟุต</div>
-                </div>
+                {property.bedrooms && (
+                  <div className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg">
+                    <Bed className="mx-auto text-blue-600 mb-2" size={20} />
+                    <div className="font-semibold text-sm sm:text-base">{property.bedrooms}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">ห้องนอน</div>
+                  </div>
+                )}
+                {property.bathrooms && (
+                  <div className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg">
+                    <Bath className="mx-auto text-blue-600 mb-2" size={20} />
+                    <div className="font-semibold text-sm sm:text-base">{property.bathrooms}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">ห้องน้ำ</div>
+                  </div>
+                )}
+                {property.usableArea && (
+                  <div className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg">
+                    <Square className="mx-auto text-blue-600 mb-2" size={20} />
+                    <div className="font-semibold text-sm sm:text-base">{property.usableArea}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">ตร.ฟุต</div>
+                  </div>
+                )}
               </div>
 
-              <div className="mb-4 sm:mb-6">
-                <h4 className="font-semibold mb-2 text-sm sm:text-base">คำอธิบาย</h4>
-                <p className="text-gray-600 text-sm sm:text-base">
-                  บ้านครอบครัวสมัยใหม่ในย่านเงียบสงบ มีครัวปรับปรุงใหม่ พื้นไม้เนื้อแข็ง สวนหลังบ้านกว้างขวาง และโรงจอดรถสองคัน เหมาะสำหรับครอบครัวที่มองหาความสะดวกสบาย
-                </p>
-              </div>
-
-              <div className="mb-4 sm:mb-6">
-                <h4 className="font-semibold mb-2 text-sm sm:text-base">คุณสมบัติ</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 text-xs sm:text-sm">
-                  {[
-                    "พื้นไม้เนื้อแข็ง",
-                    "ครัวปรับปรุงใหม่",
-                    "โรงจอดรถ 2 คัน",
-                    "สนามหลังบ้าน",
-                    "เครื่องปรับอากาศส่วนกลาง",
-                    "ใกล้โรงเรียน",
-                  ].map((feature) => (
-                    <div key={feature} className="flex items-center">
-                      <Check className="text-green-500 mr-2" size={14} />
-                      {feature}
-                    </div>
-                  ))}
+              {property.description && (
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="font-semibold mb-2 text-sm sm:text-base">คำอธิบาย</h4>
+                  <p className="text-gray-600 text-sm sm:text-base whitespace-pre-line">
+                    {property.description}
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {Array.isArray(property.features) && property.features.length > 0 && (
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="font-semibold mb-2 text-sm sm:text-base">คุณสมบัติ</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 text-xs sm:text-sm">
+                    {property.features.map((feature: string) => (
+                      <div key={feature} className="flex items-center">
+                        <Check className="text-green-500 mr-2" size={14} />
+                        {feature}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isOwner && (
+                <Link href={`/sell/${property.ownerId}/${property.id}/edit`}>
+                  <Button>แก้ไขประกาศ</Button>
+                </Link>
+              )}
             </div>
 
             <div>
-              {/* Map Placeholder */}
               <div className="h-48 sm:h-64 bg-gray-200 rounded-lg mb-4 sm:mb-6 flex items-center justify-center">
                 <div className="text-center text-gray-500">
                   <MapPin className="mx-auto mb-2" size={24} />
@@ -125,7 +148,6 @@ export default function PropertyModal({ propertyId, onClose }: PropertyModalProp
                 </div>
               </div>
 
-              {/* Contact Form */}
               <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
                 <h4 className="font-semibold mb-4 text-sm sm:text-base">ติดต่อเอเจนต์</h4>
                 <div className="space-y-3 sm:space-y-4">
@@ -150,7 +172,7 @@ export default function PropertyModal({ propertyId, onClose }: PropertyModalProp
                     className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
                   />
                   <button className="w-full bg-blue-600 text-white py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base">
-                    ส่งข้อความ
+                    สงข้อความ
                   </button>
                 </div>
 
@@ -174,3 +196,4 @@ export default function PropertyModal({ propertyId, onClose }: PropertyModalProp
     </div>
   )
 }
+
