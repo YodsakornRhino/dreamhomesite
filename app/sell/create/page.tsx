@@ -29,8 +29,10 @@ import {
 import { useAuthContext } from "@/contexts/AuthContext"
 import SellAuthPrompt from "@/components/sell-auth-prompt"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { Loader } from "@googlemaps/js-api-loader"
+import { uploadFile, uploadFiles, getDownloadURL } from "@/lib/storage"
+import { setDocument } from "@/lib/firestore"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -60,6 +62,8 @@ export default function SellCreatePage() {
   const marker = useRef<google.maps.Marker | null>(null)
   const geocoder = useRef<google.maps.Geocoder | null>(null)
   const autocomplete = useRef<google.maps.places.Autocomplete | null>(null)
+  const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const videoInputRef = useRef<HTMLInputElement | null>(null)
 
   // ====== Form states ======
   // Seller
@@ -92,10 +96,45 @@ export default function SellCreatePage() {
   // Description
   const [description, setDescription] = useState("")
 
+  // Media
+  const [photos, setPhotos] = useState<File[]>([])
+  const [video, setVideo] = useState<File | null>(null)
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  const [videoPreview, setVideoPreview] = useState<string | null>(null)
+
   // Validation UI
   const [errors, setErrors] = useState<Errors>({})
   const [touched, setTouched] = useState<Touched>({})
   const touch = (name: string) => setTouched((t) => ({ ...t, [name]: true }))
+
+  const handlePhotosChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    setPhotos((prev) => {
+      const merged = [...prev, ...files]
+      return merged.slice(0, 50)
+    })
+  }
+
+  const handleVideoChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setVideo(file)
+  }
+
+  useEffect(() => {
+    const urls = photos.map((file) => URL.createObjectURL(file))
+    setPhotoPreviews(urls)
+    return () => urls.forEach((url) => URL.revokeObjectURL(url))
+  }, [photos])
+
+  useEffect(() => {
+    if (!video) {
+      setVideoPreview(null)
+      return
+    }
+    const url = URL.createObjectURL(video)
+    setVideoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [video])
 
   // ====== Helpers: validation & progress ======
   const isNonEmpty = (s: string) => s.trim().length > 0
@@ -262,7 +301,7 @@ export default function SellCreatePage() {
   }
 
   // ====== Submit ======
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate()
     setErrors(e)
     // mark all as touched toโชว์ error
@@ -276,8 +315,60 @@ export default function SellCreatePage() {
       if (el?.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" })
       return
     }
-    // TODO: ส่งข้อมูลไปบันทึก
-    alert("เรียบร้อย! พร้อมส่งข้อมูล")
+
+    if (!user) return
+
+    try {
+      const propertyId = crypto.randomUUID()
+
+      const imageData = photos.map((file, idx) => ({
+        path: `users/${user.uid}/property/${propertyId}/images/${idx}-${file.name}`,
+        file,
+      }))
+      await uploadFiles(imageData)
+      const photoUrls = await Promise.all(
+        imageData.map(({ path }) => getDownloadURL(path))
+      )
+
+      let videoUrl: string | null = null
+      if (video) {
+        const videoPath = `users/${user.uid}/property/${propertyId}/videos/${video.name}`
+        await uploadFile(videoPath, video)
+        videoUrl = await getDownloadURL(videoPath)
+      }
+
+      await setDocument(`users/${user.uid}/user_property`, propertyId, {
+        sellerName,
+        sellerPhone,
+        sellerEmail,
+        sellerRole,
+        title,
+        propertyType,
+        transactionType,
+        price: Number(price),
+        address,
+        city,
+        province,
+        postal,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        landArea,
+        usableArea,
+        bedrooms,
+        bathrooms,
+        parking,
+        yearBuilt,
+        description,
+        photos: photoUrls,
+        video: videoUrl,
+        createdAt: new Date().toISOString(),
+      })
+
+      alert("บันทึกเรียบร้อย!")
+    } catch (err) {
+      console.error(err)
+      alert("เกิดข้อผิดพลาดในการบันทึก")
+    }
   }
 
   // convenience: แสดงข้อความผิดพลาดเมื่อ touched + error
@@ -637,18 +728,49 @@ export default function SellCreatePage() {
 
         {/* Property Photos */}
         <Card>
-          <CardHeader><CardTitle>รูปภาพทรัพย์ (สูงสุด 20 รูป)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>รูปภาพทรัพย์ (สูงสุด 50 รูป)</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Camera className="mx-auto h-10 w-10 text-gray-400 mb-4" />
               <p className="text-sm text-gray-500 mb-4">ลากและวางรูปที่นี่</p>
-              <Button><Upload className="mr-2 h-4 w-4" />เลือกภาพ</Button>
+              <Button onClick={() => photoInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />เลือกภาพ</Button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handlePhotosChange}
+              />
+              {photoPreviews.length > 0 && (
+                <>
+                  <p className="text-xs text-gray-500 mt-4">เลือกแล้ว {photos.length} รูป</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-4">
+                    {photoPreviews.map((src, idx) => (
+                      <img key={idx} src={src} alt={`preview-${idx}`} className="h-24 w-full object-cover rounded" />
+                    ))}
+                  </div>
+                </>
+              )}
               <p className="text-xs text-gray-500 mt-4">รองรับ JPG, PNG, GIF ขนาดไม่เกิน 10MB ต่อไฟล์</p>
             </div>
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Video className="mx-auto h-10 w-10 text-gray-400 mb-4" />
               <p className="text-sm text-gray-500 mb-4">อัปโหลดวิดีโอหรือทัวร์เสมือน</p>
-              <Button variant="outline"><Upload className="mr-2 h-4 w-4" />เลือกวิดีโอ</Button>
+              <Button variant="outline" onClick={() => videoInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />เลือกวิดีโอ</Button>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleVideoChange}
+              />
+              {video && <p className="text-xs text-gray-500 mt-4">{video.name}</p>}
+              {videoPreview && (
+                <video controls className="mt-4 w-full max-h-64">
+                  <source src={videoPreview} type={video?.type} />
+                </video>
+              )}
               <p className="text-xs text-gray-500 mt-4">สูงสุด 100MB รองรับ MP4, MOV</p>
             </div>
           </CardContent>
