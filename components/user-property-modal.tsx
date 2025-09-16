@@ -145,11 +145,11 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:max-w-3xl sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
+      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
         <DialogHeader className="space-y-4">
           <div className="space-y-2">
-            <DialogTitle className="text-2xl font-bold text-gray-900">{property.title}</DialogTitle>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <DialogTitle className="text-xl font-bold text-gray-900 sm:text-2xl">{property.title}</DialogTitle>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-3">
               <span className="flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
                 {locationText || property.address || "-"}
@@ -162,19 +162,19 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
               )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Badge className="bg-blue-600 text-white hover:bg-blue-600">{transactionLabel}</Badge>
             <Badge variant="outline">{typeLabel}</Badge>
-            <DialogDescription className="text-3xl font-bold text-blue-600">
+            <DialogDescription className="text-2xl font-bold text-blue-600 sm:text-3xl">
               {formatPropertyPrice(property.price, property.transactionType)}
             </DialogDescription>
           </div>
         </DialogHeader>
 
-        <div className="grid gap-6 md:grid-cols-12 lg:gap-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-12 lg:gap-8">
           <div className="space-y-6 md:col-span-7 xl:col-span-8">
             <section className="space-y-3">
-              <div className="relative h-56 w-full overflow-hidden rounded-2xl bg-muted shadow sm:h-64 lg:h-72">
+              <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-muted shadow xs:h-56 sm:h-64 lg:h-72">
                 {activeMedia ? (
                   activeMedia.type === "image" ? (
                     <Image
@@ -204,7 +204,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
                       type="button"
                       onClick={() => setActiveMediaIndex(index)}
                       className={cn(
-                        "relative h-16 w-24 overflow-hidden rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:h-20 sm:w-28",
+                        "relative h-14 w-20 overflow-hidden rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xs:h-16 xs:w-24 sm:h-20 sm:w-28",
                         index === safeIndex
                           ? "ring-2 ring-blue-500"
                           : "hover:border-blue-200",
@@ -238,7 +238,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
 
             <section className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">ข้อมูลทรัพย์สิน</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 xs:grid-cols-2">
                 <div className="flex items-center gap-3 rounded-xl border p-4">
                   <Bed className="h-5 w-5 text-blue-600" />
                   <div>
@@ -297,7 +297,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
                   <iframe
                     src={mapUrl}
                     title="ตำแหน่งทรัพย์สิน"
-                    className="h-48 w-full border-0 sm:h-56"
+                    className="h-44 w-full border-0 xs:h-48 sm:h-56"
                     loading="lazy"
                     allowFullScreen
                   />
@@ -319,11 +319,17 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
                     <p className="text-muted-foreground">{sellerRoleLabel}</p>
                   </div>
                 </div>
-                <a href={`tel:${property.sellerPhone}`} className="flex items-center gap-3 text-blue-600 hover:underline">
+                <a
+                  href={`tel:${property.sellerPhone}`}
+                  className="flex flex-wrap items-center gap-2 text-blue-600 hover:underline sm:flex-nowrap sm:gap-3"
+                >
                   <Phone className="h-5 w-5" />
                   {property.sellerPhone}
                 </a>
-                <a href={`mailto:${property.sellerEmail}`} className="flex items-center gap-3 text-blue-600 hover:underline">
+                <a
+                  href={`mailto:${property.sellerEmail}`}
+                  className="flex flex-wrap items-center gap-2 text-blue-600 hover:underline break-all sm:flex-nowrap sm:gap-3"
+                >
                   <Mail className="h-5 w-5" />
                   {property.sellerEmail}
                 </a>
