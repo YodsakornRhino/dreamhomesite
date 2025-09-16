@@ -231,7 +231,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
 
             <section className="space-y-3 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">รายละเอียด</h3>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
+              <p className="whitespace-pre-line break-words text-sm leading-relaxed text-gray-700">
                 {property.description || "ไม่มีรายละเอียดเพิ่มเติม"}
               </p>
             </section>
