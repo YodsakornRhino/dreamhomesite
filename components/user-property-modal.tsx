@@ -41,15 +41,36 @@ interface UserPropertyModalProps {
 }
 
 export function UserPropertyModal({ open, property, onOpenChange }: UserPropertyModalProps) {
-  const [activePhotoIndex, setActivePhotoIndex] = useState(0)
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0)
 
   useEffect(() => {
-    setActivePhotoIndex(0)
+    setActiveMediaIndex(0)
   }, [property?.id])
 
-  const photos = property?.photos ?? []
-  const safeIndex = photos.length > 0 ? Math.min(activePhotoIndex, photos.length - 1) : 0
-  const mainPhoto = photos[safeIndex]
+  const mediaItems = useMemo(() => {
+    if (!property) return []
+
+    const items = (property.photos ?? [])
+      .filter((photo): photo is string => typeof photo === "string" && photo.trim().length > 0)
+      .map((photo, index) => ({
+        id: `photo-${index}`,
+        type: "image" as const,
+        url: photo,
+      }))
+
+    if (property.video) {
+      items.push({
+        id: "video",
+        type: "video" as const,
+        url: property.video,
+      })
+    }
+
+    return items
+  }, [property])
+
+  const safeIndex = mediaItems.length > 0 ? Math.min(activeMediaIndex, mediaItems.length - 1) : 0
+  const activeMedia = mediaItems[safeIndex]
 
   const locationText = useMemo(() => {
     if (!property) return ""
@@ -124,7 +145,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden sm:max-w-5xl">
         <DialogHeader className="space-y-4">
           <div className="space-y-2">
             <DialogTitle className="text-2xl font-bold text-gray-900">{property.title}</DialogTitle>
@@ -150,64 +171,63 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
           </div>
         </DialogHeader>
 
-        <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+        <div className="grid gap-6 lg:grid-cols-[1.8fr,1fr]">
           <div className="space-y-6">
             <section className="space-y-3">
-              <div className="relative overflow-hidden rounded-2xl bg-muted shadow">
-                {mainPhoto ? (
-                  <Image
-                    src={mainPhoto}
-                    alt={property.title}
-                    fill
-                    sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 55vw, 100vw"
-                    className="h-full w-full object-cover"
-                  />
+              <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-muted shadow">
+                {activeMedia ? (
+                  activeMedia.type === "image" ? (
+                    <Image
+                      src={activeMedia.url}
+                      alt={property.title}
+                      fill
+                      sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 55vw, 100vw"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <video controls className="h-full w-full object-cover">
+                      <source src={activeMedia.url} />
+                      เบราว์เซอร์ของคุณไม่รองรับการเล่นวิดีโอ
+                    </video>
+                  )
                 ) : (
-                  <div className="flex h-full min-h-[240px] w-full items-center justify-center bg-gradient-to-r from-sky-400 to-indigo-500 text-white">
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-r from-sky-400 to-indigo-500 text-white">
                     <ImageIcon className="h-12 w-12" />
                   </div>
                 )}
               </div>
-              {photos.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {photos.map((photo, index) => (
+              {mediaItems.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  {mediaItems.map((item, index) => (
                     <button
-                      key={photo + index}
+                      key={item.id}
                       type="button"
-                      onClick={() => setActivePhotoIndex(index)}
+                      onClick={() => setActiveMediaIndex(index)}
                       className={cn(
-                        "relative h-20 w-28 flex-shrink-0 overflow-hidden rounded-lg border transition",
+                        "relative h-20 w-28 overflow-hidden rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
                         index === safeIndex
                           ? "ring-2 ring-blue-500"
                           : "hover:border-blue-200",
                       )}
                     >
-                      <Image
-                        src={photo}
-                        alt={`รูปที่ ${index + 1}`}
-                        fill
-                        sizes="120px"
-                        className="object-cover"
-                      />
+                      {item.type === "image" ? (
+                        <Image
+                          src={item.url}
+                          alt={`รูปที่ ${index + 1}`}
+                          fill
+                          sizes="120px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-black/80 text-white">
+                          <Video className="h-6 w-6" />
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
               )}
             </section>
-
-            {property.video && (
-              <section className="space-y-3">
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-                  <Video className="h-5 w-5 text-blue-600" /> วิดีโอทรัพย์สิน
-                </h3>
-                <div className="overflow-hidden rounded-2xl border bg-black">
-                  <video controls className="h-full w-full">
-                    <source src={property.video} />
-                    เบราว์เซอร์ของคุณไม่รองรับการเล่นวิดีโอ
-                  </video>
-                </div>
-              </section>
-            )}
 
             <section className="space-y-3">
               <h3 className="text-lg font-semibold text-gray-900">รายละเอียด</h3>
