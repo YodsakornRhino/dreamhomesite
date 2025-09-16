@@ -171,10 +171,10 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
           </div>
         </DialogHeader>
 
-        <div className="grid gap-6 lg:grid-cols-[1.8fr,1fr]">
+        <div className="grid gap-6 lg:gap-8 lg:grid-cols-[minmax(0,3fr),minmax(0,2fr)]">
           <div className="space-y-6">
             <section className="space-y-3">
-              <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-muted shadow">
+              <div className="relative h-56 w-full overflow-hidden rounded-2xl bg-muted shadow sm:h-64 lg:h-72">
                 {activeMedia ? (
                   activeMedia.type === "image" ? (
                     <Image
@@ -204,7 +204,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
                       type="button"
                       onClick={() => setActiveMediaIndex(index)}
                       className={cn(
-                        "relative h-20 w-28 overflow-hidden rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                        "relative h-16 w-24 overflow-hidden rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:h-20 sm:w-28",
                         index === safeIndex
                           ? "ring-2 ring-blue-500"
                           : "hover:border-blue-200",
@@ -287,26 +287,28 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
                 )}
               </div>
             </section>
+          </div>
 
-            <section className="space-y-3">
+          <aside className="space-y-6">
+            <section className="space-y-3 rounded-2xl border p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">แผนที่</h3>
               {mapUrl ? (
-                <iframe
-                  src={mapUrl}
-                  title="ตำแหน่งทรัพย์สิน"
-                  className="h-64 w-full rounded-2xl border"
-                  loading="lazy"
-                  allowFullScreen
-                />
+                <div className="overflow-hidden rounded-xl border">
+                  <iframe
+                    src={mapUrl}
+                    title="ตำแหน่งทรัพย์สิน"
+                    className="h-48 w-full border-0 sm:h-56"
+                    loading="lazy"
+                    allowFullScreen
+                  />
+                </div>
               ) : (
-                <div className="flex h-48 w-full items-center justify-center rounded-2xl border border-dashed text-sm text-muted-foreground">
+                <div className="flex h-40 w-full items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
                   ไม่มีพิกัดแผนที่สำหรับประกาศนี้
                 </div>
               )}
             </section>
-          </div>
 
-          <aside className="space-y-6">
             <section className="space-y-4 rounded-2xl border p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">ข้อมูลผู้ขาย</h3>
               <div className="space-y-3 text-sm text-gray-700">
