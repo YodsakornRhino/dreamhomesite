@@ -47,66 +47,71 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
     setActivePhotoIndex(0)
   }, [property?.id])
 
-  if (!property) return null
-
-  const photos = Array.isArray(property.photos) ? property.photos : []
+  const photos = property?.photos ?? []
   const safeIndex = photos.length > 0 ? Math.min(activePhotoIndex, photos.length - 1) : 0
   const mainPhoto = photos[safeIndex]
 
   const locationText = useMemo(() => {
+    if (!property) return ""
     const segments = [property.address, property.city, property.province]
       .map((segment) => segment?.trim())
       .filter(Boolean)
     return segments.join(", ")
-  }, [property.address, property.city, property.province])
+  }, [property])
 
   const createdAtDisplay = useMemo(() => {
-    if (!property.createdAt) return null
+    if (!property?.createdAt) return null
     const date = new Date(property.createdAt)
     if (Number.isNaN(date.getTime())) return null
     return date.toLocaleDateString("th-TH", {
       dateStyle: "medium",
       timeZone: "Asia/Bangkok",
     })
-  }, [property.createdAt])
+  }, [property])
 
   const landAreaDisplay = useMemo(() => {
+    if (!property) return ""
     const numeric = Number(property.landArea)
     if (Number.isFinite(numeric) && numeric > 0) {
       return `${numeric.toLocaleString("th-TH")} ตร.ว.`
     }
     return property.landArea
-  }, [property.landArea])
+  }, [property])
 
   const usableAreaDisplay = useMemo(() => {
+    if (!property) return ""
     const numeric = Number(property.usableArea)
     if (Number.isFinite(numeric) && numeric > 0) {
       return `${numeric.toLocaleString("th-TH")} ตร.ม.`
     }
     return property.usableArea
-  }, [property.usableArea])
+  }, [property])
 
   const bedroomsDisplay = useMemo(() => {
+    if (!property) return "-"
     const numeric = Number(property.bedrooms)
     if (Number.isFinite(numeric) && numeric > 0) return numeric
     return property.bedrooms || "-"
-  }, [property.bedrooms])
+  }, [property])
 
   const bathroomsDisplay = useMemo(() => {
+    if (!property) return "-"
     const numeric = Number(property.bathrooms)
     if (Number.isFinite(numeric) && numeric > 0) return numeric
     return property.bathrooms || "-"
-  }, [property.bathrooms])
+  }, [property])
 
   const parkingDisplay = useMemo(() => {
-    if (!property.parking) return null
+    if (!property?.parking) return null
     if (property.parking === "none") return "ไม่มีที่จอดรถ"
     const numeric = Number(property.parking)
     if (Number.isFinite(numeric) && numeric >= 0) {
       return `${numeric} คัน`
     }
     return property.parking
-  }, [property.parking])
+  }, [property])
+
+  if (!property) return null
 
   const sellerRoleLabel = SELLER_ROLE_LABELS[property.sellerRole] ?? property.sellerRole
   const transactionLabel = TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
