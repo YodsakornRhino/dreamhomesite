@@ -229,16 +229,16 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
               )}
             </section>
 
-            <section className="space-y-3">
+            <section className="space-y-3 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">รายละเอียด</h3>
               <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
                 {property.description || "ไม่มีรายละเอียดเพิ่มเติม"}
               </p>
             </section>
 
-            <section className="space-y-3">
+            <section className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">ข้อมูลทรัพย์สิน</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex items-center gap-3 rounded-xl border p-4">
                   <Bed className="h-5 w-5 text-blue-600" />
                   <div>
@@ -290,7 +290,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
           </div>
 
           <aside className="space-y-6">
-            <section className="space-y-3 rounded-2xl border p-6 shadow-sm">
+            <section className="space-y-3 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">แผนที่</h3>
               {mapUrl ? (
                 <div className="overflow-hidden rounded-xl border">
@@ -309,7 +309,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
               )}
             </section>
 
-            <section className="space-y-4 rounded-2xl border p-6 shadow-sm">
+            <section className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">ข้อมูลผู้ขาย</h3>
               <div className="space-y-3 text-sm text-gray-700">
                 <div className="flex items-center gap-3">
@@ -330,7 +330,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
               </div>
             </section>
 
-            <section className="space-y-3 rounded-2xl border p-6 shadow-sm">
+            <section className="space-y-3 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">ที่อยู่</h3>
               <div className="space-y-1 text-sm text-gray-700">
                 <p>{property.address}</p>
