@@ -145,7 +145,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden sm:max-w-5xl">
+      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:max-w-3xl sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
         <DialogHeader className="space-y-4">
           <div className="space-y-2">
             <DialogTitle className="text-2xl font-bold text-gray-900">{property.title}</DialogTitle>
@@ -171,8 +171,8 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
           </div>
         </DialogHeader>
 
-        <div className="grid gap-6 lg:gap-8 lg:grid-cols-[minmax(0,3fr),minmax(0,2fr)]">
-          <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-12 lg:gap-8">
+          <div className="space-y-6 md:col-span-7 xl:col-span-8">
             <section className="space-y-3">
               <div className="relative h-56 w-full overflow-hidden rounded-2xl bg-muted shadow sm:h-64 lg:h-72">
                 {activeMedia ? (
@@ -289,7 +289,7 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
             </section>
           </div>
 
-          <aside className="space-y-6">
+          <aside className="space-y-6 md:col-span-5 xl:col-span-4">
             <section className="space-y-3 rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900">แผนที่</h3>
               {mapUrl ? (
