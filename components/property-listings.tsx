@@ -1,47 +1,43 @@
 "use client"
 
-import { useState } from "react"
-import PropertyCard from "./property-card"
-import PropertyModal from "./property-modal"
+import { useMemo, useState } from "react"
 import { Grid, List, ChevronLeft, ChevronRight } from "lucide-react"
-import MobileFilterDrawer from "./mobile-filter-drawer"
 
-const allProperties = [
-  {
-    id: 4,
-    title: "ลอฟต์ใจกลางเมือง",
-    price: "$380,000",
-    location: "321 ถนนบรอดเวย์ ใจกลางเมือง",
-    beds: 1,
-    baths: 1,
-    sqft: 750,
-    type: "sale" as const,
-    gradient: "bg-gradient-to-r from-yellow-400 to-orange-500",
-  },
-  {
-    id: 5,
-    title: "วิลล่าสวน",
-    price: "$3,200/mo",
-    location: "654 ซอยการ์เดน ย่านฝั่งตะวันตก",
-    beds: 4,
-    baths: 3,
-    sqft: 1800,
-    type: "rent" as const,
-    gradient: "bg-gradient-to-r from-teal-400 to-blue-500",
-  },
-]
+import { useAllUserProperties } from "@/hooks/use-all-user-properties"
+import type { UserProperty } from "@/types/user-property"
+
+import MobileFilterDrawer from "./mobile-filter-drawer"
+import { UserPropertyCard } from "./user-property-card"
+import { UserPropertyModal } from "./user-property-modal"
+
+const BEDROOM_OPTIONS = ["1+", "2+", "3+", "4+"]
 
 export default function PropertyListings() {
-  const [selectedProperty, setSelectedProperty] = useState<number | null>(null)
+  const { properties, loading, error } = useAllUserProperties()
+  const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [selectedBedrooms, setSelectedBedrooms] = useState<string | null>(null)
 
-  const handleViewDetails = (id: number) => {
-    setSelectedProperty(id)
+  const filteredProperties = useMemo(() => {
+    if (!selectedBedrooms) return properties
+
+    const minBedrooms = parseInt(selectedBedrooms, 10)
+    if (!Number.isFinite(minBedrooms)) return properties
+
+    return properties.filter((property) => {
+      const numericBedrooms = Number(property.bedrooms)
+      return Number.isFinite(numericBedrooms) && numericBedrooms >= minBedrooms
+    })
+  }, [properties, selectedBedrooms])
+
+  const handleViewDetails = (property: UserProperty) => {
+    setSelectedProperty(property)
   }
 
-  const handleCloseModal = () => {
-    setSelectedProperty(null)
+  const handleModalChange = (open: boolean) => {
+    if (!open) {
+      setSelectedProperty(null)
+    }
   }
 
   const handleApplyFilters = () => {
@@ -53,43 +49,49 @@ export default function PropertyListings() {
   }
 
   return (
-    <section className="py-16 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="bg-white py-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Filters Sidebar */}
           <div className="lg:w-1/4">
-            <div className="bg-gray-50 rounded-lg p-4 sm:p-6 sticky top-24">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-800">ตัวกรอง</h3>
-                <button className="text-blue-600 hover:text-blue-700 text-sm">ล้างทั้งหมด</button>
+            <div className="sticky top-24 rounded-lg bg-gray-50 p-4 sm:p-6">
+              <div className="mb-4 flex items-center justify-between sm:mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 sm:text-xl">ตัวกรอง</h3>
+                <button
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                  onClick={() => setSelectedBedrooms(null)}
+                >
+                  ล้างทั้งหมด
+                </button>
               </div>
 
               {/* Price Range */}
               <div className="mb-4 sm:mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">ช่วงราคา</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">ช่วงราคา</label>
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="number"
                     placeholder="ต่ำสุด"
-                    className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <input
                     type="number"
                     placeholder="สูงสุด"
-                    className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               {/* Property Type */}
               <div className="mb-4 sm:mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">ประเภทอสังหาริมทรัพย์</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">ประเภทอสังหาริมทรัพย์</label>
                 <div className="space-y-2">
                   {["บ้าน", "อพาร์ตเมนต์", "คอนโด", "ที่ดิน"].map((type) => (
                     <label key={type} className="flex items-center">
                       <input
                         type="checkbox"
                         className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        disabled
                       />
                       <span className="text-sm sm:text-base">{type}</span>
                     </label>
@@ -99,9 +101,9 @@ export default function PropertyListings() {
 
               {/* Bedrooms */}
               <div className="mb-4 sm:mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">จำนวนห้องนอน</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {["1+", "2+", "3+", "4+"].map((bedrooms) => (
+                <label className="mb-2 block text-sm font-medium text-gray-700">จำนวนห้องนอน</label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {BEDROOM_OPTIONS.map((bedrooms) => (
                     <button
                       key={bedrooms}
                       onClick={() => handleBedroomFilter(bedrooms)}
@@ -119,7 +121,7 @@ export default function PropertyListings() {
 
               <button
                 onClick={handleApplyFilters}
-                className="w-full bg-blue-600 text-white py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm text-white transition hover:bg-blue-700 sm:py-2 sm:text-base"
               >
                 ใช้ตัวกรอง
               </button>
@@ -128,19 +130,19 @@ export default function PropertyListings() {
 
           {/* Listings */}
           <div className="lg:w-3/4">
-            <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center mb-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">อสังหาริมทรัพย์ทั้งหมด</h2>
-              <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
-                <select className="px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base">
+            <div className="mb-6 flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <h2 className="text-xl font-bold text-gray-800 sm:text-2xl">อสังหาริมทรัพย์ทั้งหมด</h2>
+              <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
+                <select className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-4 sm:text-base">
                   <option>เรียงโดย: ใหม่ล่าสุด</option>
                   <option>ราคา: จากต่ำไปสูง</option>
                   <option>ราคา: จากสูงไปต่ำ</option>
                   <option>ขนาด: ใหญ่ที่สุดก่อน</option>
                 </select>
-                <div className="flex border rounded-lg self-start sm:self-auto">
+                <div className="flex self-start rounded-lg border sm:self-auto">
                   <button
                     onClick={() => setViewMode("grid")}
-                    className={`px-3 py-2 rounded-l-lg transition-colors ${
+                    className={`rounded-l-lg px-3 py-2 transition-colors ${
                       viewMode === "grid" ? "bg-blue-600 text-white" : "hover:bg-gray-50"
                     }`}
                   >
@@ -148,7 +150,7 @@ export default function PropertyListings() {
                   </button>
                   <button
                     onClick={() => setViewMode("list")}
-                    className={`px-3 py-2 border-l rounded-r-lg transition-colors ${
+                    className={`rounded-r-lg border-l px-3 py-2 transition-colors ${
                       viewMode === "list" ? "bg-blue-600 text-white" : "hover:bg-gray-50"
                     }`}
                   >
@@ -158,13 +160,41 @@ export default function PropertyListings() {
               </div>
             </div>
 
-            <div
-              className={`grid gap-4 sm:gap-6 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
-            >
-              {allProperties.map((property) => (
-                <PropertyCard key={property.id} {...property} onViewDetails={handleViewDetails} />
-              ))}
-            </div>
+            {loading ? (
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex h-full flex-col overflow-hidden rounded-2xl border bg-white p-4 shadow-sm animate-pulse"
+                  >
+                    <div className="mb-4 h-40 w-full rounded-xl bg-gray-200" />
+                    <div className="space-y-3">
+                      <div className="h-4 w-3/4 rounded bg-gray-200" />
+                      <div className="h-4 w-1/2 rounded bg-gray-200" />
+                      <div className="h-4 w-full rounded bg-gray-200" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <p className="text-sm text-red-600">{error}</p>
+            ) : filteredProperties.length === 0 ? (
+              <p className="text-gray-500">ไม่พบอสังหาริมทรัพย์ที่ตรงกับการค้นหาของคุณ</p>
+            ) : (
+              <div
+                className={`grid gap-4 sm:gap-6 ${
+                  viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+                }`}
+              >
+                {filteredProperties.map((property) => (
+                  <UserPropertyCard
+                    key={property.id}
+                    property={property}
+                    onViewDetails={handleViewDetails}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Pagination */}
             <div className="flex justify-center mt-12">
@@ -184,7 +214,11 @@ export default function PropertyListings() {
         </div>
       </div>
 
-      {selectedProperty && <PropertyModal propertyId={selectedProperty} onClose={handleCloseModal} />}
+      <UserPropertyModal
+        open={Boolean(selectedProperty)}
+        property={selectedProperty}
+        onOpenChange={handleModalChange}
+      />
 
       <MobileFilterDrawer
         selectedBedrooms={selectedBedrooms}
