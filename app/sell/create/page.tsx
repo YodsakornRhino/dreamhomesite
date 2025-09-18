@@ -376,6 +376,13 @@ export default function SellCreatePage() {
         video: videoUrl,
       })
 
+      await setDocument("property", propertyId, {
+  ...propertyBase,          // ข้อมูลพื้นฐานเดิม
+  userUid: user.uid,        // ชี้ว่าเป็นทรัพย์ของ user ไหน
+  photos: photoUrls,        // รูปที่อัปโหลดแล้ว
+  video: videoUrl,          // วิดีโอที่อัปโหลดแล้ว (ถ้ามี)
+})
+
       alert("บันทึกเรียบร้อย!")
     } catch (err) {
       console.error(err)
