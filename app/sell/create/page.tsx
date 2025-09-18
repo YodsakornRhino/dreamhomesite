@@ -355,6 +355,11 @@ export default function SellCreatePage() {
       )
       const propertyId = docRef.id
 
+      await setDocument("property", propertyId, {
+        ...propertyBase,
+        userId: user.uid,
+      })
+
       const imageData = photos.map((file, idx) => ({
         path: `user/${user.uid}/property/${propertyId}/images/${idx}-${file.name}`,
         file,
@@ -371,10 +376,13 @@ export default function SellCreatePage() {
         videoUrl = await getDownloadURL(videoPath)
       }
 
-      await setDocument(`users/${user.uid}/user_property`, propertyId, {
+      const mediaData = {
         photos: photoUrls,
         video: videoUrl,
-      })
+      }
+
+      await setDocument(`users/${user.uid}/user_property`, propertyId, mediaData)
+      await setDocument("property", propertyId, mediaData)
 
       alert("บันทึกเรียบร้อย!")
     } catch (err) {
