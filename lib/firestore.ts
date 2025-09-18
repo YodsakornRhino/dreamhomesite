@@ -193,4 +193,31 @@ export const subscribeToCollection = async (
   }
 }
 
+export const subscribeToCollectionGroup = async (
+  collectionId: string,
+  callback: (docs: QueryDocumentSnapshot<DocumentData>[]) => void,
+  ...queryConstraints: QueryConstraint[]
+): Promise<() => void> => {
+  try {
+    const { collectionGroup, query, onSnapshot } = await import("firebase/firestore")
+    const db = await getFirestoreInstance()
+
+    let q: Query<DocumentData>
+    if (queryConstraints.length > 0) {
+      q = query(collectionGroup(db, collectionId), ...queryConstraints)
+    } else {
+      q = collectionGroup(db, collectionId)
+    }
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      callback(querySnapshot.docs)
+    })
+
+    return unsubscribe
+  } catch (error) {
+    console.error("Error subscribing to collection group:", error)
+    throw error
+  }
+}
+
 export { getFirestoreInstance }

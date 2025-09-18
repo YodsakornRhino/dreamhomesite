@@ -1,56 +1,61 @@
 "use client"
 
-import { useState } from "react"
-import PropertyCard from "./property-card"
-import PropertyModal from "./property-modal"
+import { useMemo, useState } from "react"
 import { Grid, List, ChevronLeft, ChevronRight } from "lucide-react"
-import MobileFilterDrawer from "./mobile-filter-drawer"
 
-const allProperties = [
-  {
-    id: 4,
-    title: "ลอฟต์ใจกลางเมือง",
-    price: "$380,000",
-    location: "321 ถนนบรอดเวย์ ใจกลางเมือง",
-    beds: 1,
-    baths: 1,
-    sqft: 750,
-    type: "sale" as const,
-    gradient: "bg-gradient-to-r from-yellow-400 to-orange-500",
-  },
-  {
-    id: 5,
-    title: "วิลล่าสวน",
-    price: "$3,200/mo",
-    location: "654 ซอยการ์เดน ย่านฝั่งตะวันตก",
-    beds: 4,
-    baths: 3,
-    sqft: 1800,
-    type: "rent" as const,
-    gradient: "bg-gradient-to-r from-teal-400 to-blue-500",
-  },
-]
+import { UserPropertyCard } from "@/components/user-property-card"
+import { UserPropertyModal } from "@/components/user-property-modal"
+import MobileFilterDrawer from "@/components/mobile-filter-drawer"
+import { useAllUserProperties } from "@/hooks/use-user-properties"
+import type { UserProperty } from "@/types/user-property"
+
+const parseBedroomFilter = (value: string | null): number | null => {
+  if (!value) return null
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 export default function PropertyListings() {
-  const [selectedProperty, setSelectedProperty] = useState<number | null>(null)
+  const { properties, loading, error } = useAllUserProperties()
+  const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [selectedBedrooms, setSelectedBedrooms] = useState<string | null>(null)
 
-  const handleViewDetails = (id: number) => {
-    setSelectedProperty(id)
+  const handleViewDetails = (property: UserProperty) => {
+    setSelectedProperty(property)
   }
 
-  const handleCloseModal = () => {
-    setSelectedProperty(null)
+  const handleModalChange = (open: boolean) => {
+    if (!open) {
+      setSelectedProperty(null)
+    }
   }
 
   const handleApplyFilters = () => {
+    // TODO: Implement real filters when ready
+    // eslint-disable-next-line no-alert
     alert("ใช้ตัวกรองแล้ว! ระบบจะกรองอสังหาริมทรัพย์ตามที่คุณเลือก")
   }
 
   const handleBedroomFilter = (bedrooms: string) => {
-    setSelectedBedrooms(selectedBedrooms === bedrooms ? null : bedrooms)
+    setSelectedBedrooms((current) => (current === bedrooms ? null : bedrooms))
   }
+
+  const filteredProperties = useMemo(() => {
+    const minimumBedrooms = parseBedroomFilter(selectedBedrooms)
+
+    if (minimumBedrooms === null) {
+      return properties
+    }
+
+    return properties.filter((property) => {
+      const numericBedrooms = Number(property.bedrooms)
+      if (Number.isFinite(numericBedrooms)) {
+        return numericBedrooms >= minimumBedrooms
+      }
+      return false
+    })
+  }, [properties, selectedBedrooms])
 
   return (
     <section className="py-16 bg-white">
@@ -61,7 +66,13 @@ export default function PropertyListings() {
             <div className="bg-gray-50 rounded-lg p-4 sm:p-6 sticky top-24">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <h3 className="text-lg sm:text-xl font-semibold text-gray-800">ตัวกรอง</h3>
-                <button className="text-blue-600 hover:text-blue-700 text-sm">ล้างทั้งหมด</button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBedrooms(null)}
+                  className="text-blue-600 hover:text-blue-700 text-sm"
+                >
+                  ล้างทั้งหมด
+                </button>
               </div>
 
               {/* Price Range */}
@@ -90,8 +101,9 @@ export default function PropertyListings() {
                       <input
                         type="checkbox"
                         className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        disabled
                       />
-                      <span className="text-sm sm:text-base">{type}</span>
+                      <span className="text-sm sm:text-base text-gray-400">{type}</span>
                     </label>
                   ))}
                 </div>
@@ -104,6 +116,7 @@ export default function PropertyListings() {
                   {["1+", "2+", "3+", "4+"].map((bedrooms) => (
                     <button
                       key={bedrooms}
+                      type="button"
                       onClick={() => handleBedroomFilter(bedrooms)}
                       className={`px-2 sm:px-3 py-2 border rounded-lg text-sm transition-colors ${
                         selectedBedrooms === bedrooms
@@ -118,6 +131,7 @@ export default function PropertyListings() {
               </div>
 
               <button
+                type="button"
                 onClick={handleApplyFilters}
                 className="w-full bg-blue-600 text-white py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
               >
@@ -131,14 +145,12 @@ export default function PropertyListings() {
             <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center mb-6">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-800">อสังหาริมทรัพย์ทั้งหมด</h2>
               <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
-                <select className="px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base">
+                <select className="px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base" disabled>
                   <option>เรียงโดย: ใหม่ล่าสุด</option>
-                  <option>ราคา: จากต่ำไปสูง</option>
-                  <option>ราคา: จากสูงไปต่ำ</option>
-                  <option>ขนาด: ใหญ่ที่สุดก่อน</option>
                 </select>
                 <div className="flex border rounded-lg self-start sm:self-auto">
                   <button
+                    type="button"
                     onClick={() => setViewMode("grid")}
                     className={`px-3 py-2 rounded-l-lg transition-colors ${
                       viewMode === "grid" ? "bg-blue-600 text-white" : "hover:bg-gray-50"
@@ -147,6 +159,7 @@ export default function PropertyListings() {
                     <Grid size={16} />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setViewMode("list")}
                     className={`px-3 py-2 border-l rounded-r-lg transition-colors ${
                       viewMode === "list" ? "bg-blue-600 text-white" : "hover:bg-gray-50"
@@ -161,21 +174,51 @@ export default function PropertyListings() {
             <div
               className={`grid gap-4 sm:gap-6 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
             >
-              {allProperties.map((property) => (
-                <PropertyCard key={property.id} {...property} onViewDetails={handleViewDetails} />
-              ))}
+              {loading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex h-full flex-col overflow-hidden rounded-2xl border bg-white p-4 shadow-sm animate-pulse"
+                  >
+                    <div className="mb-4 h-48 w-full rounded-xl bg-gray-200" />
+                    <div className="space-y-3">
+                      <div className="h-4 w-3/4 rounded bg-gray-200" />
+                      <div className="h-4 w-1/2 rounded bg-gray-200" />
+                      <div className="h-4 w-full rounded bg-gray-200" />
+                    </div>
+                  </div>
+                ))
+              ) : error ? (
+                <p className="text-sm text-red-600 sm:col-span-2 lg:col-span-3">{error}</p>
+              ) : filteredProperties.length === 0 ? (
+                <p className="text-gray-500 sm:col-span-2 lg:col-span-3">ไม่พบประกาศที่ตรงกับเงื่อนไข</p>
+              ) : (
+                filteredProperties.map((property) => (
+                  <UserPropertyCard
+                    key={property.id}
+                    property={property}
+                    onViewDetails={handleViewDetails}
+                  />
+                ))
+              )}
             </div>
 
             {/* Pagination */}
             <div className="flex justify-center mt-12">
-              <div className="flex items-center space-x-2">
-                <button className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="flex items-center space-x-2 text-gray-400">
+                <button className="px-3 py-2 border rounded-lg cursor-not-allowed" type="button" disabled>
                   <ChevronLeft size={16} />
                 </button>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg">1</button>
-                <button className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors">2</button>
-                <button className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors">3</button>
-                <button className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors">
+                <button className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg" type="button" disabled>
+                  1
+                </button>
+                <button className="px-4 py-2 border rounded-lg cursor-not-allowed" type="button" disabled>
+                  2
+                </button>
+                <button className="px-4 py-2 border rounded-lg cursor-not-allowed" type="button" disabled>
+                  3
+                </button>
+                <button className="px-3 py-2 border rounded-lg cursor-not-allowed" type="button" disabled>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -184,7 +227,11 @@ export default function PropertyListings() {
         </div>
       </div>
 
-      {selectedProperty && <PropertyModal propertyId={selectedProperty} onClose={handleCloseModal} />}
+      <UserPropertyModal
+        open={Boolean(selectedProperty)}
+        property={selectedProperty}
+        onOpenChange={handleModalChange}
+      />
 
       <MobileFilterDrawer
         selectedBedrooms={selectedBedrooms}
