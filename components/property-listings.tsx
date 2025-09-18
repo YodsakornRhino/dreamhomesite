@@ -7,6 +7,7 @@ import { UserPropertyCard } from "@/components/user-property-card"
 import { UserPropertyModal } from "@/components/user-property-modal"
 import MobileFilterDrawer from "@/components/mobile-filter-drawer"
 import { useAllUserProperties } from "@/hooks/use-user-properties"
+import { useAuthContext } from "@/contexts/AuthContext"
 import type { UserProperty } from "@/types/user-property"
 
 const parseBedroomFilter = (value: string | null): number | null => {
@@ -16,7 +17,11 @@ const parseBedroomFilter = (value: string | null): number | null => {
 }
 
 export default function PropertyListings() {
-  const { properties, loading, error } = useAllUserProperties()
+  const { user } = useAuthContext()
+  const excludeOwnerUids = useMemo(() => (user ? [user.uid] : undefined), [user])
+  const { properties, loading, error } = useAllUserProperties(
+    excludeOwnerUids ? { excludeOwnerUids } : undefined,
+  )
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [selectedBedrooms, setSelectedBedrooms] = useState<string | null>(null)

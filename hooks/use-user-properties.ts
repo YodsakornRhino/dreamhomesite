@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 
 import { subscribeToCollectionGroup } from "@/lib/firestore"
@@ -62,12 +62,14 @@ const mapDocumentToProperty = (
   doc: QueryDocumentSnapshot<DocumentData>,
 ): UserProperty => {
   const data = doc.data()
+  const ownerUid = doc.ref.parent?.parent?.id ?? null
   const photos = Array.isArray(data.photos)
     ? data.photos.filter((item: unknown): item is string => typeof item === "string")
     : []
 
   return {
     id: doc.ref.path,
+    ownerUid,
     sellerName: toStringValue(data.sellerName),
     sellerPhone: toStringValue(data.sellerPhone),
     sellerEmail: toStringValue(data.sellerEmail),
@@ -98,10 +100,18 @@ const mapDocumentToProperty = (
   }
 }
 
-export const useAllUserProperties = () => {
-  const [properties, setProperties] = useState<UserProperty[]>([])
+interface UseAllUserPropertiesOptions {
+  includeOwnerUids?: string[]
+  excludeOwnerUids?: string[]
+}
+
+export const useAllUserProperties = (options?: UseAllUserPropertiesOptions) => {
+  const [allProperties, setAllProperties] = useState<UserProperty[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const includeOwnerUids = options?.includeOwnerUids
+  const excludeOwnerUids = options?.excludeOwnerUids
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
@@ -116,13 +126,13 @@ export const useAllUserProperties = () => {
           if (!isActive) return
           const mapped = docs.map(mapDocumentToProperty)
           mapped.sort((a, b) => parseCreatedAt(b.createdAt) - parseCreatedAt(a.createdAt))
-          setProperties(mapped)
+          setAllProperties(mapped)
           setLoading(false)
         })
       } catch (err) {
         console.error("Failed to load properties:", err)
         if (!isActive) return
-        setProperties([])
+        setAllProperties([])
         setError("ไม่สามารถโหลดรายการประกาศได้ กรุณาลองใหม่อีกครั้ง")
         setLoading(false)
       }
@@ -137,6 +147,26 @@ export const useAllUserProperties = () => {
       }
     }
   }, [])
+
+  const properties = useMemo(() => {
+    let filtered = allProperties
+
+    if (includeOwnerUids && includeOwnerUids.length > 0) {
+      const includeSet = new Set(includeOwnerUids)
+      filtered = filtered.filter((property) =>
+        property.ownerUid ? includeSet.has(property.ownerUid) : false,
+      )
+    }
+
+    if (excludeOwnerUids && excludeOwnerUids.length > 0) {
+      const excludeSet = new Set(excludeOwnerUids)
+      filtered = filtered.filter(
+        (property) => !property.ownerUid || !excludeSet.has(property.ownerUid),
+      )
+    }
+
+    return filtered
+  }, [allProperties, includeOwnerUids, excludeOwnerUids])
 
   return { properties, loading, error }
 }

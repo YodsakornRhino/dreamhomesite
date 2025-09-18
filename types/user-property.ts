@@ -1,5 +1,6 @@
 export interface UserProperty {
   id: string
+  ownerUid?: string | null
   sellerName: string
   sellerPhone: string
   sellerEmail: string

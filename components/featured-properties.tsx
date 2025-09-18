@@ -6,9 +6,14 @@ import { UserPropertyCard } from "@/components/user-property-card"
 import { UserPropertyModal } from "@/components/user-property-modal"
 import { useAllUserProperties } from "@/hooks/use-user-properties"
 import type { UserProperty } from "@/types/user-property"
+import { useAuthContext } from "@/contexts/AuthContext"
 
 export default function FeaturedProperties() {
-  const { properties, loading, error } = useAllUserProperties()
+  const { user } = useAuthContext()
+  const excludeOwnerUids = useMemo(() => (user ? [user.uid] : undefined), [user])
+  const { properties, loading, error } = useAllUserProperties(
+    excludeOwnerUids ? { excludeOwnerUids } : undefined,
+  )
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
 
   const featuredProperties = useMemo(() => properties.slice(0, 3), [properties])

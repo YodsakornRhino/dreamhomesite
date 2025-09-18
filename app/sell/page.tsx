@@ -76,6 +76,7 @@ const mapDocumentToProperty = (
 
   return {
     id: doc.id,
+    ownerUid: doc.ref.parent?.parent?.id ?? null,
     sellerName: toStringValue(data.sellerName),
     sellerPhone: toStringValue(data.sellerPhone),
     sellerEmail: toStringValue(data.sellerEmail),
