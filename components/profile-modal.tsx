@@ -332,7 +332,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         if (oldPath) {
           try { await deleteFile(oldPath) } catch (e) { console.warn("Delete old photo failed:", e) }
         }
-        const path = `user/${uid}/profile pic/${Date.now()}-${photoFile.name}`
+        const path = `user/${uid}/profilepic/${Date.now()}-${photoFile.name}`
         await uploadFile(path, photoFile)
         const newURL = await getDownloadURL(path)
         photoURL = newURL
