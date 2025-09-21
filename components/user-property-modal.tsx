@@ -1,7 +1,8 @@
-"use client"
+"use client";
 
-import Image from "next/image"
-import { useEffect, useMemo, useState } from "react"
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bath,
   Bed,
@@ -13,142 +14,189 @@ import {
   Mail,
   Ruler,
   Square,
-  User,
   Video,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
+import { useUserProfile } from "@/hooks/use-user-profile";
+import { useUserProperties } from "@/hooks/use-user-properties";
 import {
   formatPropertyPrice,
   PROPERTY_TYPE_LABELS,
   SELLER_ROLE_LABELS,
   TRANSACTION_LABELS,
-} from "@/lib/property"
-import { cn } from "@/lib/utils"
-import type { UserProperty } from "@/types/user-property"
+} from "@/lib/property";
+import { cn } from "@/lib/utils";
+import type { UserProperty } from "@/types/user-property";
 
 interface UserPropertyModalProps {
-  open: boolean
-  property: UserProperty | null
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  property: UserProperty | null;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function UserPropertyModal({ open, property, onOpenChange }: UserPropertyModalProps) {
-  const [activeMediaIndex, setActiveMediaIndex] = useState(0)
+export function UserPropertyModal({
+  open,
+  property,
+  onOpenChange,
+}: UserPropertyModalProps) {
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+
+  const userUid = property?.userUid?.trim() ? property.userUid : null;
+  const {
+    profile: sellerProfile,
+    loading: sellerProfileLoading,
+    error: sellerProfileError,
+  } = useUserProfile(userUid);
+  const {
+    properties: sellerListings,
+    loading: sellerListingsLoading,
+    error: sellerListingsError,
+  } = useUserProperties(userUid);
 
   useEffect(() => {
-    setActiveMediaIndex(0)
-  }, [property?.id])
+    setActiveMediaIndex(0);
+  }, [property?.id]);
 
   const mediaItems = useMemo(() => {
-    if (!property) return []
+    if (!property) return [];
 
     const items = (property.photos ?? [])
-      .filter((photo): photo is string => typeof photo === "string" && photo.trim().length > 0)
+      .filter(
+        (photo): photo is string =>
+          typeof photo === "string" && photo.trim().length > 0,
+      )
       .map((photo, index) => ({
         id: `photo-${index}`,
         type: "image" as const,
         url: photo,
-      }))
+      }));
 
     if (property.video) {
       items.push({
         id: "video",
         type: "video" as const,
         url: property.video,
-      })
+      });
     }
 
-    return items
-  }, [property])
+    return items;
+  }, [property]);
 
-  const safeIndex = mediaItems.length > 0 ? Math.min(activeMediaIndex, mediaItems.length - 1) : 0
-  const activeMedia = mediaItems[safeIndex]
+  const safeIndex =
+    mediaItems.length > 0
+      ? Math.min(activeMediaIndex, mediaItems.length - 1)
+      : 0;
+  const activeMedia = mediaItems[safeIndex];
 
   const locationText = useMemo(() => {
-    if (!property) return ""
+    if (!property) return "";
     const segments = [property.address, property.city, property.province]
       .map((segment) => segment?.trim())
-      .filter(Boolean)
-    return segments.join(", ")
-  }, [property])
+      .filter(Boolean);
+    return segments.join(", ");
+  }, [property]);
 
   const createdAtDisplay = useMemo(() => {
-    if (!property?.createdAt) return null
-    const date = new Date(property.createdAt)
-    if (Number.isNaN(date.getTime())) return null
+    if (!property?.createdAt) return null;
+    const date = new Date(property.createdAt);
+    if (Number.isNaN(date.getTime())) return null;
     return date.toLocaleDateString("th-TH", {
       dateStyle: "medium",
       timeZone: "Asia/Bangkok",
-    })
-  }, [property])
+    });
+  }, [property]);
 
   const landAreaDisplay = useMemo(() => {
-    if (!property) return ""
-    const numeric = Number(property.landArea)
+    if (!property) return "";
+    const numeric = Number(property.landArea);
     if (Number.isFinite(numeric) && numeric > 0) {
-      return `${numeric.toLocaleString("th-TH")} ตร.ว.`
+      return `${numeric.toLocaleString("th-TH")} ตร.ว.`;
     }
-    return property.landArea
-  }, [property])
+    return property.landArea;
+  }, [property]);
 
   const usableAreaDisplay = useMemo(() => {
-    if (!property) return ""
-    const numeric = Number(property.usableArea)
+    if (!property) return "";
+    const numeric = Number(property.usableArea);
     if (Number.isFinite(numeric) && numeric > 0) {
-      return `${numeric.toLocaleString("th-TH")} ตร.ม.`
+      return `${numeric.toLocaleString("th-TH")} ตร.ม.`;
     }
-    return property.usableArea
-  }, [property])
+    return property.usableArea;
+  }, [property]);
 
   const bedroomsDisplay = useMemo(() => {
-    if (!property) return "-"
-    const numeric = Number(property.bedrooms)
-    if (Number.isFinite(numeric) && numeric > 0) return numeric
-    return property.bedrooms || "-"
-  }, [property])
+    if (!property) return "-";
+    const numeric = Number(property.bedrooms);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+    return property.bedrooms || "-";
+  }, [property]);
 
   const bathroomsDisplay = useMemo(() => {
-    if (!property) return "-"
-    const numeric = Number(property.bathrooms)
-    if (Number.isFinite(numeric) && numeric > 0) return numeric
-    return property.bathrooms || "-"
-  }, [property])
+    if (!property) return "-";
+    const numeric = Number(property.bathrooms);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+    return property.bathrooms || "-";
+  }, [property]);
 
   const parkingDisplay = useMemo(() => {
-    if (!property?.parking) return null
-    if (property.parking === "none") return "ไม่มีที่จอดรถ"
-    const numeric = Number(property.parking)
+    if (!property?.parking) return null;
+    if (property.parking === "none") return "ไม่มีที่จอดรถ";
+    const numeric = Number(property.parking);
     if (Number.isFinite(numeric) && numeric >= 0) {
-      return `${numeric} คัน`
+      return `${numeric} คัน`;
     }
-    return property.parking
-  }, [property])
+    return property.parking;
+  }, [property]);
 
-  if (!property) return null
+  if (!property) return null;
 
-  const sellerRoleLabel = SELLER_ROLE_LABELS[property.sellerRole] ?? property.sellerRole
-  const transactionLabel = TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
-  const typeLabel = PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType
+  const sellerRoleLabel =
+    SELLER_ROLE_LABELS[property.sellerRole] ?? property.sellerRole;
+  const transactionLabel =
+    TRANSACTION_LABELS[property.transactionType] ?? property.transactionType;
+  const typeLabel =
+    PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType;
+  const sellerDisplayName = sellerProfile?.name || property.sellerName;
+  const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
+  const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
+  const sellerInitials = useMemo(() => {
+    const name = sellerProfile?.name || property.sellerName || "";
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((segment) => segment.charAt(0))
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }, [property.sellerName, sellerProfile?.name]);
+  const sellerListingsCount = useMemo(
+    () => sellerListings.length,
+    [sellerListings],
+  );
 
   const mapUrl =
     typeof property.lat === "number" && typeof property.lng === "number"
       ? `https://www.google.com/maps?q=${property.lat},${property.lng}&hl=th&z=16&output=embed`
-      : null
+      : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
         <DialogHeader className="space-y-4">
           <div className="space-y-2">
-            <DialogTitle className="text-xl font-bold text-gray-900 sm:text-2xl">{property.title}</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-gray-900 sm:text-2xl">
+              {property.title}
+            </DialogTitle>
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-3">
               <span className="flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
@@ -163,7 +211,9 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Badge className="bg-blue-600 text-white hover:bg-blue-600">{transactionLabel}</Badge>
+            <Badge className="bg-blue-600 text-white hover:bg-blue-600">
+              {transactionLabel}
+            </Badge>
             <Badge variant="outline">{typeLabel}</Badge>
             <DialogDescription className="text-2xl font-bold text-blue-600 sm:text-3xl">
               {formatPropertyPrice(property.price, property.transactionType)}
@@ -230,41 +280,55 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
             </section>
 
             <section className="space-y-3 rounded-2xl border bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900">รายละเอียด</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                รายละเอียด
+              </h3>
               <p className="whitespace-pre-line break-words text-sm leading-relaxed text-gray-700">
                 {property.description || "ไม่มีรายละเอียดเพิ่มเติม"}
               </p>
             </section>
 
             <section className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900">ข้อมูลทรัพย์สิน</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                ข้อมูลทรัพย์สิน
+              </h3>
               <div className="grid gap-4 xs:grid-cols-2">
                 <div className="flex items-center gap-3 rounded-xl border p-4">
                   <Bed className="h-5 w-5 text-blue-600" />
                   <div>
                     <p className="text-sm text-muted-foreground">ห้องนอน</p>
-                    <p className="text-base font-semibold text-gray-900">{bedroomsDisplay}</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {bedroomsDisplay}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-xl border p-4">
                   <Bath className="h-5 w-5 text-blue-600" />
                   <div>
                     <p className="text-sm text-muted-foreground">ห้องน้ำ</p>
-                    <p className="text-base font-semibold text-gray-900">{bathroomsDisplay}</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {bathroomsDisplay}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-xl border p-4">
                   <Ruler className="h-5 w-5 text-blue-600" />
                   <div>
                     <p className="text-sm text-muted-foreground">พื้นที่ดิน</p>
-                    <p className="text-base font-semibold text-gray-900">{landAreaDisplay || "-"}</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {landAreaDisplay || "-"}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-xl border p-4">
                   <Square className="h-5 w-5 text-blue-600" />
                   <div>
-                    <p className="text-sm text-muted-foreground">พื้นที่ใช้สอย</p>
-                    <p className="text-base font-semibold text-gray-900">{usableAreaDisplay || "-"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      พื้นที่ใช้สอย
+                    </p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {usableAreaDisplay || "-"}
+                    </p>
                   </div>
                 </div>
                 {parkingDisplay && (
@@ -272,7 +336,9 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
                     <Car className="h-5 w-5 text-blue-600" />
                     <div>
                       <p className="text-sm text-muted-foreground">ที่จอดรถ</p>
-                      <p className="text-base font-semibold text-gray-900">{parkingDisplay}</p>
+                      <p className="text-base font-semibold text-gray-900">
+                        {parkingDisplay}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -280,8 +346,12 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
                   <div className="flex items-center gap-3 rounded-xl border p-4">
                     <Calendar className="h-5 w-5 text-blue-600" />
                     <div>
-                      <p className="text-sm text-muted-foreground">สร้างเมื่อปี</p>
-                      <p className="text-base font-semibold text-gray-900">{property.yearBuilt}</p>
+                      <p className="text-sm text-muted-foreground">
+                        สร้างเมื่อปี
+                      </p>
+                      <p className="text-base font-semibold text-gray-900">
+                        {property.yearBuilt}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -310,29 +380,76 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
             </section>
 
             <section className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900">ข้อมูลผู้ขาย</h3>
-              <div className="space-y-3 text-sm text-gray-700">
-                <div className="flex items-center gap-3">
-                  <User className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-base font-semibold text-gray-900">{property.sellerName}</p>
-                    <p className="text-muted-foreground">{sellerRoleLabel}</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                ข้อมูลผู้ขาย
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-12 w-12 border">
+                    <AvatarImage
+                      src={sellerProfile?.photoURL ?? ""}
+                      alt={sellerDisplayName}
+                    />
+                    <AvatarFallback>{sellerInitials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-base font-semibold text-gray-900">
+                      {sellerDisplayName}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {sellerRoleLabel}
+                    </p>
+                    {sellerProfile?.phoneVerified && (
+                      <Badge className="mt-1 w-fit border-emerald-200 bg-emerald-50 text-xs font-medium text-emerald-600">
+                        ยืนยันเบอร์โทรแล้ว
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                <a
-                  href={`tel:${property.sellerPhone}`}
-                  className="flex flex-wrap items-center gap-2 text-blue-600 hover:underline sm:flex-nowrap sm:gap-3"
-                >
-                  <Phone className="h-5 w-5" />
-                  {property.sellerPhone}
-                </a>
-                <a
-                  href={`mailto:${property.sellerEmail}`}
-                  className="flex flex-wrap items-center gap-2 text-blue-600 hover:underline break-all sm:flex-nowrap sm:gap-3"
-                >
-                  <Mail className="h-5 w-5" />
-                  {property.sellerEmail}
-                </a>
+
+                {sellerProfileLoading && (
+                  <p className="text-sm text-muted-foreground">
+                    กำลังโหลดข้อมูลผู้ขาย...
+                  </p>
+                )}
+                {sellerProfileError && (
+                  <p className="text-sm text-red-600">{sellerProfileError}</p>
+                )}
+
+                <div className="space-y-3 text-sm text-gray-700">
+                  {sellerPhone && (
+                    <a
+                      href={`tel:${sellerPhone}`}
+                      className="flex flex-wrap items-center gap-2 text-blue-600 hover:underline sm:flex-nowrap sm:gap-3"
+                    >
+                      <Phone className="h-5 w-5" />
+                      {sellerPhone}
+                    </a>
+                  )}
+                  {sellerEmail && (
+                    <a
+                      href={`mailto:${sellerEmail}`}
+                      className="flex flex-wrap items-center gap-2 break-all text-blue-600 hover:underline sm:flex-nowrap sm:gap-3"
+                    >
+                      <Mail className="h-5 w-5" />
+                      {sellerEmail}
+                    </a>
+                  )}
+                </div>
+
+                {sellerListingsError && (
+                  <p className="text-sm text-red-600">{sellerListingsError}</p>
+                )}
+
+                {property.userUid && (
+                  <Link href={`/users/${property.userUid}`} className="block">
+                    <Button variant="outline" className="w-full justify-center">
+                      {sellerListingsLoading
+                        ? "กำลังโหลดประกาศจากผู้ขาย..."
+                        : `ดูประกาศทั้งหมดจากผู้ขายรายนี้ (${sellerListingsCount})`}
+                    </Button>
+                  </Link>
+                )}
               </div>
             </section>
 
@@ -340,12 +457,16 @@ export function UserPropertyModal({ open, property, onOpenChange }: UserProperty
               <h3 className="text-lg font-semibold text-gray-900">ที่อยู่</h3>
               <div className="space-y-1 text-sm text-gray-700">
                 <p>{property.address}</p>
-                <p>{[property.city, property.province, property.postal].filter(Boolean).join(" ")}</p>
+                <p>
+                  {[property.city, property.province, property.postal]
+                    .filter(Boolean)
+                    .join(" ")}
+                </p>
               </div>
             </section>
           </aside>
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
