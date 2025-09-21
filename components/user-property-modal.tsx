@@ -158,6 +158,18 @@ export function UserPropertyModal({
     return property.parking;
   }, [property]);
 
+  const sellerInitials = useMemo(() => {
+    const name = sellerProfile?.name || property?.sellerName || "";
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((segment) => segment.charAt(0))
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }, [property?.sellerName, sellerProfile?.name]);
+  const sellerListingsCount = sellerListings.length;
+
   if (!property) return null;
 
   const sellerRoleLabel =
@@ -169,20 +181,6 @@ export function UserPropertyModal({
   const sellerDisplayName = sellerProfile?.name || property.sellerName;
   const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
   const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
-  const sellerInitials = useMemo(() => {
-    const name = sellerProfile?.name || property.sellerName || "";
-    if (!name) return "?";
-    return name
-      .split(" ")
-      .map((segment) => segment.charAt(0))
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-  }, [property.sellerName, sellerProfile?.name]);
-  const sellerListingsCount = useMemo(
-    () => sellerListings.length,
-    [sellerListings],
-  );
 
   const mapUrl =
     typeof property.lat === "number" && typeof property.lng === "number"
