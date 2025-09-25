@@ -452,7 +452,17 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
     try {
       setSubmitting(true)
-      await setDocument("users", user.uid, { uid: user.uid })
+
+
+      const ensureUserDocExists = async () => {
+        const userDoc = await getDocument("users", user.uid)
+        if (!userDoc) {
+          await setDocument("users", user.uid, { uid: user.uid })
+        }
+      }
+
+      await ensureUserDocExists()
+
 
       const propertyBase = {
         userUid: user.uid,
