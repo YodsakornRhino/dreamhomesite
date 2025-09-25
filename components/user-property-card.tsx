@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import { useMemo, useState } from "react"
 import { Bath, Bed, Heart, MapPin, Square } from "lucide-react"
 
@@ -133,9 +134,12 @@ export function UserPropertyCard({ property, onViewDetails }: UserPropertyCardPr
           </span>
         </div>
 
-        <div className="mt-auto pt-2">
+        <div className="mt-auto pt-2 space-y-2">
           <Button className="w-full" onClick={() => onViewDetails(property)}>
             ดูรายละเอียด
+          </Button>
+          <Button asChild variant="outline" className="w-full">
+            <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
           </Button>
         </div>
       </div>
