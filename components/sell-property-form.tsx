@@ -238,7 +238,9 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
   }, [])
 
   useEffect(() => {
-    if (!mapsReady || !mapRef.current) return
+    if (!mapsReady || propertyLoading) return
+    if (!mapRef.current) return
+    if (gmap.current) return
 
     const start =
       latlng.lat !== null && latlng.lng !== null
@@ -300,7 +302,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
       marker.current.setPosition(loc)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapsReady])
+  }, [mapsReady, propertyLoading])
 
   useEffect(() => {
     if (!mapsReady || !gmap.current || !marker.current) return
@@ -428,6 +430,18 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
     setDescription(property.description)
     setExistingPhotoUrls(property.photos ?? [])
     setExistingVideoUrl(property.video ?? null)
+    if (searchRef.current) {
+      const formattedLocation = [
+        property.address,
+        property.city,
+        property.province,
+      ]
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join(", ")
+
+      searchRef.current.value = formattedLocation || property.address || ""
+    }
     initialCreatedAtRef.current = property.createdAt
   }
 
