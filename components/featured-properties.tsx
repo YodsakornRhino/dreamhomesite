@@ -1,75 +1,72 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
+import PropertyCard from "./property-card"
+import PropertyModal from "./property-modal"
 
-import { useAllUserProperties } from "@/hooks/use-all-user-properties"
-import type { UserProperty } from "@/types/user-property"
-
-import { UserPropertyCard } from "./user-property-card"
-import { UserPropertyModal } from "./user-property-modal"
+const featuredProperties = [
+  {
+    id: 1,
+    title: "บ้านครอบครัวสมัยใหม่",
+    price: "$450,000",
+    location: "123 ถนนโอ๊ค ใจกลางเมือง",
+    beds: 3,
+    baths: 2,
+    sqft: 1200,
+    type: "sale" as const,
+    gradient: "bg-gradient-to-r from-blue-400 to-purple-500",
+  },
+  {
+    id: 2,
+    title: "อพาร์ตเมนต์หรู",
+    price: "$2,500/mo",
+    location: "456 ถนนไพน์ ย่านมิดทาวน์",
+    beds: 2,
+    baths: 2,
+    sqft: 950,
+    type: "rent" as const,
+    gradient: "bg-gradient-to-r from-green-400 to-blue-500",
+  },
+  {
+    id: 3,
+    title: "คอทเทจอบอุ่น",
+    price: "$320,000",
+    location: "789 ถนนเมเปิล ชานเมือง",
+    beds: 2,
+    baths: 1,
+    sqft: 800,
+    type: "sale" as const,
+    gradient: "bg-gradient-to-r from-purple-400 to-pink-500",
+  },
+]
 
 export default function FeaturedProperties() {
-  const { properties, loading, error } = useAllUserProperties()
-  const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
+  const [selectedProperty, setSelectedProperty] = useState<number | null>(null)
 
-  const featuredProperties = useMemo(() => properties.slice(0, 3), [properties])
-
-  const handleViewDetails = (property: UserProperty) => {
-    setSelectedProperty(property)
+  const handleViewDetails = (id: number) => {
+    setSelectedProperty(id)
   }
 
-  const handleModalChange = (open: boolean) => {
-    if (!open) {
-      setSelectedProperty(null)
-    }
+  const handleCloseModal = () => {
+    setSelectedProperty(null)
   }
 
   return (
     <section className="py-16">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-12 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-gray-800 md:text-4xl">อสังหาริมทรัพย์แนะนำ</h2>
-          <p className="text-lg text-gray-600">คัดสรรอสังหาริมทรัพย์พิเศษเพื่อคุณ</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">อสังหาริมทรัพย์แนะนำ</h2>
+          <p className="text-gray-600 text-lg">คัดสรรอสังหาริมทรัพย์พิเศษเพื่อคุณ</p>
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={index}
-                className="flex h-full flex-col overflow-hidden rounded-2xl border bg-white p-4 shadow-sm animate-pulse"
-              >
-                <div className="mb-4 h-40 w-full rounded-xl bg-gray-200" />
-                <div className="space-y-3">
-                  <div className="h-4 w-3/4 rounded bg-gray-200" />
-                  <div className="h-4 w-1/2 rounded bg-gray-200" />
-                  <div className="h-4 w-full rounded bg-gray-200" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <p className="text-center text-sm text-red-600">{error}</p>
-        ) : featuredProperties.length === 0 ? (
-          <p className="text-center text-gray-500">ยังไม่มีประกาศแนะนำในขณะนี้</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {featuredProperties.map((property) => (
-              <UserPropertyCard
-                key={property.id}
-                property={property}
-                onViewDetails={handleViewDetails}
-              />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {featuredProperties.map((property) => (
+            <PropertyCard key={property.id} {...property} onViewDetails={handleViewDetails} />
+          ))}
+        </div>
       </div>
 
-      <UserPropertyModal
-        open={Boolean(selectedProperty)}
-        property={selectedProperty}
-        onOpenChange={handleModalChange}
-      />
+      {selectedProperty && <PropertyModal propertyId={selectedProperty} onClose={handleCloseModal} />}
     </section>
   )
 }
