@@ -13,6 +13,7 @@ import type { UserProperty } from "@/types/user-property"
 interface UserPropertyCardProps {
   property: UserProperty
   onViewDetails: (property: UserProperty) => void
+  showEditActions?: boolean
 }
 
 const placeholderGradients: Record<string, string> = {
@@ -21,7 +22,11 @@ const placeholderGradients: Record<string, string> = {
   land: "from-emerald-400 via-green-500 to-lime-500",
 }
 
-export function UserPropertyCard({ property, onViewDetails }: UserPropertyCardProps) {
+export function UserPropertyCard({
+  property,
+  onViewDetails,
+  showEditActions = false,
+}: UserPropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
 
   const mainPhoto = property.photos?.[0]
@@ -138,9 +143,11 @@ export function UserPropertyCard({ property, onViewDetails }: UserPropertyCardPr
           <Button className="w-full" onClick={() => onViewDetails(property)}>
             ดูรายละเอียด
           </Button>
-          <Button asChild variant="outline" className="w-full">
-            <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
-          </Button>
+          {showEditActions && (
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
+            </Button>
+          )}
         </div>
       </div>
     </div>

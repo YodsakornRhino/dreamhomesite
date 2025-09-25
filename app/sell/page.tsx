@@ -130,6 +130,7 @@ export default function SellDashboardPage() {
                   key={property.id}
                   property={property}
                   onViewDetails={handleViewDetails}
+                  showEditActions
                 />
               ))}
             </div>
