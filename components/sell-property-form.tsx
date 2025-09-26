@@ -30,7 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { addDocument, getDocument, setDocument } from "@/lib/firestore"
-import { uploadFile, uploadFiles, getDownloadURL } from "@/lib/storage"
+import { uploadFile, uploadFiles, getDownloadURL, deleteFile } from "@/lib/storage"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
 import type { UserProperty } from "@/types/user-property"
 
@@ -52,6 +52,18 @@ const isPositive = (s: string) => {
 }
 const emailOk = (s: string) => /\S+@\S+\.\S+/.test(s)
 const phoneOk = (s: string) => s.replace(/\D/g, "").length >= 6
+
+const extractStoragePath = (url: string): string | null => {
+  try {
+    const parsed = new URL(url)
+    const [, pathPart] = parsed.pathname.split("/o/")
+    if (!pathPart) return null
+    return decodeURIComponent(pathPart)
+  } catch (error) {
+    console.error("Failed to extract storage path", error)
+    return null
+  }
+}
 
 export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
   const { user, loading } = useAuthContext()
@@ -97,6 +109,8 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
   const [existingVideoUrl, setExistingVideoUrl] = useState<string | null>(null)
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
+  const [removedPhotoPaths, setRemovedPhotoPaths] = useState<string[]>([])
+  const [removedVideoPath, setRemovedVideoPath] = useState<string | null>(null)
 
   const [errors, setErrors] = useState<Errors>({})
   const [touched, setTouched] = useState<Touched>({})
@@ -124,6 +138,12 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
     const file = e.target.files?.[0] || null
     setVideo(file)
     if (file) {
+      if (existingVideoUrl) {
+        const path = extractStoragePath(existingVideoUrl)
+        if (path) {
+          setRemovedVideoPath(path)
+        }
+      }
       setExistingVideoUrl(null)
     }
   }
@@ -430,6 +450,8 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
     setDescription(property.description)
     setExistingPhotoUrls(property.photos ?? [])
     setExistingVideoUrl(property.video ?? null)
+    setRemovedPhotoPaths([])
+    setRemovedVideoPath(null)
     if (searchRef.current) {
       const formattedLocation = [
         property.address,
@@ -583,6 +605,28 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           createdAt,
         })
 
+        if (removedPhotoPaths.length > 0) {
+          await Promise.all(
+            removedPhotoPaths.map(async (path) => {
+              try {
+                await deleteFile(path)
+              } catch (error) {
+                console.error("Failed to delete photo from storage", error)
+              }
+            }),
+          )
+          setRemovedPhotoPaths([])
+        }
+
+        if (removedVideoPath) {
+          try {
+            await deleteFile(removedVideoPath)
+          } catch (error) {
+            console.error("Failed to delete video from storage", error)
+          }
+          setRemovedVideoPath(null)
+        }
+
         alert("อัปเดตประกาศเรียบร้อย!")
       }
     } catch (err) {
@@ -599,9 +643,21 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
   const handleRemoveExistingPhoto = (url: string) => {
     setExistingPhotoUrls((prev) => prev.filter((item) => item !== url))
+    const path = extractStoragePath(url)
+    if (path) {
+      setRemovedPhotoPaths((prev) =>
+        prev.includes(path) ? prev : [...prev, path],
+      )
+    }
   }
 
   const handleRemoveExistingVideo = () => {
+    if (existingVideoUrl) {
+      const path = extractStoragePath(existingVideoUrl)
+      if (path) {
+        setRemovedVideoPath(path)
+      }
+    }
     setExistingVideoUrl(null)
   }
 
