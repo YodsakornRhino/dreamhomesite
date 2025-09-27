@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Bath, Bed, Heart, MapPin, Square } from "lucide-react"
+import { Bath, Bed, Heart, MapPin, Square, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { formatPropertyPrice, PROPERTY_TYPE_LABELS, TRANSACTION_LABELS } from "@/lib/property"
@@ -14,6 +14,8 @@ interface UserPropertyCardProps {
   property: UserProperty
   onViewDetails: (property: UserProperty) => void
   showEditActions?: boolean
+  onDelete?: (property: UserProperty) => void
+  isDeleting?: boolean
 }
 
 const placeholderGradients: Record<string, string> = {
@@ -26,6 +28,8 @@ export function UserPropertyCard({
   property,
   onViewDetails,
   showEditActions = false,
+  onDelete,
+  isDeleting = false,
 }: UserPropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
 
@@ -140,13 +144,44 @@ export function UserPropertyCard({
         </div>
 
         <div className="mt-auto pt-2 space-y-2">
-          <Button className="w-full" onClick={() => onViewDetails(property)}>
+          <Button
+            className="w-full"
+            onClick={() => onViewDetails(property)}
+            disabled={isDeleting}
+          >
             ดูรายละเอียด
           </Button>
           {showEditActions && (
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
-            </Button>
+            <>
+              <Button
+                asChild
+                variant="outline"
+                className={cn(
+                  "w-full",
+                  isDeleting && "pointer-events-none opacity-50",
+                )}
+              >
+                <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
+              </Button>
+              {onDelete && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => onDelete(property)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    "กำลังลบ..."
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      ลบประกาศ
+                    </span>
+                  )}
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>

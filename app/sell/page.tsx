@@ -10,7 +10,8 @@ import SellAuthPrompt from "@/components/sell-auth-prompt"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { subscribeToCollection } from "@/lib/firestore"
+import { deleteDocument, subscribeToCollection } from "@/lib/firestore"
+import { deleteFile, extractStoragePathFromUrl } from "@/lib/storage"
 import { mapDocumentToUserProperty, parseUserPropertyCreatedAt } from "@/lib/user-property-mapper"
 import type { UserProperty } from "@/types/user-property"
 
@@ -20,6 +21,7 @@ export default function SellDashboardPage() {
   const [propertiesLoading, setPropertiesLoading] = useState(true)
   const [propertiesError, setPropertiesError] = useState<string | null>(null)
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
+  const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (loading) {
@@ -85,6 +87,54 @@ export default function SellDashboardPage() {
     }
   }
 
+  const handleDeleteProperty = async (property: UserProperty) => {
+    if (!user) return
+
+    const confirmed = window.confirm(
+      "คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้? การลบไม่สามารถย้อนกลับได้",
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingPropertyId(property.id)
+
+    const photoPaths = (property.photos ?? [])
+      .map((url) => extractStoragePathFromUrl(url))
+      .filter((path): path is string => Boolean(path))
+
+    const videoPath = property.video ? extractStoragePathFromUrl(property.video) : null
+
+    try {
+      await Promise.all([
+        deleteDocument(`users/${user.uid}/user_property`, property.id),
+        deleteDocument("property", property.id),
+      ])
+
+      const storagePaths = videoPath ? [...photoPaths, videoPath] : photoPaths
+
+      if (storagePaths.length > 0) {
+        await Promise.all(
+          storagePaths.map(async (path) => {
+            try {
+              await deleteFile(path)
+            } catch (error) {
+              console.error("Failed to delete file from storage", error)
+            }
+          }),
+        )
+      }
+
+      alert("ลบประกาศเรียบร้อยแล้ว")
+    } catch (error) {
+      console.error("Failed to delete property", error)
+      alert("ไม่สามารถลบประกาศได้ กรุณาลองใหม่อีกครั้ง")
+    } finally {
+      setDeletingPropertyId(null)
+    }
+  }
+
   if (loading) return null
   if (!user) return <SellAuthPrompt />
 
@@ -131,6 +181,8 @@ export default function SellDashboardPage() {
                   property={property}
                   onViewDetails={handleViewDetails}
                   showEditActions
+                  onDelete={handleDeleteProperty}
+                  isDeleting={deletingPropertyId === property.id}
                 />
               ))}
             </div>
