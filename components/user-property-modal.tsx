@@ -2,12 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import {
   Bath,
   Bed,
   Calendar,
   Car,
+  ChevronLeft,
+  ChevronRight,
   ImageIcon,
   MapPin,
   Phone,
@@ -50,6 +59,7 @@ export function UserPropertyModal({
   onOpenChange,
 }: UserPropertyModalProps) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [pointerStartX, setPointerStartX] = useState<number | null>(null);
 
   const userUid = property?.userUid?.trim() ? property.userUid : null;
   const {
@@ -91,6 +101,72 @@ export function UserPropertyModal({
 
     return items;
   }, [property]);
+
+  const goToPrevious = useCallback(() => {
+    if (mediaItems.length === 0) return;
+    setActiveMediaIndex((prev) => {
+      if (mediaItems.length === 0) return 0;
+      return (prev - 1 + mediaItems.length) % mediaItems.length;
+    });
+  }, [mediaItems.length]);
+
+  const goToNext = useCallback(() => {
+    if (mediaItems.length === 0) return;
+    setActiveMediaIndex((prev) => {
+      if (mediaItems.length === 0) return 0;
+      return (prev + 1) % mediaItems.length;
+    });
+  }, [mediaItems.length]);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (mediaItems.length <= 1) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goToPrevious();
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goToNext();
+      }
+    },
+    [goToNext, goToPrevious, mediaItems.length],
+  );
+
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      setPointerStartX(event.clientX);
+    },
+    [],
+  );
+
+  const handlePointerEnd = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (pointerStartX === null || mediaItems.length <= 1) {
+        setPointerStartX(null);
+        return;
+      }
+
+      const deltaX = event.clientX - pointerStartX;
+      const swipeThreshold = 40;
+
+      if (Math.abs(deltaX) > swipeThreshold) {
+        if (deltaX > 0) {
+          goToPrevious();
+        } else {
+          goToNext();
+        }
+      }
+
+      setPointerStartX(null);
+    },
+    [goToNext, goToPrevious, mediaItems.length, pointerStartX],
+  );
+
+  const resetPointer = useCallback(() => {
+    setPointerStartX(null);
+  }, []);
 
   const safeIndex =
     mediaItems.length > 0
@@ -222,7 +298,41 @@ export function UserPropertyModal({
         <div className="grid grid-cols-1 gap-6 md:grid-cols-12 lg:gap-8">
           <div className="space-y-6 md:col-span-7 xl:col-span-8">
             <section className="space-y-3">
-              <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-muted shadow xs:h-56 sm:h-64 lg:h-72">
+              <div
+                className="relative h-48 w-full touch-pan-y overflow-hidden rounded-2xl bg-muted shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xs:h-56 sm:h-64 lg:h-72"
+                tabIndex={0}
+                role="group"
+                aria-label="แกลเลอรีสื่อประกาศ"
+                onKeyDown={handleKeyDown}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerEnd}
+                onPointerCancel={resetPointer}
+                onPointerLeave={resetPointer}
+              >
+                {mediaItems.length > 1 && (
+                  <>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      onClick={goToPrevious}
+                      className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 text-gray-900 shadow backdrop-blur transition hover:bg-white focus-visible:ring-2 focus-visible:ring-blue-500"
+                      aria-label="ดูสื่อก่อนหน้า"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      onClick={goToNext}
+                      className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 text-gray-900 shadow backdrop-blur transition hover:bg-white focus-visible:ring-2 focus-visible:ring-blue-500"
+                      aria-label="ดูสื่อถัดไป"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  </>
+                )}
                 {activeMedia ? (
                   activeMedia.type === "image" ? (
                     <Image
