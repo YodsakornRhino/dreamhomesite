@@ -230,10 +230,10 @@ export function UserPropertyModal({
                       alt={property.title}
                       fill
                       sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 55vw, 100vw"
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain object-center"
                     />
                   ) : (
-                    <video controls className="h-full w-full object-cover">
+                    <video controls className="h-full w-full object-contain object-center bg-black">
                       <source src={activeMedia.url} />
                       เบราว์เซอร์ของคุณไม่รองรับการเล่นวิดีโอ
                     </video>
