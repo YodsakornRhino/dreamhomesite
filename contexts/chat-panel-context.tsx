@@ -4,18 +4,24 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
+
+export interface ChatParticipant {
+  name: string;
+  avatarUrl?: string;
+}
 
 interface ChatPanelContextValue {
   isOpen: boolean;
+  participant: ChatParticipant | null;
   open: () => void;
+  openWith: (participant: ChatParticipant) => void;
   close: () => void;
   setOpen: (open: boolean) => void;
+  setParticipant: (participant: ChatParticipant | null) => void;
 }
 
 const ChatPanelContext = createContext<ChatPanelContextValue | undefined>(
@@ -28,24 +34,36 @@ export function ChatPanelProvider({
   children: ReactNode;
 }): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
-  const pathname = usePathname();
+  const [participant, setParticipant] = useState<ChatParticipant | null>(null);
 
   const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => setIsOpen(false), []);
-  const setOpen = useCallback((next: boolean) => setIsOpen(next), []);
-
-  useEffect(() => {
+  const openWith = useCallback((nextParticipant: ChatParticipant) => {
+    setParticipant(nextParticipant);
+    setIsOpen(true);
+  }, []);
+  const close = useCallback(() => {
     setIsOpen(false);
-  }, [pathname]);
+    setParticipant(null);
+  }, []);
+  const setOpen = useCallback((next: boolean) => setIsOpen(next), []);
+  const handleSetParticipant = useCallback(
+    (nextParticipant: ChatParticipant | null) => {
+      setParticipant(nextParticipant);
+    },
+    [],
+  );
 
   const value = useMemo<ChatPanelContextValue>(
     () => ({
       isOpen,
       open,
+      openWith,
       close,
       setOpen,
+      participant,
+      setParticipant: handleSetParticipant,
     }),
-    [close, isOpen, open, setOpen],
+    [close, handleSetParticipant, isOpen, open, openWith, participant, setOpen],
   );
 
   return (

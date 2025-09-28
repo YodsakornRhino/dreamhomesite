@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ChatPanelProvider } from "@/contexts/chat-panel-context";
 import { ChatPanelOffsetContainer } from "@/components/chat-panel-offset-container";
+import { ChatPanel } from "@/components/chat-panel";
 import { Toaster } from "@/components/ui/toaster";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <main className="flex-1">{children}</main>
                   <Footer />
                 </ChatPanelOffsetContainer>
+                <ChatPanel />
               </ChatPanelProvider>
               <Toaster />
             </AuthProvider>

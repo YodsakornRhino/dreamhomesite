@@ -6,14 +6,8 @@ import { X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useChatPanel } from "@/contexts/chat-panel-context";
 import { cn } from "@/lib/utils";
-
-interface UserChatDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  participantName: string;
-  participantAvatar?: string;
-}
 
 interface ChatMessage {
   id: number;
@@ -22,7 +16,7 @@ interface ChatMessage {
   timestamp: string;
 }
 
-const initialMessages: ChatMessage[] = [
+const defaultMessages: ChatMessage[] = [
   {
     id: 1,
     sender: "seller",
@@ -43,23 +37,53 @@ const initialMessages: ChatMessage[] = [
   },
 ];
 
-export function UserChatDialog({
-  open,
-  onOpenChange,
-  participantName,
-  participantAvatar,
-}: UserChatDialogProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+const DEFAULT_PARTICIPANT = {
+  name: "DreamHome Assistant",
+  avatarUrl: "",
+};
+
+export function ChatPanel(): JSX.Element {
+  const { isOpen, close, participant } = useChatPanel();
+  const activeParticipant = participant ?? DEFAULT_PARTICIPANT;
+  const [messages, setMessages] = useState<ChatMessage[]>(defaultMessages);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    if (!isOpen) {
+      setMessage("");
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setMessages(defaultMessages);
+  }, [activeParticipant.name]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [close, isOpen]);
+
   const participantInitials = useMemo(() => {
-    return participantName
+    return activeParticipant.name
       .split(" ")
       .map((segment) => segment.charAt(0))
       .join("")
       .slice(0, 2)
       .toUpperCase();
-  }, [participantName]);
+  }, [activeParticipant.name]);
 
   const handleSendMessage = () => {
     if (!message.trim()) {
@@ -78,29 +102,8 @@ export function UserChatDialog({
         }),
       },
     ]);
+
     setMessage("");
-  };
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onOpenChange]);
-
-  const handleClose = () => {
-    onOpenChange(false);
   };
 
   return (
@@ -108,45 +111,44 @@ export function UserChatDialog({
       <div
         role="presentation"
         aria-hidden="true"
-        onClick={handleClose}
+        onClick={close}
         className={cn(
           "fixed inset-0 z-30 bg-background/80 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
-          open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+          isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
         )}
       />
+
       <aside
         role="dialog"
         aria-modal="true"
-        aria-labelledby="user-chat-panel-title"
+        aria-labelledby="global-chat-panel-title"
         className={cn(
-          "fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l bg-background shadow-xl transition-transform duration-300 ease-in-out",
-          open ? "translate-x-0" : "translate-x-full",
+          "fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l bg-background shadow-xl transition-transform duration-300 ease-in-out lg:max-w-none lg:w-[28rem]",
+          isOpen ? "translate-x-0" : "translate-x-full",
+          isOpen ? "pointer-events-auto" : "pointer-events-none",
         )}
       >
         <header className="flex items-center justify-between border-b p-4">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={participantAvatar ?? ""} alt={participantName} />
+              <AvatarImage src={activeParticipant.avatarUrl ?? ""} alt={activeParticipant.name} />
               <AvatarFallback className="font-semibold">
                 {participantInitials}
               </AvatarFallback>
             </Avatar>
             <div className="space-y-1">
-              <p
-                id="user-chat-panel-title"
-                className="text-sm font-semibold text-foreground"
-              >
-                แชทกับ {participantName}
+              <p id="global-chat-panel-title" className="text-sm font-semibold text-foreground">
+                แชทกับ {activeParticipant.name}
               </p>
               <p className="text-xs text-muted-foreground">
-                พูดคุยรายละเอียดเกี่ยวกับการซื้อบ้านแบบตัวต่อตัวกับผู้ขายรายนี้
+                พูดคุยรายละเอียดเกี่ยวกับการซื้อบ้านแบบตัวต่อตัวกับผู้เชี่ยวชาญ
               </p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleClose}
+            onClick={close}
             aria-label="ปิดหน้าต่างแชท"
           >
             <X className="h-4 w-4" />
@@ -206,7 +208,7 @@ export function UserChatDialog({
                 }
               }}
             />
-            <Button onClick={handleSendMessage} type="button">
+            <Button type="button" onClick={handleSendMessage}>
               ส่งข้อความ
             </Button>
           </div>

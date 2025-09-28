@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import ChatWidget from "@/components/chat-widget";
-import { UserChatDialog } from "@/components/user-chat-dialog";
 import { UserPropertyCard } from "@/components/user-property-card";
 import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,7 +33,7 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
-  const { isOpen: chatPanelOpen, setOpen: setChatPanelOpen } = useChatPanel();
+  const { openWith } = useChatPanel();
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";
@@ -122,7 +121,14 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
               </div>
 
               <div className="flex w-full flex-col gap-2 sm:w-auto">
-                <Button onClick={() => setChatPanelOpen(true)}>
+                <Button
+                  onClick={() =>
+                    openWith({
+                      name: profile?.name ?? "ผู้ขาย",
+                      avatarUrl: profile?.photoURL ?? "",
+                    })
+                  }
+                >
                   เริ่มแชท 1 ต่อ 1
                 </Button>
                 {profile?.email && (
@@ -186,13 +192,6 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
         open={Boolean(selectedProperty)}
         property={selectedProperty}
         onOpenChange={handleModalChange}
-      />
-
-      <UserChatDialog
-        open={chatPanelOpen}
-        onOpenChange={setChatPanelOpen}
-        participantName={profile?.name ?? "ผู้ขาย"}
-        participantAvatar={profile?.photoURL ?? ""}
       />
 
       <ChatWidget />
