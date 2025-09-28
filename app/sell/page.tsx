@@ -218,7 +218,7 @@ export default function SellDashboardPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>ยืนยันการลบประกาศ</DialogTitle>
             <DialogDescription>
@@ -231,6 +231,7 @@ export default function SellDashboardPage() {
                 property={propertyPendingDelete}
                 onViewDetails={() => {}}
                 showInteractiveElements={false}
+                className="mx-auto max-w-[420px]"
               />
             </div>
           )}

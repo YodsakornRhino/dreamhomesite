@@ -17,6 +17,7 @@ interface UserPropertyCardProps {
   onDelete?: (property: UserProperty) => void
   isDeleting?: boolean
   showInteractiveElements?: boolean
+  className?: string
 }
 
 const placeholderGradients: Record<string, string> = {
@@ -32,6 +33,7 @@ export function UserPropertyCard({
   onDelete,
   isDeleting = false,
   showInteractiveElements = true,
+  className,
 }: UserPropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
 
@@ -69,7 +71,12 @@ export function UserPropertyCard({
   const gradient = placeholderGradients[property.propertyType] ?? placeholderGradients.house
 
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+    <div
+      className={cn(
+        "group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg",
+        className,
+      )}
+    >
       <div className="relative h-48 w-full overflow-hidden">
         {mainPhoto ? (
           <Image
