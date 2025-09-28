@@ -39,14 +39,11 @@ import {
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { useChatPanel, CHAT_PANEL_PADDING_CLASS } from "@/contexts/chat-panel-context"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
-import { cn } from "@/lib/utils"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
-  const { isOpen: isChatPanelOpen } = useChatPanel()
   const { toast } = useToast()
   const pathname = usePathname()
 
@@ -136,12 +133,7 @@ const Navigation: React.FC = () => {
 
   return (
     <>
-      <nav
-        className={cn(
-          "sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 transition-[padding] duration-300 ease-in-out",
-          isChatPanelOpen ? CHAT_PANEL_PADDING_CLASS : undefined,
-        )}
-      >
+      <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="container mx-auto px-4">
           <div className="flex h-14 sm:h-16 w-full items-center">
             {/* Logo */}

@@ -83,5 +83,4 @@ export function useChatPanel(): ChatPanelContextValue {
   return context;
 }
 
-export const CHAT_PANEL_PADDING_CLASS = "lg:pr-[28rem]";
 export const CHAT_WIDGET_OFFSET_CLASS = "lg:right-[calc(28rem+1.5rem)]";

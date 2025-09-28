@@ -78,12 +78,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               />
 
               <ChatPanelProvider>
-                <ChatPanelOffsetContainer>
-                  <Navigation />
-                  <main className="flex-1">{children}</main>
-                  <Footer />
-                </ChatPanelOffsetContainer>
-                <ChatPanel />
+                <div className="min-h-screen lg:flex lg:items-stretch">
+                  <ChatPanelOffsetContainer>
+                    <Navigation />
+                    <main className="flex-1">{children}</main>
+                    <Footer />
+                  </ChatPanelOffsetContainer>
+                  <ChatPanel />
+                </div>
               </ChatPanelProvider>
               <Toaster />
             </AuthProvider>

@@ -2,12 +2,6 @@
 
 import type { ReactNode } from "react";
 
-import {
-  CHAT_PANEL_PADDING_CLASS,
-  useChatPanel,
-} from "@/contexts/chat-panel-context";
-import { cn } from "@/lib/utils";
-
 interface ChatPanelOffsetContainerProps {
   children: ReactNode;
 }
@@ -15,15 +9,8 @@ interface ChatPanelOffsetContainerProps {
 export function ChatPanelOffsetContainer({
   children,
 }: ChatPanelOffsetContainerProps): JSX.Element {
-  const { isOpen } = useChatPanel();
-
   return (
-    <div
-      className={cn(
-        "min-h-screen flex flex-col transition-[padding] duration-300 ease-in-out",
-        isOpen ? CHAT_PANEL_PADDING_CLASS : undefined,
-      )}
-    >
+    <div className="flex min-h-screen flex-1 flex-col bg-background transition-[max-width] duration-300 ease-in-out">
       {children}
     </div>
   );
