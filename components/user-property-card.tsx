@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Bath, Bed, Heart, MapPin, Square } from "lucide-react"
+import { Bath, Bed, Heart, MapPin, Square, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { formatPropertyPrice, PROPERTY_TYPE_LABELS, TRANSACTION_LABELS } from "@/lib/property"
@@ -14,6 +14,10 @@ interface UserPropertyCardProps {
   property: UserProperty
   onViewDetails: (property: UserProperty) => void
   showEditActions?: boolean
+  onDelete?: (property: UserProperty) => void
+  isDeleting?: boolean
+  showInteractiveElements?: boolean
+  className?: string
 }
 
 const placeholderGradients: Record<string, string> = {
@@ -26,6 +30,10 @@ export function UserPropertyCard({
   property,
   onViewDetails,
   showEditActions = false,
+  onDelete,
+  isDeleting = false,
+  showInteractiveElements = true,
+  className,
 }: UserPropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
 
@@ -63,7 +71,12 @@ export function UserPropertyCard({
   const gradient = placeholderGradients[property.propertyType] ?? placeholderGradients.house
 
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+    <div
+      className={cn(
+        "group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg",
+        className,
+      )}
+    >
       <div className="relative h-48 w-full overflow-hidden">
         {mainPhoto ? (
           <Image
@@ -96,14 +109,16 @@ export function UserPropertyCard({
           {transactionLabel}
         </span>
 
-        <button
-          type="button"
-          onClick={() => setIsFavorited((prev) => !prev)}
-          className="absolute right-4 top-4 rounded-full bg-white p-2 text-gray-500 shadow transition hover:bg-gray-100"
-          aria-label={isFavorited ? "นำออกจากรายการโปรด" : "เพิ่มในรายการโปรด"}
-        >
-          <Heart className={cn("h-4 w-4", isFavorited ? "fill-red-500 text-red-500" : "text-gray-400")} />
-        </button>
+        {showInteractiveElements && (
+          <button
+            type="button"
+            onClick={() => setIsFavorited((prev) => !prev)}
+            className="absolute right-4 top-4 rounded-full bg-white p-2 text-gray-500 shadow transition hover:bg-gray-100"
+            aria-label={isFavorited ? "นำออกจากรายการโปรด" : "เพิ่มในรายการโปรด"}
+          >
+            <Heart className={cn("h-4 w-4", isFavorited ? "fill-red-500 text-red-500" : "text-gray-400")} />
+          </button>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-4 p-6">
@@ -139,16 +154,69 @@ export function UserPropertyCard({
           </span>
         </div>
 
-        <div className="mt-auto pt-2 space-y-2">
-          <Button className="w-full" onClick={() => onViewDetails(property)}>
-            ดูรายละเอียด
-          </Button>
-          {showEditActions && (
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
-            </Button>
-          )}
-        </div>
+        {showInteractiveElements && (
+          <div className="mt-auto pt-2">
+            {showEditActions && onDelete ? (
+              <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] grid-rows-[repeat(2,minmax(0,1fr))] gap-x-2 gap-y-2">
+                <Button
+                  className="col-start-1 row-start-1 h-full w-full"
+                  onClick={() => onViewDetails(property)}
+                  disabled={isDeleting}
+                >
+                  ดูรายละเอียด
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className={cn(
+                    "col-start-1 row-start-2 h-full w-full",
+                    isDeleting && "pointer-events-none opacity-50",
+                  )}
+                >
+                  <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="col-start-2 row-span-2 flex h-full w-full flex-col items-center justify-center gap-2 text-base font-semibold"
+                  onClick={() => onDelete(property)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    "กำลังลบ..."
+                  ) : (
+                    <>
+                      <Trash2 className="h-5 w-5" />
+                      ลบประกาศ
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Button
+                  className="w-full"
+                  onClick={() => onViewDetails(property)}
+                  disabled={isDeleting}
+                >
+                  ดูรายละเอียด
+                </Button>
+                {showEditActions && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    className={cn(
+                      "w-full",
+                      isDeleting && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

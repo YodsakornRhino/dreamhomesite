@@ -17,6 +17,18 @@ const getStorageInstance = async (): Promise<FirebaseStorage> => {
   return storageInstance
 }
 
+export const extractStoragePathFromUrl = (url: string): string | null => {
+  try {
+    const parsed = new URL(url)
+    const [, pathPart] = parsed.pathname.split("/o/")
+    if (!pathPart) return null
+    return decodeURIComponent(pathPart)
+  } catch (error) {
+    console.error("Failed to extract storage path", error)
+    return null
+  }
+}
+
 // Upload a file
 export const uploadFile = async (path: string, file: File, metadata?: any): Promise<UploadResult> => {
   try {

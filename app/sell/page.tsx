@@ -9,8 +9,17 @@ import { UserPropertyModal } from "@/components/user-property-modal"
 import SellAuthPrompt from "@/components/sell-auth-prompt"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { subscribeToCollection } from "@/lib/firestore"
+import { deleteDocument, subscribeToCollection } from "@/lib/firestore"
+import { deleteFile, extractStoragePathFromUrl } from "@/lib/storage"
 import { mapDocumentToUserProperty, parseUserPropertyCreatedAt } from "@/lib/user-property-mapper"
 import type { UserProperty } from "@/types/user-property"
 
@@ -20,6 +29,8 @@ export default function SellDashboardPage() {
   const [propertiesLoading, setPropertiesLoading] = useState(true)
   const [propertiesError, setPropertiesError] = useState<string | null>(null)
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
+  const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(null)
+  const [propertyPendingDelete, setPropertyPendingDelete] = useState<UserProperty | null>(null)
 
   useEffect(() => {
     if (loading) {
@@ -85,6 +96,57 @@ export default function SellDashboardPage() {
     }
   }
 
+  const handleDeleteRequest = (property: UserProperty) => {
+    setPropertyPendingDelete(property)
+  }
+
+  const resetDeleteState = () => {
+    setPropertyPendingDelete(null)
+    setDeletingPropertyId(null)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!user || !propertyPendingDelete) return
+
+    const property = propertyPendingDelete
+
+    setDeletingPropertyId(property.id)
+
+    const photoPaths = (property.photos ?? [])
+      .map((url) => extractStoragePathFromUrl(url))
+      .filter((path): path is string => Boolean(path))
+
+    const videoPath = property.video ? extractStoragePathFromUrl(property.video) : null
+
+    try {
+      await Promise.all([
+        deleteDocument(`users/${user.uid}/user_property`, property.id),
+        deleteDocument("property", property.id),
+      ])
+
+      const storagePaths = videoPath ? [...photoPaths, videoPath] : photoPaths
+
+      if (storagePaths.length > 0) {
+        await Promise.all(
+          storagePaths.map(async (path) => {
+            try {
+              await deleteFile(path)
+            } catch (error) {
+              console.error("Failed to delete file from storage", error)
+            }
+          }),
+        )
+      }
+
+      alert("ลบประกาศเรียบร้อยแล้ว")
+    } catch (error) {
+      console.error("Failed to delete property", error)
+      alert("ไม่สามารถลบประกาศได้ กรุณาลองใหม่อีกครั้ง")
+    } finally {
+      resetDeleteState()
+    }
+  }
+
   if (loading) return null
   if (!user) return <SellAuthPrompt />
 
@@ -131,6 +193,8 @@ export default function SellDashboardPage() {
                   property={property}
                   onViewDetails={handleViewDetails}
                   showEditActions
+                  onDelete={handleDeleteRequest}
+                  isDeleting={deletingPropertyId === property.id}
                 />
               ))}
             </div>
@@ -145,6 +209,52 @@ export default function SellDashboardPage() {
         property={selectedProperty}
         onOpenChange={handleModalChange}
       />
+
+      <Dialog
+        open={Boolean(propertyPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deletingPropertyId) {
+            resetDeleteState()
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>ยืนยันการลบประกาศ</DialogTitle>
+            <DialogDescription>
+              คุณแน่ใจหรือไม่ว่าต้องการลบประกาศนี้? การลบไม่สามารถย้อนกลับได้
+            </DialogDescription>
+          </DialogHeader>
+          {propertyPendingDelete && (
+            <div className="py-4">
+              <UserPropertyCard
+                property={propertyPendingDelete}
+                onViewDetails={() => {}}
+                showInteractiveElements={false}
+                className="mx-auto max-w-[420px]"
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetDeleteState}
+              disabled={Boolean(deletingPropertyId)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={Boolean(deletingPropertyId)}
+            >
+              {deletingPropertyId ? "กำลังลบ..." : "ลบประกาศ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

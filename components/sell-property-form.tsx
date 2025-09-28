@@ -29,8 +29,19 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { addDocument, getDocument, setDocument } from "@/lib/firestore"
-import { uploadFile, uploadFiles, getDownloadURL, deleteFile } from "@/lib/storage"
+import {
+  addDocument,
+  getDocument,
+  getFirestoreInstance,
+  setDocument,
+} from "@/lib/firestore"
+import {
+  uploadFile,
+  uploadFiles,
+  getDownloadURL,
+  deleteFile,
+  extractStoragePathFromUrl,
+} from "@/lib/storage"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
 import type { UserProperty } from "@/types/user-property"
 
@@ -52,18 +63,6 @@ const isPositive = (s: string) => {
 }
 const emailOk = (s: string) => /\S+@\S+\.\S+/.test(s)
 const phoneOk = (s: string) => s.replace(/\D/g, "").length >= 6
-
-const extractStoragePath = (url: string): string | null => {
-  try {
-    const parsed = new URL(url)
-    const [, pathPart] = parsed.pathname.split("/o/")
-    if (!pathPart) return null
-    return decodeURIComponent(pathPart)
-  } catch (error) {
-    console.error("Failed to extract storage path", error)
-    return null
-  }
-}
 
 export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
   const { user, loading } = useAuthContext()
@@ -139,7 +138,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
     setVideo(file)
     if (file) {
       if (existingVideoUrl) {
-        const path = extractStoragePath(existingVideoUrl)
+        const path = extractStoragePathFromUrl(existingVideoUrl)
         if (path) {
           setRemovedVideoPath(path)
         }
@@ -413,6 +412,23 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           setPropertyLoading(false)
           return
         }
+        const propertyDoc = await getDocument("property", propertyId)
+        if (propertyDoc) {
+          const data = propertyDoc.data() as { userRef?: unknown }
+          if (!data?.userRef) {
+            try {
+              const { doc } = await import("firebase/firestore")
+              const ownerRef = doc(
+                await getFirestoreInstance(),
+                "users",
+                user.uid,
+              )
+              await setDocument("property", propertyId, { userRef: ownerRef })
+            } catch (patchError) {
+              console.error("Failed to backfill property ownerRef", patchError)
+            }
+          }
+        }
         const property = mapDocumentToUserProperty(docSnap)
         applyInitialProperty(property)
         initialDataLoadedRef.current = true
@@ -486,6 +502,9 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
     if (!user) return
 
+    const { doc } = await import("firebase/firestore")
+    const ownerRef = doc(await getFirestoreInstance(), "users", user.uid)
+
     try {
       setSubmitting(true)
 
@@ -502,6 +521,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
       const propertyBase = {
         userUid: user.uid,
+        userRef: ownerRef,
         sellerName,
         sellerPhone,
         sellerEmail,
@@ -643,7 +663,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
   const handleRemoveExistingPhoto = (url: string) => {
     setExistingPhotoUrls((prev) => prev.filter((item) => item !== url))
-    const path = extractStoragePath(url)
+    const path = extractStoragePathFromUrl(url)
     if (path) {
       setRemovedPhotoPaths((prev) =>
         prev.includes(path) ? prev : [...prev, path],
@@ -653,7 +673,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
   const handleRemoveExistingVideo = () => {
     if (existingVideoUrl) {
-      const path = extractStoragePath(existingVideoUrl)
+      const path = extractStoragePathFromUrl(existingVideoUrl)
       if (path) {
         setRemovedVideoPath(path)
       }
