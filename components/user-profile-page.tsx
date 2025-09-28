@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import ChatWidget from "@/components/chat-widget";
+import { UserChatDialog } from "@/components/user-chat-dialog";
 import { UserPropertyCard } from "@/components/user-property-card";
 import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -32,6 +33,7 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
+  const [chatOpen, setChatOpen] = useState(false);
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";
@@ -118,6 +120,9 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
             </div>
 
             <div className="flex w-full flex-col gap-2 sm:w-auto">
+              <Button onClick={() => setChatOpen(true)}>
+                เริ่มแชท 1 ต่อ 1
+              </Button>
               {profile?.email && (
                 <Button asChild variant="outline">
                   <a href={`mailto:${profile.email}`}>ติดต่อผู้ขายผ่านอีเมล</a>
@@ -178,6 +183,13 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
         open={Boolean(selectedProperty)}
         property={selectedProperty}
         onOpenChange={handleModalChange}
+      />
+
+      <UserChatDialog
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+        participantName={profile?.name ?? "ผู้ขาย"}
+        participantAvatar={profile?.photoURL ?? ""}
       />
 
       <ChatWidget />
