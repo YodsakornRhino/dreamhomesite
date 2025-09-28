@@ -29,7 +29,12 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { addDocument, getDocument, setDocument } from "@/lib/firestore"
+import {
+  addDocument,
+  getDocument,
+  getFirestoreInstance,
+  setDocument,
+} from "@/lib/firestore"
 import {
   uploadFile,
   uploadFiles,
@@ -407,6 +412,23 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           setPropertyLoading(false)
           return
         }
+        const propertyDoc = await getDocument("property", propertyId)
+        if (propertyDoc) {
+          const data = propertyDoc.data() as { userRef?: unknown }
+          if (!data?.userRef) {
+            try {
+              const { doc } = await import("firebase/firestore")
+              const ownerRef = doc(
+                await getFirestoreInstance(),
+                "users",
+                user.uid,
+              )
+              await setDocument("property", propertyId, { userRef: ownerRef })
+            } catch (patchError) {
+              console.error("Failed to backfill property ownerRef", patchError)
+            }
+          }
+        }
         const property = mapDocumentToUserProperty(docSnap)
         applyInitialProperty(property)
         initialDataLoadedRef.current = true
@@ -480,6 +502,9 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
     if (!user) return
 
+    const { doc } = await import("firebase/firestore")
+    const ownerRef = doc(await getFirestoreInstance(), "users", user.uid)
+
     try {
       setSubmitting(true)
 
@@ -496,6 +521,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
       const propertyBase = {
         userUid: user.uid,
+        userRef: ownerRef,
         sellerName,
         sellerPhone,
         sellerEmail,
