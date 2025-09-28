@@ -5,9 +5,16 @@ import type React from "react"
 import { useState } from "react"
 import { MessageCircle, X, Send, Bot } from "lucide-react"
 
+import {
+  CHAT_WIDGET_OFFSET_CLASS,
+  useChatPanel,
+} from "@/contexts/chat-panel-context"
+import { cn } from "@/lib/utils"
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState("")
+  const { isOpen: isChatPanelOpen } = useChatPanel()
 
   const toggleChat = () => {
     setIsOpen(!isOpen)
@@ -29,7 +36,12 @@ export default function ChatWidget() {
   return (
     <>
       {/* Chat Button */}
-      <div className="fixed bottom-6 right-6 z-40">
+      <div
+        className={cn(
+          "fixed bottom-6 right-6 z-40 transition-[right] duration-300 ease-in-out",
+          isChatPanelOpen ? CHAT_WIDGET_OFFSET_CLASS : undefined,
+        )}
+      >
         <button
           onClick={toggleChat}
           className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 animate-bounce"

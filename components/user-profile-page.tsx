@@ -11,10 +11,10 @@ import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useChatPanel } from "@/contexts/chat-panel-context";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
-import { cn } from "@/lib/utils";
 
 interface UserProfilePageProps {
   uid: string;
@@ -34,7 +34,7 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
-  const [chatOpen, setChatOpen] = useState(false);
+  const { isOpen: chatPanelOpen, setOpen: setChatPanelOpen } = useChatPanel();
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";
@@ -60,12 +60,7 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div
-        className={cn(
-          "mx-auto w-full max-w-6xl px-4 py-10 transition-all duration-300",
-          chatOpen ? "lg:pr-[28rem]" : "",
-        )}
-      >
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 transition-all duration-300">
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -127,7 +122,7 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
               </div>
 
               <div className="flex w-full flex-col gap-2 sm:w-auto">
-                <Button onClick={() => setChatOpen(true)}>
+                <Button onClick={() => setChatPanelOpen(true)}>
                   เริ่มแชท 1 ต่อ 1
                 </Button>
                 {profile?.email && (
@@ -194,8 +189,8 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
       />
 
       <UserChatDialog
-        open={chatOpen}
-        onOpenChange={setChatOpen}
+        open={chatPanelOpen}
+        onOpenChange={setChatPanelOpen}
         participantName={profile?.name ?? "ผู้ขาย"}
         participantAvatar={profile?.photoURL ?? ""}
       />

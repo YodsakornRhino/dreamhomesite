@@ -8,6 +8,8 @@ import "./globals.css";
 import ClientOnly from "@/components/ClientOnly";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ChatPanelProvider } from "@/contexts/chat-panel-context";
+import { ChatPanelOffsetContainer } from "@/components/chat-panel-offset-container";
 import { Toaster } from "@/components/ui/toaster";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
@@ -74,11 +76,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 aria-hidden="true"
               />
 
-              <div className="min-h-screen flex flex-col">
-                <Navigation />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
+              <ChatPanelProvider>
+                <ChatPanelOffsetContainer>
+                  <Navigation />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                </ChatPanelOffsetContainer>
+              </ChatPanelProvider>
               <Toaster />
             </AuthProvider>
           </ThemeProvider>
