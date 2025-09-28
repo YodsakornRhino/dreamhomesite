@@ -157,9 +157,9 @@ export function UserPropertyCard({
         {showInteractiveElements && (
           <div className="mt-auto pt-2">
             {showEditActions && onDelete ? (
-              <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] grid-rows-2 gap-2">
+              <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] grid-rows-[repeat(2,minmax(0,1fr))] gap-x-2 gap-y-2">
                 <Button
-                  className="col-start-1 row-start-1 w-full"
+                  className="col-start-1 row-start-1 h-full w-full"
                   onClick={() => onViewDetails(property)}
                   disabled={isDeleting}
                 >
@@ -169,7 +169,7 @@ export function UserPropertyCard({
                   asChild
                   variant="outline"
                   className={cn(
-                    "col-start-1 row-start-2 w-full",
+                    "col-start-1 row-start-2 h-full w-full",
                     isDeleting && "pointer-events-none opacity-50",
                   )}
                 >
@@ -178,7 +178,7 @@ export function UserPropertyCard({
                 <Button
                   type="button"
                   variant="destructive"
-                  className="col-start-2 row-span-2 flex w-32 flex-col items-center justify-center gap-2 text-base font-semibold sm:w-40"
+                  className="col-start-2 row-span-2 flex h-full w-full flex-col items-center justify-center gap-2 text-base font-semibold"
                   onClick={() => onDelete(property)}
                   disabled={isDeleting}
                 >
