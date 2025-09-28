@@ -226,9 +226,13 @@ export default function SellDashboardPage() {
             </DialogDescription>
           </DialogHeader>
           {propertyPendingDelete && (
-            <p className="text-sm text-muted-foreground">
-              {propertyPendingDelete.title || "ประกาศนี้"}
-            </p>
+            <div className="py-4">
+              <UserPropertyCard
+                property={propertyPendingDelete}
+                onViewDetails={() => {}}
+                showInteractiveElements={false}
+              />
+            </div>
           )}
           <DialogFooter>
             <Button

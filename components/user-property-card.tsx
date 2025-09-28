@@ -16,6 +16,7 @@ interface UserPropertyCardProps {
   showEditActions?: boolean
   onDelete?: (property: UserProperty) => void
   isDeleting?: boolean
+  showInteractiveElements?: boolean
 }
 
 const placeholderGradients: Record<string, string> = {
@@ -30,6 +31,7 @@ export function UserPropertyCard({
   showEditActions = false,
   onDelete,
   isDeleting = false,
+  showInteractiveElements = true,
 }: UserPropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
 
@@ -100,14 +102,16 @@ export function UserPropertyCard({
           {transactionLabel}
         </span>
 
-        <button
-          type="button"
-          onClick={() => setIsFavorited((prev) => !prev)}
-          className="absolute right-4 top-4 rounded-full bg-white p-2 text-gray-500 shadow transition hover:bg-gray-100"
-          aria-label={isFavorited ? "นำออกจากรายการโปรด" : "เพิ่มในรายการโปรด"}
-        >
-          <Heart className={cn("h-4 w-4", isFavorited ? "fill-red-500 text-red-500" : "text-gray-400")} />
-        </button>
+        {showInteractiveElements && (
+          <button
+            type="button"
+            onClick={() => setIsFavorited((prev) => !prev)}
+            className="absolute right-4 top-4 rounded-full bg-white p-2 text-gray-500 shadow transition hover:bg-gray-100"
+            aria-label={isFavorited ? "นำออกจากรายการโปรด" : "เพิ่มในรายการโปรด"}
+          >
+            <Heart className={cn("h-4 w-4", isFavorited ? "fill-red-500 text-red-500" : "text-gray-400")} />
+          </button>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-4 p-6">
@@ -143,47 +147,49 @@ export function UserPropertyCard({
           </span>
         </div>
 
-        <div className="mt-auto pt-2 space-y-2">
-          <Button
-            className="w-full"
-            onClick={() => onViewDetails(property)}
-            disabled={isDeleting}
-          >
-            ดูรายละเอียด
-          </Button>
-          {showEditActions && (
-            <>
-              <Button
-                asChild
-                variant="outline"
-                className={cn(
-                  "w-full",
-                  isDeleting && "pointer-events-none opacity-50",
-                )}
-              >
-                <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
-              </Button>
-              {onDelete && (
+        {showInteractiveElements && (
+          <div className="mt-auto pt-2 space-y-2">
+            <Button
+              className="w-full"
+              onClick={() => onViewDetails(property)}
+              disabled={isDeleting}
+            >
+              ดูรายละเอียด
+            </Button>
+            {showEditActions && (
+              <>
                 <Button
-                  type="button"
-                  variant="destructive"
-                  className="w-full"
-                  onClick={() => onDelete(property)}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? (
-                    "กำลังลบ..."
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <Trash2 className="h-4 w-4" />
-                      ลบประกาศ
-                    </span>
+                  asChild
+                  variant="outline"
+                  className={cn(
+                    "w-full",
+                    isDeleting && "pointer-events-none opacity-50",
                   )}
+                >
+                  <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
                 </Button>
-              )}
-            </>
-          )}
-        </div>
+                {onDelete && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() => onDelete(property)}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      "กำลังลบ..."
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        ลบประกาศ
+                      </span>
+                    )}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
