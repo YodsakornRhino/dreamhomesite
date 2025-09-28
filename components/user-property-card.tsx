@@ -157,11 +157,30 @@ export function UserPropertyCard({
         {showInteractiveElements && (
           <div className="mt-auto pt-2">
             {showEditActions && onDelete ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex gap-2">
+                <div className="flex flex-1 flex-col gap-2">
+                  <Button
+                    className="w-full"
+                    onClick={() => onViewDetails(property)}
+                    disabled={isDeleting}
+                  >
+                    ดูรายละเอียด
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className={cn(
+                      "w-full",
+                      isDeleting && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
+                  </Button>
+                </div>
                 <Button
                   type="button"
                   variant="destructive"
-                  className="col-span-1 row-span-2 flex h-full w-full flex-col items-center justify-center gap-2 text-base font-semibold"
+                  className="flex w-32 flex-col items-center justify-center gap-2 self-stretch text-base font-semibold sm:w-40"
                   onClick={() => onDelete(property)}
                   disabled={isDeleting}
                 >
@@ -173,23 +192,6 @@ export function UserPropertyCard({
                       ลบประกาศ
                     </>
                   )}
-                </Button>
-                <Button
-                  className="h-full w-full"
-                  onClick={() => onViewDetails(property)}
-                  disabled={isDeleting}
-                >
-                  ดูรายละเอียด
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className={cn(
-                    "h-full w-full",
-                    isDeleting && "pointer-events-none opacity-50",
-                  )}
-                >
-                  <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
                 </Button>
               </div>
             ) : (
