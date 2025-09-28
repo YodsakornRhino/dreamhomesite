@@ -78,7 +78,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               />
 
               <ChatPanelProvider>
-                <div className="min-h-screen lg:flex lg:items-stretch">
+                <div
+                  className="min-h-screen lg:flex lg:items-stretch lg:[--chat-panel-gutter:1.5rem] lg:[--chat-panel-width:clamp(20rem,28vw,28rem)]"
+                >
                   <ChatPanelOffsetContainer>
                     <Navigation />
                     <main className="flex-1">{children}</main>

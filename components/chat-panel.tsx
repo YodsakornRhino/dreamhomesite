@@ -125,7 +125,7 @@ export function ChatPanel(): JSX.Element {
         className={cn(
           "fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l bg-background shadow-xl transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none",
-          "lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:max-w-none lg:w-[28rem] lg:translate-x-0 lg:border-l lg:shadow-none lg:pointer-events-auto lg:left-auto lg:right-auto lg:bottom-auto",
+          "lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:max-w-[var(--chat-panel-width,28rem)] lg:w-[var(--chat-panel-width,28rem)] lg:translate-x-0 lg:border-l lg:shadow-none lg:pointer-events-auto lg:left-auto lg:right-auto lg:bottom-auto",
           !isOpen && "lg:hidden",
         )}
       >
