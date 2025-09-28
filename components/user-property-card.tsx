@@ -155,45 +155,65 @@ export function UserPropertyCard({
         </div>
 
         {showInteractiveElements && (
-          <div className="mt-auto pt-2 space-y-2">
-            <Button
-              className="w-full"
-              onClick={() => onViewDetails(property)}
-              disabled={isDeleting}
-            >
-              ดูรายละเอียด
-            </Button>
-            {showEditActions && (
-              <>
+          <div className="mt-auto pt-2">
+            {showEditActions && onDelete ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="col-span-1 row-span-2 flex h-full w-full flex-col items-center justify-center gap-2 text-base font-semibold"
+                  onClick={() => onDelete(property)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    "กำลังลบ..."
+                  ) : (
+                    <>
+                      <Trash2 className="h-5 w-5" />
+                      ลบประกาศ
+                    </>
+                  )}
+                </Button>
+                <Button
+                  className="h-full w-full"
+                  onClick={() => onViewDetails(property)}
+                  disabled={isDeleting}
+                >
+                  ดูรายละเอียด
+                </Button>
                 <Button
                   asChild
                   variant="outline"
                   className={cn(
-                    "w-full",
+                    "h-full w-full",
                     isDeleting && "pointer-events-none opacity-50",
                   )}
                 >
                   <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
                 </Button>
-                {onDelete && (
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Button
+                  className="w-full"
+                  onClick={() => onViewDetails(property)}
+                  disabled={isDeleting}
+                >
+                  ดูรายละเอียด
+                </Button>
+                {showEditActions && (
                   <Button
-                    type="button"
-                    variant="destructive"
-                    className="w-full"
-                    onClick={() => onDelete(property)}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? (
-                      "กำลังลบ..."
-                    ) : (
-                      <span className="flex items-center justify-center gap-2">
-                        <Trash2 className="h-4 w-4" />
-                        ลบประกาศ
-                      </span>
+                    asChild
+                    variant="outline"
+                    className={cn(
+                      "w-full",
+                      isDeleting && "pointer-events-none opacity-50",
                     )}
+                  >
+                    <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
                   </Button>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
