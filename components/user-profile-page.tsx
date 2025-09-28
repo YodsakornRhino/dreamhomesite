@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
+import { cn } from "@/lib/utils";
 
 interface UserProfilePageProps {
   uid: string;
@@ -59,124 +60,131 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/buy"
-              className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700"
-            >
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              กลับไปหน้าซื้อ
-            </Link>
-            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              ข้อมูลผู้ขาย
-            </h1>
+      <div
+        className={cn(
+          "mx-auto w-full max-w-6xl px-4 py-10 transition-all duration-300",
+          chatOpen ? "lg:pr-[28rem]" : "",
+        )}
+      >
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/buy"
+                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700"
+              >
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                กลับไปหน้าซื้อ
+              </Link>
+              <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                ข้อมูลผู้ขาย
+              </h1>
+            </div>
           </div>
-        </div>
 
-        <Card>
-          <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
-              <Avatar className="h-20 w-20 border">
-                <AvatarImage
-                  src={profile?.photoURL ?? ""}
-                  alt={profile?.name ?? "ผู้ขาย"}
-                />
-                <AvatarFallback className="text-lg">
-                  {profileInitials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="space-y-2">
-                {profileLoading ? (
-                  <p className="text-sm text-muted-foreground">
-                    กำลังโหลดข้อมูลผู้ขาย...
-                  </p>
-                ) : profileError ? (
-                  <p className="text-sm text-red-600">{profileError}</p>
-                ) : profile ? (
-                  <>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {profile.name}
+          <Card>
+            <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
+                <Avatar className="h-20 w-20 border">
+                  <AvatarImage
+                    src={profile?.photoURL ?? ""}
+                    alt={profile?.name ?? "ผู้ขาย"}
+                  />
+                  <AvatarFallback className="text-lg">
+                    {profileInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-2">
+                  {profileLoading ? (
+                    <p className="text-sm text-muted-foreground">
+                      กำลังโหลดข้อมูลผู้ขาย...
                     </p>
-                    {profile.email && (
-                      <p className="text-sm text-gray-600">
-                        อีเมล: {profile.email}
+                  ) : profileError ? (
+                    <p className="text-sm text-red-600">{profileError}</p>
+                  ) : profile ? (
+                    <>
+                      <p className="text-2xl font-semibold text-gray-900">
+                        {profile.name}
                       </p>
-                    )}
-                    {profile.phoneNumber && (
-                      <p className="text-sm text-gray-600">
-                        เบอร์โทร: {profile.phoneNumber}
+                      {profile.email && (
+                        <p className="text-sm text-gray-600">
+                          อีเมล: {profile.email}
+                        </p>
+                      )}
+                      {profile.phoneNumber && (
+                        <p className="text-sm text-gray-600">
+                          เบอร์โทร: {profile.phoneNumber}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-500">
+                        ประกาศทั้งหมด {totalListings} รายการ
                       </p>
-                    )}
-                    <p className="text-sm text-gray-500">
-                      ประกาศทั้งหมด {totalListings} รายการ
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-600">ไม่พบข้อมูลผู้ขาย</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-600">ไม่พบข้อมูลผู้ขาย</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex w-full flex-col gap-2 sm:w-auto">
+                <Button onClick={() => setChatOpen(true)}>
+                  เริ่มแชท 1 ต่อ 1
+                </Button>
+                {profile?.email && (
+                  <Button asChild variant="outline">
+                    <a href={`mailto:${profile.email}`}>ติดต่อผู้ขายผ่านอีเมล</a>
+                  </Button>
+                )}
+                {profile?.phoneNumber && (
+                  <Button asChild>
+                    <a href={`tel:${profile.phoneNumber}`}>โทรหาผู้ขาย</a>
+                  </Button>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <section className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">
+                ประกาศของผู้ขายรายนี้
+              </h2>
+              <p className="text-sm text-gray-500">แสดง {totalListings} รายการ</p>
             </div>
 
-            <div className="flex w-full flex-col gap-2 sm:w-auto">
-              <Button onClick={() => setChatOpen(true)}>
-                เริ่มแชท 1 ต่อ 1
-              </Button>
-              {profile?.email && (
-                <Button asChild variant="outline">
-                  <a href={`mailto:${profile.email}`}>ติดต่อผู้ขายผ่านอีเมล</a>
-                </Button>
-              )}
-              {profile?.phoneNumber && (
-                <Button asChild>
-                  <a href={`tel:${profile.phoneNumber}`}>โทรหาผู้ขาย</a>
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <section className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
-              ประกาศของผู้ขายรายนี้
-            </h2>
-            <p className="text-sm text-gray-500">แสดง {totalListings} รายการ</p>
-          </div>
-
-          {propertiesLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex h-full flex-col overflow-hidden rounded-2xl border bg-white p-4 shadow-sm animate-pulse"
-                >
-                  <div className="mb-4 h-40 w-full rounded-xl bg-gray-200" />
-                  <div className="space-y-3">
-                    <div className="h-4 w-3/4 rounded bg-gray-200" />
-                    <div className="h-4 w-1/2 rounded bg-gray-200" />
-                    <div className="h-4 w-full rounded bg-gray-200" />
+            {propertiesLoading ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex h-full flex-col overflow-hidden rounded-2xl border bg-white p-4 shadow-sm animate-pulse"
+                  >
+                    <div className="mb-4 h-40 w-full rounded-xl bg-gray-200" />
+                    <div className="space-y-3">
+                      <div className="h-4 w-3/4 rounded bg-gray-200" />
+                      <div className="h-4 w-1/2 rounded bg-gray-200" />
+                      <div className="h-4 w-full rounded bg-gray-200" />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : propertiesError ? (
-            <p className="text-sm text-red-600">{propertiesError}</p>
-          ) : properties.length === 0 ? (
-            <p className="text-gray-500">ผู้ขายรายนี้ยังไม่มีประกาศขาย</p>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {properties.map((property) => (
-                <UserPropertyCard
-                  key={property.id}
-                  property={property}
-                  onViewDetails={handleViewDetails}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+                ))}
+              </div>
+            ) : propertiesError ? (
+              <p className="text-sm text-red-600">{propertiesError}</p>
+            ) : properties.length === 0 ? (
+              <p className="text-gray-500">ผู้ขายรายนี้ยังไม่มีประกาศขาย</p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {properties.map((property) => (
+                  <UserPropertyCard
+                    key={property.id}
+                    property={property}
+                    onViewDetails={handleViewDetails}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
 
       <UserPropertyModal

@@ -1,9 +1,13 @@
 import { UserProfilePage } from "@/components/user-profile-page";
 
 interface UserProfileRouteProps {
-  params: { uid: string };
+  params: Promise<{ uid: string }>;
 }
 
-export default function UserProfileRoute({ params }: UserProfileRouteProps) {
-  return <UserProfilePage uid={params.uid} />;
+export default async function UserProfileRoute({
+  params,
+}: UserProfileRouteProps) {
+  const { uid } = await params;
+
+  return <UserProfilePage uid={uid} />;
 }

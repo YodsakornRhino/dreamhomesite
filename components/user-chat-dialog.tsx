@@ -1,18 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface UserChatDialogProps {
   open: boolean;
@@ -87,55 +81,104 @@ export function UserChatDialog({
     setMessage("");
   };
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onOpenChange(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onOpenChange]);
+
+  const handleClose = () => {
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader className="space-y-3">
-          <DialogTitle>แชทกับ {participantName}</DialogTitle>
-          <DialogDescription>
-            พูดคุยรายละเอียดเกี่ยวกับการซื้อบ้านแบบตัวต่อตัวกับผู้ขายรายนี้
-          </DialogDescription>
-          <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
-            <Avatar className="h-12 w-12">
+    <>
+      <div
+        role="presentation"
+        aria-hidden="true"
+        onClick={handleClose}
+        className={cn(
+          "fixed inset-0 z-30 bg-background/80 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
+          open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+        )}
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-chat-panel-title"
+        className={cn(
+          "fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l bg-background shadow-xl transition-transform duration-300 ease-in-out",
+          open ? "translate-x-0" : "translate-x-full",
+        )}
+      >
+        <header className="flex items-center justify-between border-b p-4">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10">
               <AvatarImage src={participantAvatar ?? ""} alt={participantName} />
               <AvatarFallback className="font-semibold">
                 {participantInitials}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                {participantName}
+            <div className="space-y-1">
+              <p
+                id="user-chat-panel-title"
+                className="text-sm font-semibold text-foreground"
+              >
+                แชทกับ {participantName}
               </p>
               <p className="text-xs text-muted-foreground">
-                ตอบกลับโดยเฉลี่ยภายใน 30 นาที
+                พูดคุยรายละเอียดเกี่ยวกับการซื้อบ้านแบบตัวต่อตัวกับผู้ขายรายนี้
               </p>
             </div>
           </div>
-        </DialogHeader>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            aria-label="ปิดหน้าต่างแชท"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </header>
 
-        <div className="flex h-72 flex-col gap-4 rounded-lg border bg-muted/30 p-4">
+        <div className="flex flex-1 flex-col gap-4 p-4">
           <div className="flex-1 space-y-3 overflow-y-auto pr-1 text-sm">
             {messages.map((chat) => (
               <div
                 key={chat.id}
-                className={`flex ${
-                  chat.sender === "buyer" ? "justify-end" : "justify-start"
-                }`}
+                className={cn(
+                  "flex",
+                  chat.sender === "buyer" ? "justify-end" : "justify-start",
+                )}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 shadow-sm ${
+                  className={cn(
+                    "max-w-[80%] rounded-2xl px-4 py-2 shadow-sm",
                     chat.sender === "buyer"
                       ? "bg-blue-600 text-white"
-                      : "bg-white text-foreground"
-                  }`}
+                      : "bg-white text-foreground",
+                  )}
                 >
                   <p className="leading-relaxed">{chat.text}</p>
                   <span
-                    className={`mt-1 block text-[10px] font-medium uppercase tracking-wide ${
+                    className={cn(
+                      "mt-1 block text-[10px] font-medium uppercase tracking-wide",
                       chat.sender === "buyer"
                         ? "text-blue-100"
-                        : "text-muted-foreground"
-                    }`}
+                        : "text-muted-foreground",
+                    )}
                   >
                     {chat.timestamp}
                   </span>
@@ -143,15 +186,15 @@ export function UserChatDialog({
               </div>
             ))}
           </div>
-          <div className="space-y-2 text-xs text-muted-foreground">
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
             <p className="font-medium">
               ข้อแนะนำ: ปรึกษารายละเอียดสัญญาและการโอนกับผู้เชี่ยวชาญก่อนตัดสินใจ
             </p>
           </div>
         </div>
 
-        <DialogFooter className="sm:flex sm:flex-row sm:items-center sm:space-x-3">
-          <div className="flex w-full items-center gap-2">
+        <footer className="border-t bg-muted/10 p-4">
+          <div className="flex items-center gap-2">
             <Input
               value={message}
               placeholder="พิมพ์ข้อความถึงผู้ขาย..."
@@ -167,8 +210,8 @@ export function UserChatDialog({
               ส่งข้อความ
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </footer>
+      </aside>
+    </>
   );
 }
