@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import ChatWidget from "@/components/chat-widget";
@@ -10,7 +11,6 @@ import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useChatPanel } from "@/contexts/chat-panel-context";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
@@ -33,7 +33,7 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
-  const { openWith } = useChatPanel();
+  const router = useRouter();
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";
@@ -122,12 +122,14 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
 
               <div className="flex w-full flex-col gap-2 sm:w-auto">
                 <Button
-                  onClick={() =>
-                    openWith({
-                      name: profile?.name ?? "ผู้ขาย",
-                      avatarUrl: profile?.photoURL ?? "",
-                    })
-                  }
+                  onClick={() => {
+                    const sellerName = profile?.name ?? "ผู้ขาย DreamHome";
+                    const params = new URLSearchParams({ name: sellerName });
+                    if (profile?.photoURL) {
+                      params.set("avatar", profile.photoURL);
+                    }
+                    router.push(`/chat/${uid}?${params.toString()}`);
+                  }}
                 >
                   เริ่มแชท 1 ต่อ 1
                 </Button>

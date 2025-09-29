@@ -3,7 +3,7 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -46,6 +46,8 @@ const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
   const pathname = usePathname()
+
+  const router = useRouter()
 
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
@@ -253,7 +255,7 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => router.push("/chat")}>
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>
