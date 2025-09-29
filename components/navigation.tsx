@@ -49,7 +49,21 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useConversations } from "@/hooks/use-conversations"
 import { useConversationMessages } from "@/hooks/use-conversation-messages"
-import { ensureDirectConversation, sendConversationMessage } from "@/lib/conversations"
+import {
+  buildConversationId,
+  ensureDirectConversation,
+  sendConversationMessage,
+} from "@/lib/conversations"
+import { getDocument } from "@/lib/firestore"
+import { mapDocumentToUserProfile } from "@/lib/user-profile-mapper"
+import type { ConversationParticipant, ConversationSummary } from "@/types/conversation"
+
+type PendingConversation = {
+  id: string
+  participantIds: string[]
+  otherParticipantId: string
+  otherParticipant: ConversationParticipant | null
+}
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -65,11 +79,13 @@ const Navigation: React.FC = () => {
   const [messageDraft, setMessageDraft] = useState("")
   const [sendingMessage, setSendingMessage] = useState(false)
   const pendingConversationIdRef = useRef<string | null>(null)
+  const [pendingConversation, setPendingConversation] = useState<PendingConversation | null>(null)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const chatContainerRef = useRef<HTMLDivElement | null>(null)
+  const messageInputRef = useRef<HTMLInputElement | null>(null)
 
   // ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -174,9 +190,86 @@ const Navigation: React.FC = () => {
     [conversationsState.conversations, selectedConversationId],
   )
 
-  const activeParticipant = selectedConversation?.participants.find(
+  const pendingConversationSummary = useMemo<ConversationSummary | null>(() => {
+    if (!pendingConversation || !user) {
+      return null
+    }
+
+    const currentUserName =
+      (typeof user.displayName === "string" && user.displayName.trim()) ||
+      (typeof user.email === "string" && user.email.trim()) ||
+      "คุณ"
+
+    const currentUserParticipant: ConversationParticipant = {
+      uid: user.uid,
+      name: currentUserName,
+      email: typeof user.email === "string" ? user.email : null,
+      photoURL: typeof user.photoURL === "string" ? user.photoURL : null,
+    }
+
+    const participants = pendingConversation.participantIds.map((participantId) => {
+      if (participantId === user.uid) {
+        return currentUserParticipant
+      }
+
+      if (participantId === pendingConversation.otherParticipantId) {
+        if (pendingConversation.otherParticipant) {
+          return pendingConversation.otherParticipant
+        }
+        return {
+          uid: pendingConversation.otherParticipantId,
+          name: "กำลังโหลด...",
+          email: null,
+          photoURL: null,
+        }
+      }
+
+      return {
+        uid: participantId,
+        name: "ผู้ใช้งาน",
+        email: null,
+        photoURL: null,
+      }
+    })
+
+    const otherParticipant =
+      participants.find((participant) => participant.uid === pendingConversation.otherParticipantId) ?? null
+
+    return {
+      id: pendingConversation.id,
+      participantIds: pendingConversation.participantIds,
+      participants,
+      otherParticipant,
+      lastMessage: null,
+      updatedAt: new Date().toISOString(),
+    }
+  }, [pendingConversation, user])
+
+  const fallbackSelectedConversation =
+    pendingConversationSummary && pendingConversationSummary.id === selectedConversationId
+      ? pendingConversationSummary
+      : null
+
+  const conversationForMessaging = selectedConversation ?? fallbackSelectedConversation
+
+  const activeParticipant = conversationForMessaging?.participants.find(
     (participant) => participant.uid !== user?.uid,
-  )
+  ) ?? null
+
+  const displayConversations = useMemo(() => {
+    if (
+      pendingConversationSummary &&
+      !conversationsState.conversations.some(
+        (conversation) => conversation.id === pendingConversationSummary.id,
+      )
+    ) {
+      return [pendingConversationSummary, ...conversationsState.conversations]
+    }
+    return conversationsState.conversations
+  }, [conversationsState.conversations, pendingConversationSummary])
+
+  const isConversationListEmpty = displayConversations.length === 0
+  const isConversationListLoading = conversationsState.loading && isConversationListEmpty
 
   useEffect(() => {
     if (!isChatOpen) {
@@ -193,19 +286,24 @@ const Navigation: React.FC = () => {
     const exists = conversationsState.conversations.some(
       (conversation) => conversation.id === selectedConversationId,
     )
-    if (!exists) {
+
+    const isPending = pendingConversation?.id === selectedConversationId
+
+    if (!exists && !isPending) {
       if (pendingConversationIdRef.current === selectedConversationId) {
         return
       }
       setSelectedConversationId(null)
       return
     }
-    if (pendingConversationIdRef.current === selectedConversationId) {
+
+    if (exists && pendingConversationIdRef.current === selectedConversationId) {
       pendingConversationIdRef.current = null
     }
   }, [
     conversationsState.conversations,
     conversationsState.loading,
+    pendingConversation,
     selectedConversationId,
   ])
 
@@ -217,6 +315,77 @@ const Navigation: React.FC = () => {
   useEffect(() => {
     setMessageDraft("")
   }, [selectedConversationId])
+
+  useEffect(() => {
+    if (!pendingConversation || pendingConversation.otherParticipant) {
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const docSnap = await getDocument("users", pendingConversation.otherParticipantId)
+        if (!docSnap || cancelled) {
+          return
+        }
+        const profile = mapDocumentToUserProfile(docSnap)
+        if (cancelled) {
+          return
+        }
+        setPendingConversation((current) => {
+          if (!current || current.id !== pendingConversation.id) {
+            return current
+          }
+          return {
+            ...current,
+            otherParticipant: {
+              uid: profile.uid,
+              name: profile.name,
+              email: profile.email,
+              photoURL: profile.photoURL,
+            },
+          }
+        })
+      } catch (error) {
+        console.error("Failed to preload participant profile", error)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pendingConversation])
+
+  useEffect(() => {
+    if (!pendingConversation) {
+      return
+    }
+    const exists = conversationsState.conversations.some(
+      (conversation) => conversation.id === pendingConversation.id,
+    )
+    if (exists) {
+      setPendingConversation(null)
+      if (pendingConversationIdRef.current === pendingConversation.id) {
+        pendingConversationIdRef.current = null
+      }
+    }
+  }, [conversationsState.conversations, pendingConversation])
+
+  useEffect(() => {
+    if (isChatOpen) {
+      return
+    }
+    setPendingConversation(null)
+    pendingConversationIdRef.current = null
+  }, [isChatOpen])
+
+  useEffect(() => {
+    if (!isChatOpen || !conversationForMessaging) {
+      return
+    }
+    messageInputRef.current?.focus()
+  }, [conversationForMessaging, isChatOpen])
 
   useEffect(() => {
     if (!isChatOpen) return
@@ -270,16 +439,37 @@ const Navigation: React.FC = () => {
 
       setIsChatOpen(true)
 
+      const participantIds = [user.uid, participantId].sort((a, b) =>
+        a < b ? -1 : a > b ? 1 : 0,
+      )
+      const conversationId = buildConversationId(user.uid, participantId)
+
+      pendingConversationIdRef.current = conversationId
+      setPendingConversation({
+        id: conversationId,
+        participantIds,
+        otherParticipantId: participantId,
+        otherParticipant: null,
+      })
+      setSelectedConversationId(conversationId)
+
       void (async () => {
         try {
-          const { conversationId } = await ensureDirectConversation({
+          await ensureDirectConversation({
             currentUserId: user.uid,
             otherUserId: participantId,
           })
-          pendingConversationIdRef.current = conversationId
-          setSelectedConversationId(conversationId)
         } catch (error) {
           console.error("Failed to start chat", error)
+          setPendingConversation((current) =>
+            current && current.id === conversationId ? null : current,
+          )
+          if (pendingConversationIdRef.current === conversationId) {
+            pendingConversationIdRef.current = null
+          }
+          setSelectedConversationId((current) =>
+            current === conversationId ? null : current,
+          )
           toast({
             variant: "destructive",
             title: "ไม่สามารถเปิดแชทได้",
@@ -336,15 +526,15 @@ const Navigation: React.FC = () => {
   }
 
   const handleSendMessage = async () => {
-    if (!user || !selectedConversation) return
+    if (!user || !conversationForMessaging) return
     const trimmed = messageDraft.trim()
     if (!trimmed) return
 
     setSendingMessage(true)
     try {
       await sendConversationMessage({
-        conversationId: selectedConversation.id,
-        participantIds: selectedConversation.participantIds,
+        conversationId: conversationForMessaging.id,
+        participantIds: conversationForMessaging.participantIds,
         senderId: user.uid,
         text: trimmed,
       })
@@ -629,16 +819,16 @@ const Navigation: React.FC = () => {
               </div>
               <Input placeholder="ค้นหาในข้อความ" className="h-9 bg-slate-50" />
               <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-                {conversationsState.loading ? (
+                {isConversationListLoading ? (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
                     กำลังโหลด...
                   </div>
-                ) : conversationsState.conversations.length === 0 ? (
+                ) : isConversationListEmpty ? (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
                     ยังไม่มีประวัติการสนทนา
                   </div>
                 ) : (
-                  conversationsState.conversations.map((conversation) => {
+                  displayConversations.map((conversation) => {
                     const participant =
                       conversation.otherParticipant ??
                       conversation.participants.find((item) => item.uid !== user?.uid) ??
@@ -715,7 +905,7 @@ const Navigation: React.FC = () => {
                 ref={messagesContainerRef}
                 className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4"
               >
-                {!selectedConversation ? (
+                {!conversationForMessaging ? (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
                     เลือกแชทเพื่อเริ่มต้นสนทนา
                   </div>
@@ -725,7 +915,7 @@ const Navigation: React.FC = () => {
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                    ยังไม่มีข้อความในแชทนี้
+                    พิมพ์ข้อความแรกของคุณเพื่อเริ่มต้นการสนทนา
                   </div>
                 ) : (
                   messages.map((message) => {
@@ -758,7 +948,8 @@ const Navigation: React.FC = () => {
               <div className="border-t bg-white px-4 py-3">
                 <div className="flex items-center space-x-2">
                   <Input
-                    placeholder={selectedConversation ? "พิมพ์ข้อความ..." : "เลือกแชทก่อน"}
+                    ref={messageInputRef}
+                    placeholder={conversationForMessaging ? "พิมพ์ข้อความ..." : "เลือกแชทก่อน"}
                     className="flex-1"
                     value={messageDraft}
                     onChange={(event) => setMessageDraft(event.target.value)}
@@ -768,12 +959,14 @@ const Navigation: React.FC = () => {
                         void handleSendMessage()
                       }
                     }}
-                    disabled={!selectedConversation || sendingMessage}
+                    disabled={!conversationForMessaging || sendingMessage}
                   />
                   <Button
                     onClick={() => void handleSendMessage()}
                     disabled={
-                      !selectedConversation || sendingMessage || messageDraft.trim().length === 0
+                      !conversationForMessaging ||
+                      sendingMessage ||
+                      messageDraft.trim().length === 0
                     }
                     className="bg-blue-600 text-white hover:bg-blue-600"
                   >
