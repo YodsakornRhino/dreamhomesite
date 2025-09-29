@@ -139,17 +139,27 @@ export function UserChatPanel({
     return null
   }, [activeConversationFromStore, pendingConversation, activeConversationId])
 
+  const displayedConversations = useMemo(() => {
+    if (
+      pendingConversation?.otherUser &&
+      !conversations.some((conversation) => conversation.id === pendingConversation.id)
+    ) {
+      return [pendingConversation, ...conversations]
+    }
+    return conversations
+  }, [conversations, pendingConversation])
+
   const filteredConversations = useMemo(() => {
     if (!searchTerm.trim()) {
-      return conversations
+      return displayedConversations
     }
     const keyword = searchTerm.trim().toLowerCase()
-    return conversations.filter((conversation) => {
+    return displayedConversations.filter((conversation) => {
       const name = conversation.otherUser?.name?.toLowerCase() ?? ""
       const lastMessage = conversation.lastMessageText.toLowerCase()
       return name.includes(keyword) || lastMessage.includes(keyword)
     })
-  }, [conversations, searchTerm])
+  }, [displayedConversations, searchTerm])
 
   useEffect(() => {
     if (!open) {
@@ -496,7 +506,7 @@ export function UserChatPanel({
 
               <div className="flex-1 overflow-y-auto">
                 <div className="space-y-1 px-3 pb-4 sm:px-4 md:px-5 lg:px-6">
-                  {loadingConversations ? (
+                  {loadingConversations && displayedConversations.length === 0 ? (
                     <div className="flex h-48 items-center justify-center">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
