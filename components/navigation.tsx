@@ -49,7 +49,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useConversations } from "@/hooks/use-conversations"
 import { useConversationMessages } from "@/hooks/use-conversation-messages"
-import { sendConversationMessage } from "@/lib/conversations"
+import { ensureDirectConversation, sendConversationMessage } from "@/lib/conversations"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -64,6 +64,7 @@ const Navigation: React.FC = () => {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [messageDraft, setMessageDraft] = useState("")
   const [sendingMessage, setSendingMessage] = useState(false)
+  const pendingConversationIdRef = useRef<string | null>(null)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -185,13 +186,28 @@ const Navigation: React.FC = () => {
 
   useEffect(() => {
     if (!selectedConversationId) return
+    if (conversationsState.loading) {
+      return
+    }
+
     const exists = conversationsState.conversations.some(
       (conversation) => conversation.id === selectedConversationId,
     )
     if (!exists) {
+      if (pendingConversationIdRef.current === selectedConversationId) {
+        return
+      }
       setSelectedConversationId(null)
+      return
     }
-  }, [conversationsState.conversations, selectedConversationId])
+    if (pendingConversationIdRef.current === selectedConversationId) {
+      pendingConversationIdRef.current = null
+    }
+  }, [
+    conversationsState.conversations,
+    conversationsState.loading,
+    selectedConversationId,
+  ])
 
   useEffect(() => {
     if (!messagesContainerRef.current) return
@@ -222,6 +238,63 @@ const Navigation: React.FC = () => {
       document.removeEventListener("touchstart", handlePointerDown)
     }
   }, [isChatOpen])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined
+
+    const handler = (event: Event) => {
+      const { detail } = event as CustomEvent<{ participantId?: string | null }>
+      const participantId = detail?.participantId
+      if (!participantId) {
+        return
+      }
+
+      if (!user) {
+        setIsSignInOpen(true)
+        toast({
+          variant: "destructive",
+          title: "กรุณาเข้าสู่ระบบ",
+          description: "ต้องเข้าสู่ระบบก่อนจึงจะสามารถเริ่มแชทได้",
+        })
+        return
+      }
+
+      if (participantId === user.uid) {
+        toast({
+          title: "ไม่สามารถเริ่มแชทได้",
+          description: "ไม่สามารถสนทนากับบัญชีของตนเองได้",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setIsChatOpen(true)
+
+      void (async () => {
+        try {
+          const { conversationId } = await ensureDirectConversation({
+            currentUserId: user.uid,
+            otherUserId: participantId,
+          })
+          pendingConversationIdRef.current = conversationId
+          setSelectedConversationId(conversationId)
+        } catch (error) {
+          console.error("Failed to start chat", error)
+          toast({
+            variant: "destructive",
+            title: "ไม่สามารถเปิดแชทได้",
+            description: "กรุณาลองใหม่อีกครั้ง",
+          })
+        }
+      })()
+    }
+
+    window.addEventListener("dreamhome:chat-with-user", handler)
+
+    return () => {
+      window.removeEventListener("dreamhome:chat-with-user", handler)
+    }
+  }, [toast, user])
 
   const formatRelativeTime = (isoString: string | null) => {
     if (!isoString) return ""

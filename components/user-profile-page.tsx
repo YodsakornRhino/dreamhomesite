@@ -13,12 +13,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 interface UserProfilePageProps {
   uid: string;
 }
 
 export function UserProfilePage({ uid }: UserProfilePageProps) {
+  const { user } = useAuthContext();
   const {
     profile,
     loading: profileLoading,
@@ -53,6 +55,18 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
     if (!open) {
       setSelectedProperty(null);
     }
+  };
+
+  const handleStartChat = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("dreamhome:chat-with-user", {
+        detail: { participantId: uid },
+      }),
+    );
   };
 
   return (
@@ -126,6 +140,15 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
               {profile?.phoneNumber && (
                 <Button asChild>
                   <a href={`tel:${profile.phoneNumber}`}>โทรหาผู้ขาย</a>
+                </Button>
+              )}
+              {(!user || user.uid !== uid) && (
+                <Button
+                  type="button"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={handleStartChat}
+                >
+                  เริ่มแชทกับผู้ขาย
                 </Button>
               )}
             </div>

@@ -122,3 +122,68 @@ export const sendConversationMessage = async ({
     createdAt: now,
   })
 }
+
+interface EnsureDirectConversationParams {
+  currentUserId: string
+  otherUserId: string
+}
+
+export const ensureDirectConversation = async ({
+  currentUserId,
+  otherUserId,
+}: EnsureDirectConversationParams): Promise<{ conversationId: string }> => {
+  const trimmedCurrent = currentUserId.trim()
+  const trimmedOther = otherUserId.trim()
+
+  if (!trimmedCurrent || !trimmedOther) {
+    throw new Error("Both participant IDs are required to start a conversation")
+  }
+
+  const conversationId = buildConversationId(trimmedCurrent, trimmedOther)
+  const participantIds = [trimmedCurrent, trimmedOther].sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )
+
+  const db = await getFirestoreInstance()
+  const { doc, getDoc, serverTimestamp, setDoc } = await import("firebase/firestore")
+
+  const conversationRef = doc(db, "conversations", conversationId)
+  const snapshot = await getDoc(conversationRef)
+  const now = serverTimestamp()
+
+  const dataToMerge: Record<string, unknown> = {
+    participantIds,
+    updatedAt: now,
+  }
+
+  if (!snapshot.exists()) {
+    dataToMerge.createdAt = now
+    dataToMerge.lastMessage = null
+    dataToMerge.participantsInfo = await fetchParticipantsInfo(participantIds)
+  } else {
+    const data = snapshot.data() as Record<string, unknown>
+    const existingIds = Array.isArray(data.participantIds)
+      ? data.participantIds.filter((value): value is string => typeof value === "string")
+      : []
+
+    const mergedIds = Array.from(new Set([...existingIds, ...participantIds]))
+    mergedIds.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    dataToMerge.participantIds = mergedIds
+
+    if (!Array.isArray(data.participantsInfo) || data.participantsInfo.length === 0) {
+      dataToMerge.participantsInfo = await fetchParticipantsInfo(participantIds)
+    }
+
+    if (!("createdAt" in data)) {
+      dataToMerge.createdAt = now
+    }
+
+    if (!("lastMessage" in data)) {
+      dataToMerge.lastMessage = null
+    }
+  }
+
+  await setDoc(conversationRef, dataToMerge, { merge: true })
+
+  return { conversationId }
+}
