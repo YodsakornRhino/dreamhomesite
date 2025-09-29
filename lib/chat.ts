@@ -107,6 +107,35 @@ const mapAttachment = (raw: any): ChatAttachment | null => {
   }
 }
 
+const mapLastMessage = (raw: any): ConversationLastMessage | null => {
+  if (!raw) {
+    return null
+  }
+
+  const attachmentsRaw: any[] = Array.isArray(raw.attachments)
+    ? raw.attachments
+    : []
+
+  return {
+    senderId:
+      typeof raw.senderId === "string"
+        ? raw.senderId
+        : raw.senderId == null
+        ? null
+        : String(raw.senderId),
+    text:
+      typeof raw.text === "string"
+        ? raw.text
+        : raw.text == null
+        ? null
+        : String(raw.text),
+    attachments: attachmentsRaw
+      .map(mapAttachment)
+      .filter(Boolean) as ChatAttachment[],
+    createdAt: toDate(raw.createdAt),
+  }
+}
+
 const fetchUserProfile = async (userId: string): Promise<ChatUserProfile | null> => {
   try {
     const snapshot = await getDocument("users", userId)
@@ -188,34 +217,47 @@ export const ensureConversation = async ({
     )
   }
 
-  const ensureMetadata = async (userId: string, otherId: string) => {
-    const otherProfile = participantProfiles[otherId]
-    const metadataRef = doc(db, "users", userId, "Chat", conversationId)
-    const metadataSnap = await getDoc(metadataRef)
-    const data: Record<string, any> = {
-      conversationId,
-      participants,
-      otherUserId: otherId,
-      updatedAt: now,
-    }
+  const ensureMetadata = async (
+    userId: string,
+    otherId: string,
+    shouldThrowOnError: boolean,
+  ) => {
+    try {
+      const otherProfile = participantProfiles[otherId]
+      const metadataRef = doc(db, "users", userId, "Chat", conversationId)
+      const metadataSnap = await getDoc(metadataRef)
+      const data: Record<string, any> = {
+        conversationId,
+        participants,
+        otherUserId: otherId,
+        updatedAt: now,
+      }
 
-    if (otherProfile) {
-      data.otherUser = otherProfile
-    }
+      if (otherProfile) {
+        data.otherUser = otherProfile
+      }
 
-    if (!metadataSnap.exists()) {
-      data.createdAt = now
-      data.unreadCount = 0
-      data.pinned = false
-    }
+      if (!metadataSnap.exists()) {
+        data.createdAt = now
+        data.unreadCount = 0
+        data.pinned = false
+      }
 
-    await setDoc(metadataRef, data, { merge: true })
+      await setDoc(metadataRef, data, { merge: true })
+    } catch (error) {
+      console.warn(
+        "Failed to ensure per-user chat metadata",
+        { userId, conversationId },
+        error,
+      )
+      if (shouldThrowOnError) {
+        throw error
+      }
+    }
   }
 
-  await Promise.all([
-    ensureMetadata(currentUserId, targetUserId),
-    ensureMetadata(targetUserId, currentUserId),
-  ])
+  await ensureMetadata(currentUserId, targetUserId, true)
+  await ensureMetadata(targetUserId, currentUserId, false)
 
   return {
     conversationId,
@@ -230,67 +272,168 @@ export const subscribeToUserConversations = async (
   callback: (conversations: UserConversation[]) => void,
 ): Promise<Unsubscribe> => {
   const db = await getFirestoreInstance()
-  const { collection, onSnapshot, orderBy, query } = await import(
+  const { collection, onSnapshot, orderBy, query, where } = await import(
     "firebase/firestore"
   )
 
-  const collectionRef = collection(db, "users", userId, "Chat")
-  const q = query(
-    collectionRef,
+  const sharedCollectionRef = collection(db, COLLECTION_NAME)
+  const sharedQuery = query(
+    sharedCollectionRef,
+    where("participants", "array-contains", userId),
+  )
+
+  const metadataCollectionRef = collection(db, "users", userId, "Chat")
+  const metadataQuery = query(
+    metadataCollectionRef,
     orderBy("pinned", "desc"),
     orderBy("updatedAt", "desc"),
   )
 
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const items: UserConversation[] = snapshot.docs.map((docSnapshot) => {
-      const data = docSnapshot.data() as Record<string, any>
-      const lastMessageRaw = data.lastMessage ?? null
-      const attachmentsRaw: any[] = Array.isArray(lastMessageRaw?.attachments)
-        ? lastMessageRaw.attachments
-        : []
+  let sharedDocs = new Map<string, Record<string, any>>()
+  let metadataDocs = new Map<string, Record<string, any>>()
 
-      const lastMessage: ConversationLastMessage | null = lastMessageRaw
-        ? {
-            senderId: (lastMessageRaw.senderId as string | undefined) ?? null,
-            text: (lastMessageRaw.text as string | undefined) ?? null,
-            attachments: attachmentsRaw
-              .map(mapAttachment)
-              .filter(Boolean) as ChatAttachment[],
-            createdAt: toDate(lastMessageRaw.createdAt),
-          }
+  const emit = () => {
+    const ids = new Set<string>()
+    sharedDocs.forEach((_, key) => ids.add(key))
+    metadataDocs.forEach((_, key) => ids.add(key))
+
+    const conversations: UserConversation[] = Array.from(ids).map((id) => {
+      const shared = sharedDocs.get(id) ?? null
+      const metadata = metadataDocs.get(id) ?? null
+
+      const participantsRaw: string[] = Array.isArray(shared?.participants)
+        ? (shared!.participants as string[])
+        : Array.isArray(metadata?.participants)
+        ? (metadata!.participants as string[])
+        : [userId]
+
+      const metadataOtherUserId =
+        (metadata?.otherUserId as string | undefined) ?? null
+      const metadataOtherUser =
+        (metadata?.otherUser as ChatUserProfile | undefined) ?? null
+
+      const participantProfiles: Record<string, any> =
+        (shared?.participantProfiles as Record<string, any> | undefined) ?? {}
+
+      const otherUserIdFromParticipants = participantsRaw.find(
+        (participant) => participant !== userId,
+      )
+
+      const fallbackParticipantId = Object.keys(participantProfiles).find(
+        (participantId) => participantId !== userId,
+      )
+
+      const resolvedOtherUserId =
+        otherUserIdFromParticipants ??
+        metadataOtherUserId ??
+        (metadataOtherUser?.uid as string | undefined) ??
+        fallbackParticipantId ??
+        ""
+
+      const conversationProfile = resolvedOtherUserId
+        ? (participantProfiles[resolvedOtherUserId] as
+            | ChatUserProfile
+            | undefined
+            | null)
         : null
 
       const otherUser: ChatUserProfile = {
-        uid: (data.otherUserId as string | undefined) ?? "",
+        uid:
+          resolvedOtherUserId ||
+          (conversationProfile?.uid as string | undefined) ||
+          (metadataOtherUser?.uid as string | undefined) ||
+          "",
         name:
-          (data.otherUser?.name as string | undefined) ||
-          (data.otherUserName as string | undefined) ||
+          (conversationProfile?.name as string | undefined) ??
+          (metadataOtherUser?.name as string | undefined) ??
+          (metadata?.otherUserName as string | undefined) ??
           "ผู้ใช้ DreamHome",
-        email: (data.otherUser?.email as string | undefined) ?? null,
+        email:
+          (conversationProfile?.email as string | undefined) ??
+          (metadataOtherUser?.email as string | undefined) ??
+          null,
         photoURL:
-          (data.otherUser?.photoURL as string | undefined) ??
-          (data.otherUserPhotoURL as string | undefined) ??
+          (conversationProfile?.photoURL as string | undefined) ??
+          (metadataOtherUser?.photoURL as string | undefined) ??
+          (metadata?.otherUserPhotoURL as string | undefined) ??
           null,
       }
 
+      const participantsSet = new Set<string>()
+      for (const participant of participantsRaw) {
+        if (typeof participant === "string" && participant.trim()) {
+          participantsSet.add(participant)
+        }
+      }
+      participantsSet.add(userId)
+      if (otherUser.uid) {
+        participantsSet.add(otherUser.uid)
+      }
+      const participants = sortParticipants(Array.from(participantsSet))
+
+      const lastMessageRaw = shared?.lastMessage ?? metadata?.lastMessage ?? null
+      const lastMessage = mapLastMessage(lastMessageRaw)
+
+      const createdAt =
+        toDate(shared?.createdAt) ?? toDate(metadata?.createdAt) ?? null
+      const updatedAt =
+        toDate(shared?.updatedAt) ?? toDate(metadata?.updatedAt) ?? null
+
+      const unreadCount = Number(metadata?.unreadCount ?? 0)
+      const pinned = Boolean(metadata?.pinned)
+
       return {
-        id: docSnapshot.id,
-        participants:
-          (data.participants as string[] | undefined) ?? [userId, otherUser.uid],
+        id,
+        participants,
         otherUserId: otherUser.uid,
         otherUser,
         lastMessage,
-        pinned: Boolean(data.pinned),
-        unreadCount: Number(data.unreadCount ?? 0),
-        createdAt: toDate(data.createdAt),
-        updatedAt: toDate(data.updatedAt),
+        pinned,
+        unreadCount,
+        createdAt,
+        updatedAt,
       }
     })
 
-    callback(items)
-  })
+    callback(conversations)
+  }
 
-  return unsubscribe
+  const unsubscribeShared = onSnapshot(
+    sharedQuery,
+    (snapshot) => {
+      sharedDocs = new Map(
+        snapshot.docs.map((docSnapshot) => [
+          docSnapshot.id,
+          docSnapshot.data() as Record<string, any>,
+        ]),
+      )
+      emit()
+    },
+    (error) => {
+      console.error("Failed to subscribe to shared conversations", error)
+    },
+  )
+
+  const unsubscribeMetadata = onSnapshot(
+    metadataQuery,
+    (snapshot) => {
+      metadataDocs = new Map(
+        snapshot.docs.map((docSnapshot) => [
+          docSnapshot.id,
+          docSnapshot.data() as Record<string, any>,
+        ]),
+      )
+      emit()
+    },
+    (error) => {
+      console.error("Failed to subscribe to user conversation metadata", error)
+    },
+  )
+
+  return () => {
+    unsubscribeShared()
+    unsubscribeMetadata()
+  }
 }
 
 export const subscribeToConversationMessages = async (
@@ -377,6 +520,23 @@ export const sendMessage = async ({
     throw new Error("Sender is not part of this conversation")
   }
 
+  const participantProfiles: Record<string, any> =
+    (data.participantProfiles as Record<string, any> | undefined) ?? {}
+
+  const missingProfiles = participants.filter(
+    (participantId) => !participantProfiles[participantId],
+  )
+
+  if (missingProfiles.length > 0) {
+    const profiles = await Promise.all(
+      missingProfiles.map((participantId) => fetchUserProfile(participantId)),
+    )
+    profiles.forEach((profile, index) => {
+      const participantId = missingProfiles[index]
+      participantProfiles[participantId] = profile ?? null
+    })
+  }
+
   const now = serverTimestamp()
   const attachments: ChatAttachment[] = []
 
@@ -413,20 +573,38 @@ export const sendMessage = async ({
   await updateDoc(conversationRef, {
     lastMessage,
     updatedAt: now,
+    participantProfiles,
   })
 
   await Promise.all(
     participants.map(async (participantId) => {
-      const metadataRef = doc(db, "users", participantId, "Chat", conversationId)
-      await setDoc(
-        metadataRef,
-        {
-          lastMessage,
-          updatedAt: now,
-          unreadCount: participantId === senderId ? 0 : increment(1),
-        },
-        { merge: true },
-      )
+      try {
+        const metadataRef = doc(
+          db,
+          "users",
+          participantId,
+          "Chat",
+          conversationId,
+        )
+        await setDoc(
+          metadataRef,
+          {
+            lastMessage,
+            updatedAt: now,
+            unreadCount: participantId === senderId ? 0 : increment(1),
+          },
+          { merge: true },
+        )
+      } catch (error) {
+        if (participantId === senderId) {
+          throw error
+        }
+        console.warn(
+          "Failed to update chat metadata for participant",
+          { participantId, conversationId },
+          error,
+        )
+      }
     }),
   )
 }

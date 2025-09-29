@@ -1,8 +1,17 @@
-# Firebase Security Rule Updates for Property Deletion
+# Firebase security rules for DreamHome chat
 
-This project expects both Firestore and Cloud Storage security rules to allow a signed-in owner to delete their property listing. The following snippets extend the rules from the screenshots you shared so deletes succeed for both new and legacy documents.
+The chat UI stores two types of data:
 
-## Cloud Firestore (`firestore.rules`)
+- **Shared conversations** in the top-level `conversation` collection with
+  fields like `participants`, `participantProfiles`, `lastMessage`, and the
+  `messages` sub-collection.
+- **Per-user metadata** in `/users/{userId}/Chat/{conversationId}` where each
+  participant can manage their own pin and unread state.
+
+Update your Firestore and Storage rules so only authenticated participants can
+read or write to these paths while keeping the existing property rules intact.
+
+## Firestore rules
 
 ```rules
 rules_version = '2';
@@ -12,46 +21,80 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwnerByUid(userId) {
+    function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function hasOwnerRef(data) {
-      return data.userRef is document && data.userRef.path.size() == 2 && data.userRef.path[0] == "users";
+    function getConversation(conversationId) {
+      return get(/databases/$(database)/documents/conversation/$(conversationId));
     }
 
-    function isOwnerByRef(data) {
-      return hasOwnerRef(data) && request.auth.uid == data.userRef.id;
+    function isConversationParticipant(conversationId) {
+      return isSignedIn()
+        && getConversation(conversationId).data.participants.hasAny([request.auth.uid]);
     }
 
+    // --- existing user + property rules remain the same ---
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isOwnerByUid(userId);
+      allow read: if true;
+      allow create, update: if isOwner(userId) && request.resource.data.uid == userId;
+      allow delete: if false;
+
+      match /user_property/{propertyId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userUid == userId;
+        allow update: if isOwner(userId)
+          && resource.data.userUid == userId
+          && request.resource.data.userUid == userId;
+        allow delete: if isOwner(userId) && resource.data.userUid == userId;
+      }
+
+      // Per-user chat metadata (pin state, unread counts, otherUser profile)
+      match /Chat/{conversationId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId);
+        allow delete: if false;
+      }
     }
 
     match /property/{propertyId} {
       allow read: if true;
-      allow create: if isOwnerByUid(request.resource.data.userUid);
-      allow update: if isOwnerByUid(request.resource.data.userUid) || isOwnerByRef(resource.data) || isOwnerByRef(request.resource.data);
-      allow delete: if isOwnerByUid(resource.data.userUid) || isOwnerByRef(resource.data);
+      allow create: if isSignedIn() && request.resource.data.userUid == request.auth.uid;
+      allow update: if isOwner(resource.data.userUid)
+        && request.resource.data.userUid == resource.data.userUid;
+      allow delete: if isOwner(resource.data.userUid);
     }
 
-    match /users/{userId}/properties/{propertyId} {
-      allow read, write: if isOwnerByUid(userId);
+    // Shared one-to-one conversations
+    match /conversation/{conversationId} {
+      allow create: if isSignedIn()
+        && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow read: if isConversationParticipant(conversationId);
+      allow update: if isConversationParticipant(conversationId)
+        && (!request.resource.data.keys().hasAny(['participants'])
+          || request.resource.data.participants == resource.data.participants);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isConversationParticipant(conversationId);
+        allow create: if isConversationParticipant(conversationId)
+          && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
     }
   }
 }
 ```
 
-**Why these changes?**
+The helper functions reuse your existing ownership checks and guarantee that
+only the two `participants` stored in the conversation document can read shared
+metadata or post messages.
 
-* `allow delete` now accepts either `resource.data.userUid` or the new `userRef` field, so existing documents without the backfill can still be deleted.
-* `allow update` also trusts either `userUid` on the incoming write or the stored `userRef`, which lets your migration write the new `userRef` without being blocked.
-* `isOwnerByRef` confirms the `userRef` actually points at `/users/{uid}` and compares the document ID to the signed-in user.
+## Storage rules
 
-Once all property documents contain a valid `userRef`, you can simplify the rule by removing the `userUid` fallback.
-
-## Cloud Storage (`storage.rules`)
+Chat attachments are uploaded to `chat/{conversationId}/{fileId}` in Firebase
+Storage. Restrict access to authenticated participants of the same
+conversation.
 
 ```rules
 rules_version = '2';
@@ -61,16 +104,23 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    match /propertyImages/{propertyId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if isSignedIn();
-      allow delete: if isSignedIn();
+    function isConversationParticipant(conversationId) {
+      return isSignedIn()
+        && get(/databases/(default)/documents/conversation/$(conversationId))
+             .data.participants.hasAny([request.auth.uid]);
+    }
+
+    match /chat/{conversationId}/{fileId} {
+      allow read, write: if isConversationParticipant(conversationId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
 ```
 
-Replace the `allow delete` condition with whatever folder structure you actually use in Storage. The crucial part is verifying that the caller owns the listing—if you mirror Firestore ownership, fetch the property document with `get(/databases/(default)/documents/property/$(propertyId))` and check the same `userUid` / `userRef` combination before deleting files.
-
-After updating the rules in the Firebase console (or deploying via the CLI), retry the deletion flow from the Sell page. With the rules accepting both owner identifiers, Firestore should authorize the delete operation initiated by the updated UI.
-
+Deploy these rules through the Firebase console or CLI to remove the
+`permission-denied` errors when creating conversations, subscribing to history,
+or sending new messages from the DreamHome chat panel.
