@@ -94,9 +94,8 @@ export const ensureConversation = async ({
 
   const now = serverTimestamp()
 
-  const [currentChatRef, targetChatRef, conversationRef] = [
+  const [currentChatRef, conversationRef] = [
     doc(db, "users", currentUser.uid, "Chat", conversationId),
-    doc(db, "users", targetUser.uid, "Chat", conversationId),
     doc(db, "chats", conversationId),
   ]
 
@@ -133,7 +132,7 @@ export const ensureConversation = async ({
     ? existingConversation.get("createdAt") ?? now
     : now
 
-  const writes: Promise<unknown>[] = [
+  await Promise.all([
     setDoc(
       currentChatRef,
       {
@@ -186,27 +185,7 @@ export const ensureConversation = async ({
       }
       throw error
     }),
-  ]
-
-  writes.push(
-    setDoc(
-      targetChatRef,
-      {
-        conversationId,
-        participants: [currentUser.uid, targetUser.uid],
-        otherUser: currentUser,
-        createdAt: targetCreatedAt,
-        updatedAt: now,
-        pinned: (targetSummary.pinned as boolean | undefined) ?? false,
-      },
-      { merge: true },
-    ).catch((error: unknown) => {
-      console.warn("Failed to create chat reference for target user", error)
-      return null
-    }),
-  )
-
-  await Promise.all(writes)
+  ])
 
   return conversationId
 }
@@ -256,11 +235,6 @@ export const sendMessage = async ({
     lastMessage: messageData,
     updatedAt: timestamp,
   }
-  const conversationMetaForRecipient = {
-    lastMessage: messageData,
-    updatedAt: timestamp,
-  }
-
   const messagesCollection = collection(doc(db, "chats", conversationId), "messages")
   await addDoc(messagesCollection, messageData)
 
@@ -299,19 +273,6 @@ export const sendMessage = async ({
       },
       { merge: true },
     ),
-    setDoc(
-      doc(db, "users", recipient.uid, "Chat", conversationId),
-      {
-        conversationId,
-        participants: [sender.uid, recipient.uid],
-        otherUser: sender,
-        ...conversationMetaForRecipient,
-      },
-      { merge: true },
-    ).catch((error: unknown) => {
-      console.warn("Failed to update recipient chat metadata", error)
-      return null
-    }),
     setDoc(
       conversationRef,
       {

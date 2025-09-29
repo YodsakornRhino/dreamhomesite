@@ -114,6 +114,7 @@ export function UserChatPanel({
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const ensuredConversationsRef = useRef<Set<string>>(new Set())
 
   const activeConversationFromStore = useMemo(
     () =>
@@ -158,6 +159,7 @@ export function UserChatPanel({
       setMessageInput("")
       setSelectedFiles([])
       setPendingConversation(null)
+      ensuredConversationsRef.current.clear()
       return
     }
 
@@ -190,6 +192,8 @@ export function UserChatPanel({
       setActiveConversationId(ensuredConversationId)
       setPendingConversation(fallbackConversation)
 
+      ensuredConversationsRef.current.add(ensuredConversationId)
+
       ensureConversation({
         currentUser: currentUserParticipant,
         targetUser: {
@@ -209,6 +213,7 @@ export function UserChatPanel({
             variant: "destructive",
           })
           setPendingConversation(null)
+          ensuredConversationsRef.current.delete(ensuredConversationId)
         })
     }
   }, [
@@ -333,6 +338,31 @@ export function UserChatPanel({
     setActiveConversationId(conversation.id)
     setPendingConversation(conversation)
   }
+
+  useEffect(() => {
+    if (!open || !currentUserParticipant || !activeConversation?.otherUser) {
+      return
+    }
+
+    const conversationKey = activeConversation.id
+    if (ensuredConversationsRef.current.has(conversationKey)) {
+      return
+    }
+
+    ensuredConversationsRef.current.add(conversationKey)
+
+    ensureConversation({
+      currentUser: currentUserParticipant,
+      targetUser: activeConversation.otherUser,
+    }).catch((error) => {
+      console.error("Failed to ensure conversation", error)
+      ensuredConversationsRef.current.delete(conversationKey)
+    })
+  }, [
+    open,
+    activeConversation,
+    currentUserParticipant,
+  ])
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return
