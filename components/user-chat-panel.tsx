@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from "react"
 import {
+  AlertCircle,
   ArrowLeft,
   FileImage,
   FileVideo,
@@ -29,6 +30,16 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { cn } from "@/lib/utils"
+import {
+  ensureConversation,
+  markConversationRead,
+  sendMessage as sendChatMessage,
+  setConversationPinned,
+  subscribeToConversationMessages,
+  subscribeToUserConversations,
+  type ChatMessage as StoredChatMessage,
+  type UserConversation,
+} from "@/lib/chat"
 
 interface ChatContact {
   id: string
@@ -41,31 +52,6 @@ interface UserChatPanelProps {
   onClose: () => void
   initialConversationId?: string | null
   initialContact?: ChatContact | null
-}
-
-interface ChatAttachment {
-  id: string
-  type: "image" | "video"
-  name: string
-  url: string
-}
-
-interface ChatMessage {
-  id: string
-  senderId: string
-  text: string | null
-  attachments: ChatAttachment[]
-  createdAt: Date
-}
-
-interface Conversation {
-  id: string
-  name: string
-  avatar: string | null
-  pinned: boolean
-  unreadCount: number
-  createdAt: Date
-  messages: ChatMessage[]
 }
 
 const getInitials = (name: string): string => {
@@ -87,90 +73,6 @@ const formatMessageTime = (timestamp: Date | null): string => {
   return format(timestamp, "HH:mm น.", { locale: th })
 }
 
-const createSampleConversations = (): Conversation[] => {
-  const now = new Date()
-  return [
-    {
-      id: "conv-001",
-      name: "คุณสมชาย บ้านเดี่ยวบางนา",
-      avatar: null,
-      pinned: true,
-      unreadCount: 2,
-      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 5),
-      messages: [
-        {
-          id: "conv-001-msg-001",
-          senderId: "conv-001-buyer",
-          text: "สวัสดีครับ สนใจบ้านเดี่ยว 3 ห้องนอนของคุณครับ ยังพร้อมขายอยู่ไหม?",
-          attachments: [],
-          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 4.5),
-        },
-        {
-          id: "conv-001-msg-002",
-          senderId: "current-user",
-          text: "พร้อมขายครับ บ้านเพิ่งรีโนเวทเสร็จเมื่อเดือนที่แล้ว สนใจนัดชมวันไหนได้บ้างครับ",
-          attachments: [],
-          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 4.4),
-        },
-        {
-          id: "conv-001-msg-003",
-          senderId: "conv-001-buyer",
-          text: "สุดสัปดาห์นี้ได้ไหมครับ ถ้ามีรูปเพิ่มเติมส่งมาได้เลยนะครับ",
-          attachments: [],
-          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 3),
-        },
-      ],
-    },
-    {
-      id: "conv-002",
-      name: "คุณณิชา คอนโดหรูสุขุมวิท",
-      avatar: null,
-      pinned: false,
-      unreadCount: 0,
-      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2),
-      messages: [
-        {
-          id: "conv-002-msg-001",
-          senderId: "current-user",
-          text: "สวัสดีค่ะ คอนโดยังอยู่ไหมคะ",
-          attachments: [],
-          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2),
-        },
-        {
-          id: "conv-002-msg-002",
-          senderId: "conv-002-owner",
-          text: "ยังว่างอยู่ค่ะ สามารถนัดชมได้ทุกวันหลัง 6 โมงเย็นนะคะ",
-          attachments: [],
-          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 20),
-        },
-        {
-          id: "conv-002-msg-003",
-          senderId: "current-user",
-          text: null,
-          attachments: [
-            {
-              id: "conv-002-msg-003-attach-1",
-              type: "image",
-              name: "แปลนห้อง.jpg",
-              url: "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=400&q=80",
-            },
-          ],
-          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 19),
-        },
-      ],
-    },
-    {
-      id: "conv-003",
-      name: "คุณอรทัย บ้านสวนเชียงใหม่",
-      avatar: null,
-      pinned: false,
-      unreadCount: 0,
-      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24),
-      messages: [],
-    },
-  ]
-}
-
 export function UserChatPanel({
   open,
   onClose,
@@ -188,9 +90,14 @@ export function UserChatPanel({
   const [messageInput, setMessageInput] = useState("")
   const [showListOnMobile, setShowListOnMobile] = useState(true)
   const [sendingMessage, setSendingMessage] = useState(false)
-  const [conversations, setConversations] = useState<Conversation[]>(
-    () => createSampleConversations(),
+  const [conversations, setConversations] = useState<UserConversation[]>([])
+  const [messages, setMessages] = useState<StoredChatMessage[]>([])
+  const [conversationsLoading, setConversationsLoading] = useState(false)
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [conversationsError, setConversationsError] = useState<string | null>(
+    null,
   )
+  const [messagesError, setMessagesError] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
@@ -203,6 +110,8 @@ export function UserChatPanel({
       setMessageInput("")
       setShowListOnMobile(true)
       setSendingMessage(false)
+      setMessages([])
+      setMessagesError(null)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
@@ -211,73 +120,137 @@ export function UserChatPanel({
 
     if (initialConversationId) {
       setActiveConversationId(initialConversationId)
-    }
-
-    if (initialContact) {
       setShowListOnMobile(false)
     }
-  }, [open, initialConversationId, initialContact])
+  }, [open, initialConversationId])
 
   useEffect(() => {
-    if (!open || !initialConversationId) {
+    if (!user?.uid) {
+      setConversations([])
+      setConversationsLoading(false)
+      setConversationsError(null)
       return
     }
 
-    setConversations((previous) => {
-      const exists = previous.some((conversation) => conversation.id === initialConversationId)
-      if (exists) {
-        return previous
-      }
+    let isActive = true
+    let unsubscribe: (() => void) | undefined
 
-      const now = new Date()
-      const placeholder: Conversation = {
-        id: initialConversationId,
-        name: "บทสนทนาใหม่",
-        avatar: null,
-        pinned: false,
-        unreadCount: 0,
-        createdAt: now,
-        messages: [],
-      }
+    setConversationsLoading(true)
+    setConversationsError(null)
 
-      return [placeholder, ...previous]
+    subscribeToUserConversations(user.uid, (items) => {
+      if (!isActive) return
+      setConversations(items)
+      setConversationsLoading(false)
     })
-  }, [initialConversationId, open])
+      .then((fn) => {
+        if (!isActive) {
+          fn()
+          return
+        }
+        unsubscribe = fn
+      })
+      .catch((error) => {
+        console.error("Failed to subscribe to conversations", error)
+        if (!isActive) {
+          return
+        }
+        setConversationsLoading(false)
+        setConversationsError("ไม่สามารถโหลดรายการแชทได้")
+      })
+
+    return () => {
+      isActive = false
+      unsubscribe?.()
+    }
+  }, [user?.uid])
 
   useEffect(() => {
-    if (!open || !initialContact) {
+    if (!open || !user?.uid || !initialContact?.id) {
       return
     }
 
-    const conversationId = `contact-${initialContact.id}`
-    setConversations((previous) => {
-      const exists = previous.some((conversation) => conversation.id === conversationId)
-      if (exists) {
-        return previous
-      }
+    let cancelled = false
+    setShowListOnMobile(false)
 
-      const now = new Date()
-      const newConversation: Conversation = {
-        id: conversationId,
-        name: initialContact.name?.trim() || "ผู้ใช้ DreamHome",
-        avatar: initialContact.avatar ?? null,
-        pinned: false,
-        unreadCount: 0,
-        createdAt: now,
-        messages: [],
-      }
-
-      return [newConversation, ...previous]
+    ensureConversation({
+      currentUserId: user.uid,
+      targetUserId: initialContact.id,
     })
-    setActiveConversationId(conversationId)
-  }, [initialContact, open])
+      .then((result) => {
+        if (cancelled) return
+        setActiveConversationId(result.conversationId)
+      })
+      .catch((error) => {
+        console.error("Failed to ensure conversation", error)
+        if (cancelled) return
+        toast({
+          title: "ไม่สามารถเปิดแชทได้",
+          description: "โปรดลองใหม่อีกครั้ง",
+          variant: "destructive",
+        })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, user?.uid, initialContact?.id, toast])
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      setMessages([])
+      setMessagesLoading(false)
+      setMessagesError(null)
+      return
+    }
+
+    let isActive = true
+    let unsubscribe: (() => void) | undefined
+    setMessagesLoading(true)
+    setMessagesError(null)
+
+    subscribeToConversationMessages(activeConversationId, (items) => {
+      if (!isActive) return
+      setMessages(items)
+      setMessagesLoading(false)
+    })
+      .then((fn) => {
+        if (!isActive) {
+          fn()
+          return
+        }
+        unsubscribe = fn
+      })
+      .catch((error) => {
+        console.error("Failed to subscribe to messages", error)
+        if (!isActive) {
+          return
+        }
+        setMessages([])
+        setMessagesLoading(false)
+        setMessagesError("ไม่สามารถโหลดข้อความได้")
+      })
+
+    return () => {
+      isActive = false
+      unsubscribe?.()
+    }
+  }, [activeConversationId])
+
+  useEffect(() => {
+    if (!user?.uid || !activeConversationId) {
+      return
+    }
+
+    markConversationRead(user.uid, activeConversationId).catch((error) => {
+      console.error("Failed to mark conversation as read", error)
+    })
+  }, [activeConversationId, user?.uid])
 
   const activeConversation = useMemo(() => {
     if (!activeConversationId) return null
     return conversations.find((conversation) => conversation.id === activeConversationId) ?? null
   }, [activeConversationId, conversations])
-
-  const messages = activeConversation?.messages ?? []
 
   useEffect(() => {
     if (!open) return
@@ -285,20 +258,24 @@ export function UserChatPanel({
   }, [open, activeConversationId, messages.length])
 
   const sortedConversations = useMemo(() => {
-    const withLastTimestamp = conversations.map((conversation) => {
-      const lastMessage = conversation.messages[conversation.messages.length - 1] ?? null
-      const lastTimestamp = lastMessage?.createdAt ?? conversation.createdAt
-      return { conversation, lastTimestamp }
-    })
+    return [...conversations].sort((a, b) => {
+      if (a.pinned !== b.pinned) {
+        return a.pinned ? -1 : 1
+      }
 
-    return withLastTimestamp
-      .sort((a, b) => {
-        if (a.conversation.pinned !== b.conversation.pinned) {
-          return a.conversation.pinned ? -1 : 1
-        }
-        return b.lastTimestamp.getTime() - a.lastTimestamp.getTime()
-      })
-      .map((item) => item.conversation)
+      const timeA =
+        a.lastMessage?.createdAt?.getTime() ??
+        a.updatedAt?.getTime() ??
+        a.createdAt?.getTime() ??
+        0
+      const timeB =
+        b.lastMessage?.createdAt?.getTime() ??
+        b.updatedAt?.getTime() ??
+        b.createdAt?.getTime() ??
+        0
+
+      return timeB - timeA
+    })
   }, [conversations])
 
   const filteredConversations = useMemo(() => {
@@ -308,14 +285,17 @@ export function UserChatPanel({
 
     const keyword = searchTerm.trim().toLowerCase()
     return sortedConversations.filter((conversation) => {
-      if (conversation.name.toLowerCase().includes(keyword)) {
+      const name = conversation.otherUser.name.toLowerCase()
+      if (name.includes(keyword)) {
         return true
       }
 
-      return conversation.messages.some((message) => {
-        const text = message.text ?? ""
-        return text.toLowerCase().includes(keyword)
-      })
+      const messageText = conversation.lastMessage?.text ?? ""
+      if (messageText.toLowerCase().includes(keyword)) {
+        return true
+      }
+
+      return false
     })
   }, [searchTerm, sortedConversations])
 
@@ -326,6 +306,11 @@ export function UserChatPanel({
     setMessageInput("")
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
+    }
+    if (user?.uid) {
+      markConversationRead(user.uid, conversationId).catch((error) => {
+        console.error("Failed to mark conversation as read", error)
+      })
     }
   }
 
@@ -342,67 +327,28 @@ export function UserChatPanel({
     setSelectedFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))
   }
 
-  const togglePin = () => {
-    if (!activeConversation) {
+  const togglePin = async () => {
+    if (!activeConversation || !user?.uid) {
       return
     }
 
-    setConversations((previous) =>
-      previous.map((conversation) =>
-        conversation.id === activeConversation.id
-          ? { ...conversation, pinned: !conversation.pinned }
-          : conversation,
-      ),
-    )
-  }
-
-  const ensureConversationExists = (): string => {
-    if (activeConversationId) {
-      return activeConversationId
-    }
-
-    if (initialContact) {
-      const conversationId = `contact-${initialContact.id}`
-      setConversations((previous) => {
-        const exists = previous.some((conversation) => conversation.id === conversationId)
-        if (exists) {
-          return previous
-        }
-
-        const now = new Date()
-        const newConversation: Conversation = {
-          id: conversationId,
-          name: initialContact.name?.trim() || "ผู้ใช้ DreamHome",
-          avatar: initialContact.avatar ?? null,
-          pinned: false,
-          unreadCount: 0,
-          createdAt: now,
-          messages: [],
-        }
-
-        return [newConversation, ...previous]
+    try {
+      await setConversationPinned(
+        user.uid,
+        activeConversation.id,
+        !activeConversation.pinned,
+      )
+    } catch (error) {
+      console.error("Failed to toggle pin", error)
+      toast({
+        title: "ปักหมุดไม่สำเร็จ",
+        description: "โปรดลองอีกครั้ง",
+        variant: "destructive",
       })
-      setActiveConversationId(conversationId)
-      return conversationId
     }
-
-    const generatedId = `local-${Date.now()}`
-    const now = new Date()
-    const fallbackConversation: Conversation = {
-      id: generatedId,
-      name: "ผู้ใช้ DreamHome",
-      avatar: null,
-      pinned: false,
-      unreadCount: 0,
-      createdAt: now,
-      messages: [],
-    }
-    setConversations((previous) => [fallbackConversation, ...previous])
-    setActiveConversationId(generatedId)
-    return generatedId
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!user) {
       toast({
         title: "ต้องเข้าสู่ระบบก่อน",
@@ -420,40 +366,31 @@ export function UserChatPanel({
     setSendingMessage(true)
 
     try {
-      const conversationId = ensureConversationExists()
-      const attachments = selectedFiles.map((file, index) => ({
-        id: `${conversationId}-file-${Date.now()}-${index}`,
-        type: file.type.startsWith("video/") ? "video" : "image",
-        name: file.name,
-        url: URL.createObjectURL(file),
-      }))
+      let conversationId = activeConversationId
 
-      const newMessage: ChatMessage = {
-        id: `${conversationId}-message-${Date.now()}`,
-        senderId: user.uid ?? "current-user",
-        text: trimmedMessage || null,
-        attachments,
-        createdAt: new Date(),
+      if (!conversationId) {
+        if (!initialContact?.id) {
+          toast({
+            title: "ไม่สามารถส่งข้อความได้",
+            description: "กรุณาเลือกผู้ใช้ที่จะสนทนาก่อน",
+            variant: "destructive",
+          })
+          return
+        }
+
+        const result = await ensureConversation({
+          currentUserId: user.uid,
+          targetUserId: initialContact.id,
+        })
+        conversationId = result.conversationId
+        setActiveConversationId(conversationId)
       }
 
-      setConversations((previous) => {
-        const existingIndex = previous.findIndex(
-          (conversation) => conversation.id === conversationId,
-        )
-
-        if (existingIndex === -1) {
-          return previous
-        }
-
-        const updated = [...previous]
-        const target = updated[existingIndex]
-        updated[existingIndex] = {
-          ...target,
-          messages: [...target.messages, newMessage],
-          unreadCount: 0,
-        }
-
-        return updated
+      await sendChatMessage({
+        conversationId,
+        senderId: user.uid,
+        text: trimmedMessage || null,
+        files: selectedFiles,
       })
 
       setMessageInput("")
@@ -462,6 +399,13 @@ export function UserChatPanel({
         fileInputRef.current.value = ""
       }
       setShowListOnMobile(false)
+    } catch (error) {
+      console.error("Failed to send message", error)
+      toast({
+        title: "ส่งข้อความไม่สำเร็จ",
+        description: "โปรดลองอีกครั้ง",
+        variant: "destructive",
+      })
     } finally {
       setSendingMessage(false)
     }
@@ -471,7 +415,7 @@ export function UserChatPanel({
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       if (!sendingMessage) {
-        handleSendMessage()
+        void handleSendMessage()
       }
     }
   }
@@ -481,15 +425,21 @@ export function UserChatPanel({
     (messageInput.trim().length > 0 || selectedFiles.length > 0) &&
     !sendingMessage
 
-  const conversationListEmpty = !filteredConversations.length
+  const conversationListEmpty =
+    !filteredConversations.length && !conversationsLoading
 
-  const activeConversationDate = (() => {
+  const activeConversationDate = useMemo(() => {
     if (!activeConversation) {
       return null
     }
-    const lastMessage = activeConversation.messages[activeConversation.messages.length - 1]
-    return lastMessage?.createdAt ?? activeConversation.createdAt
-  })()
+
+    return (
+      activeConversation.lastMessage?.createdAt ??
+      activeConversation.updatedAt ??
+      activeConversation.createdAt ??
+      null
+    )
+  }, [activeConversation])
 
   return (
     <div
@@ -553,7 +503,16 @@ export function UserChatPanel({
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              {conversationListEmpty ? (
+              {conversationsLoading ? (
+                <div className="flex h-full items-center justify-center text-slate-400">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : conversationsError ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-red-500">
+                  <AlertCircle className="h-6 w-6" />
+                  <p>{conversationsError}</p>
+                </div>
+              ) : conversationListEmpty ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
                   <MessageCircle className="h-8 w-8 text-emerald-500" />
                   <p>ยังไม่มีบทสนทนา เริ่มพูดคุยกับผู้ขายเพื่อวางแผนซื้อบ้าน</p>
@@ -561,13 +520,33 @@ export function UserChatPanel({
               ) : (
                 filteredConversations.map((conversation) => {
                   const isActive = activeConversationId === conversation.id
-                  const lastMessage = conversation.messages[conversation.messages.length - 1] ?? null
-                  const lastTimestamp = lastMessage?.createdAt ?? conversation.createdAt
-                  const lastMessagePreview =
-                    lastMessage?.text?.trim() ||
-                    (lastMessage?.attachments.length
-                      ? "ส่งไฟล์แนบ"
-                      : "ยังไม่มีข้อความ")
+                  const lastMessage = conversation.lastMessage
+                  const lastTimestamp =
+                    lastMessage?.createdAt ??
+                    conversation.updatedAt ??
+                    conversation.createdAt ??
+                    null
+
+                  let lastMessagePreview = "ยังไม่มีข้อความ"
+                  if (lastMessage) {
+                    if (lastMessage.text && lastMessage.text.trim()) {
+                      lastMessagePreview = lastMessage.text.trim()
+                    } else if (lastMessage.attachments.length > 0) {
+                      if (lastMessage.attachments.length === 1) {
+                        const attachment = lastMessage.attachments[0]
+                        if (attachment.type === "image") {
+                          lastMessagePreview = "ส่งรูปภาพ"
+                        } else if (attachment.type === "video") {
+                          lastMessagePreview = "ส่งวิดีโอ"
+                        } else {
+                          lastMessagePreview = `ส่งไฟล์ ${attachment.name}`
+                        }
+                      } else {
+                        lastMessagePreview = `ส่งไฟล์แนบ ${lastMessage.attachments.length} รายการ`
+                      }
+                    }
+                  }
+
                   const unreadCount = conversation.unreadCount
 
                   return (
@@ -583,18 +562,21 @@ export function UserChatPanel({
                       )}
                     >
                       <Avatar className="h-12 w-12 border border-white shadow-sm">
-                        {conversation.avatar ? (
-                          <AvatarImage src={conversation.avatar} alt={conversation.name} />
+                        {conversation.otherUser.photoURL ? (
+                          <AvatarImage
+                            src={conversation.otherUser.photoURL}
+                            alt={conversation.otherUser.name}
+                          />
                         ) : (
                           <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                            {getInitials(conversation.name)}
+                            {getInitials(conversation.otherUser.name)}
                           </AvatarFallback>
                         )}
                       </Avatar>
                       <div className="flex min-w-0 flex-1 flex-col">
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-semibold text-slate-900">
-                            {conversation.name}
+                            {conversation.otherUser.name}
                           </p>
                           {conversation.pinned && (
                             <Pin className="h-3.5 w-3.5 text-emerald-500" />
@@ -640,20 +622,20 @@ export function UserChatPanel({
                       <ArrowLeft className="h-5 w-5" />
                     </Button>
                     <Avatar className="h-10 w-10 border">
-                      {activeConversation.avatar ? (
+                      {activeConversation.otherUser.photoURL ? (
                         <AvatarImage
-                          src={activeConversation.avatar}
-                          alt={activeConversation.name}
+                          src={activeConversation.otherUser.photoURL}
+                          alt={activeConversation.otherUser.name}
                         />
                       ) : (
                         <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                          {getInitials(activeConversation.name)}
+                          {getInitials(activeConversation.otherUser.name)}
                         </AvatarFallback>
                       )}
                     </Avatar>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
-                        {activeConversation.name}
+                        {activeConversation.otherUser.name}
                       </p>
                       <p className="text-xs text-slate-500">
                         {activeConversationDate ? formatRelative(activeConversationDate) : "พร้อมพูดคุย"}
@@ -679,7 +661,16 @@ export function UserChatPanel({
                 </div>
 
                 <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 md:px-8">
-                  {messages.length === 0 ? (
+                  {messagesLoading ? (
+                    <div className="flex h-full items-center justify-center text-slate-400">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    </div>
+                  ) : messagesError ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-red-500">
+                      <AlertCircle className="h-6 w-6" />
+                      <p>{messagesError}</p>
+                    </div>
+                  ) : messages.length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
                       <MessageCircle className="h-8 w-8 text-emerald-500" />
                       <p>เริ่มต้นบทสนทนาโดยส่งข้อความแรกถึงผู้ใช้รายนี้</p>
@@ -722,8 +713,10 @@ export function UserChatPanel({
                                   >
                                     {attachment.type === "video" ? (
                                       <FileVideo className="h-4 w-4" />
-                                    ) : (
+                                    ) : attachment.type === "image" ? (
                                       <FileImage className="h-4 w-4" />
+                                    ) : (
+                                      <Paperclip className="h-4 w-4" />
                                     )}
                                     <span className="max-w-[160px] truncate" title={attachment.name}>
                                       {attachment.name}
