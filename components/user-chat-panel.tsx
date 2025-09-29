@@ -1,144 +1,76 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react"
+import Image from "next/image"
 import {
   ArrowLeft,
   CheckCircle2,
+  FileImage,
+  FileVideo,
+  Loader2,
   MessageCircle,
+  Paperclip,
   Phone,
+  Pin,
+  PinOff,
   Search,
+  Send,
   X,
-} from "lucide-react";
+} from "lucide-react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
-type ChatMessage = {
-  id: string;
-  sender: "me" | "them";
-  content: string;
-  timestamp: string;
-};
-
-type Conversation = {
-  id: string;
-  name: string;
-  avatar?: string;
-  status: "online" | "offline" | "recently";
-  lastMessage: string;
-  updatedAt: string;
-  unreadCount?: number;
-  messages: ChatMessage[];
-};
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/hooks/use-toast"
+import { useAuthContext } from "@/contexts/AuthContext"
+import { cn } from "@/lib/utils"
+import {
+  ensureConversation,
+  sendMessage,
+  togglePinConversation,
+  uploadChatAttachments,
+  type ChatAttachmentMetadata,
+  type ConversationParticipant,
+} from "@/lib/chat"
+import { formatRelativeTime, useUserChats } from "@/hooks/use-user-chats"
+import { getFirestoreInstance } from "@/lib/firestore"
 
 interface ChatContact {
-  id: string;
-  name: string;
-  avatar?: string | null;
+  id: string
+  name: string
+  avatar?: string | null
+}
+
+interface ChatMessage {
+  id: string
+  senderId: string
+  text: string
+  attachments: ChatAttachmentMetadata[]
+  createdAt: Date | null
 }
 
 interface UserChatPanelProps {
-  open: boolean;
-  onClose: () => void;
-  initialConversationId?: string | null;
-  initialContact?: ChatContact | null;
+  open: boolean
+  onClose: () => void
+  initialConversationId?: string | null
+  initialContact?: ChatContact | null
 }
 
-const conversations: Conversation[] = [
-  {
-    id: "1",
-    name: "คุณภูมินทร์ ใจดี",
-    avatar: "https://i.pravatar.cc/100?img=12",
-    status: "online",
-    lastMessage: "สนใจนัดดูบ้านวันเสาร์นี้ครับ",
-    updatedAt: "2 นาทีที่แล้ว",
-    unreadCount: 2,
-    messages: [
-      {
-        id: "m1",
-        sender: "them",
-        content: "สวัสดีครับ บ้านแถวลาดพร้าวยังมีอยู่ไหมครับ",
-        timestamp: "10:12",
-      },
-      {
-        id: "m2",
-        sender: "me",
-        content: "ยังมีอยู่ครับ สนใจนัดดูวันไหนได้เลย",
-        timestamp: "10:14",
-      },
-      {
-        id: "m3",
-        sender: "them",
-        content: "สนใจนัดดูบ้านวันเสาร์นี้ครับ",
-        timestamp: "10:15",
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "ครอบครัวธนทรัพย์ Family",
-    avatar: "https://i.pravatar.cc/100?img=32",
-    status: "recently",
-    lastMessage: "ขอบคุณสำหรับข้อมูลเพิ่มเติมนะคะ",
-    updatedAt: "6 ชั่วโมงที่แล้ว",
-    messages: [
-      {
-        id: "m1",
-        sender: "them",
-        content: "อยากทราบรายละเอียดค่าโอนค่ะ",
-        timestamp: "08:20",
-      },
-      {
-        id: "m2",
-        sender: "me",
-        content: "ผู้ขายรับผิดชอบให้ทั้งหมดเลยครับ",
-        timestamp: "08:28",
-      },
-      {
-        id: "m3",
-        sender: "them",
-        content: "ขอบคุณสำหรับข้อมูลเพิ่มเติมนะคะ",
-        timestamp: "09:02",
-      },
-    ],
-  },
-  {
-    id: "3",
-    name: "คุณสุกัลยาณี",
-    avatar: "https://i.pravatar.cc/100?img=48",
-    status: "offline",
-    lastMessage: "เดี๋ยวขอคุยกับครอบครัวก่อนนะคะ",
-    updatedAt: "เมื่อวานนี้",
-    messages: [
-      {
-        id: "m1",
-        sender: "them",
-        content: "ต้องการขอส่วนลดเพิ่มอีกนิดค่ะ",
-        timestamp: "17:45",
-      },
-      {
-        id: "m2",
-        sender: "me",
-        content: "ได้ครับ เดี๋ยวผมลองคุยกับเจ้าของให้อีกที",
-        timestamp: "17:52",
-      },
-      {
-        id: "m3",
-        sender: "them",
-        content: "เดี๋ยวขอคุยกับครอบครัวก่อนนะคะ",
-        timestamp: "18:05",
-      },
-    ],
-  },
-];
-
-const statusBadgeMap: Record<Conversation["status"], string> = {
-  online: "bg-green-500",
-  offline: "bg-gray-400",
-  recently: "bg-amber-400",
-};
+const toDate = (value: unknown): Date | null => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  if (typeof value === "number") return new Date(value)
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (value as any).toDate()
+    } catch (error) {
+      console.warn("Failed to convert timestamp", error)
+      return null
+    }
+  }
+  return null
+}
 
 export function UserChatPanel({
   open,
@@ -146,81 +78,279 @@ export function UserChatPanel({
   initialConversationId,
   initialContact,
 }: UserChatPanelProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+  const { user } = useAuthContext()
+  const { toast } = useToast()
+
+  const currentUserParticipant = useMemo<ConversationParticipant | null>(() => {
+    if (!user) return null
+    return {
+      uid: user.uid,
+      name: user.displayName || user.email || "ผู้ใช้งาน DreamHome",
+      photoURL: user.photoURL ?? undefined,
+    }
+  }, [user])
+
+  const { conversations, loading: loadingConversations } = useUserChats(
+    currentUserParticipant?.uid,
+  )
+
+  const [searchTerm, setSearchTerm] = useState("")
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     null,
-  );
+  )
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [messageInput, setMessageInput] = useState("")
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isSending, setIsSending] = useState(false)
 
-  const conversationItems = useMemo<Conversation[]>(() => {
-    if (!initialContact) {
-      return conversations;
-    }
-
-    const exists = conversations.some(
-      (conversation) => conversation.id === initialContact.id,
-    );
-
-    if (exists) {
-      return conversations;
-    }
-
-    return [
-      {
-        id: initialContact.id,
-        name: initialContact.name,
-        avatar: initialContact.avatar ?? undefined,
-        status: "online",
-        lastMessage: "ยังไม่มีข้อความ — เริ่มต้นการสนทนาได้เลย",
-        updatedAt: "เพิ่งเริ่มต้น",
-        messages: [],
-      },
-      ...conversations,
-    ];
-  }, [initialContact]);
-
-  useEffect(() => {
-    if (!open) {
-      setActiveConversationId(null);
-      setSearchTerm("");
-      return;
-    }
-
-    if (initialConversationId) {
-      setActiveConversationId(initialConversationId);
-      return;
-    }
-
-    if (initialContact) {
-      setActiveConversationId(initialContact.id);
-    }
-  }, [open, initialConversationId, initialContact]);
-
-  const filteredConversations = useMemo(() => {
-    const list = conversationItems;
-
-    if (!searchTerm.trim()) {
-      return list;
-    }
-
-    const keyword = searchTerm.trim().toLowerCase();
-    return list.filter((conversation) =>
-      [conversation.name, conversation.lastMessage]
-        .join(" ")
-        .toLowerCase()
-        .includes(keyword),
-    );
-  }, [conversationItems, searchTerm]);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const activeConversation = useMemo(
     () =>
-      conversationItems.find(
-        (conversation) => conversation.id === activeConversationId,
-      ) || null,
-    [conversationItems, activeConversationId],
-  );
+      conversations.find((conversation) => conversation.id === activeConversationId) ??
+      null,
+    [conversations, activeConversationId],
+  )
 
-  const isNewConversation =
-    activeConversation != null && activeConversation.messages.length === 0;
+  const filteredConversations = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return conversations
+    }
+    const keyword = searchTerm.trim().toLowerCase()
+    return conversations.filter((conversation) => {
+      const name = conversation.otherUser?.name?.toLowerCase() ?? ""
+      const lastMessage = conversation.lastMessageText.toLowerCase()
+      return name.includes(keyword) || lastMessage.includes(keyword)
+    })
+  }, [conversations, searchTerm])
+
+  useEffect(() => {
+    if (!open) {
+      setActiveConversationId(null)
+      setSearchTerm("")
+      setMessages([])
+      setMessageInput("")
+      setSelectedFiles([])
+      return
+    }
+
+    if (!currentUserParticipant) {
+      return
+    }
+
+    if (initialContact) {
+      ensureConversation({
+        currentUser: currentUserParticipant,
+        targetUser: {
+          uid: initialContact.id,
+          name: initialContact.name,
+          photoURL: initialContact.avatar ?? undefined,
+        },
+      })
+        .then((conversationId) => {
+          setActiveConversationId(conversationId)
+        })
+        .catch((error) => {
+          console.error("Failed to ensure conversation", error)
+          toast({
+            title: "ไม่สามารถเปิดแชทได้",
+            description: "เกิดข้อผิดพลาดในการเริ่มต้นการสนทนา",
+            variant: "destructive",
+          })
+        })
+    }
+  }, [
+    open,
+    initialContact,
+    currentUserParticipant,
+    toast,
+  ])
+
+  useEffect(() => {
+    if (!open || !initialConversationId) {
+      return
+    }
+
+    const matched = conversations.find(
+      (conversation) =>
+        conversation.id === initialConversationId ||
+        conversation.otherUser?.uid === initialConversationId,
+    )
+    if (matched) {
+      setActiveConversationId(matched.id)
+    }
+  }, [open, initialConversationId, conversations])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    if (!activeConversationId) {
+      setMessages([])
+      return
+    }
+
+    let unsubscribe: (() => void) | undefined
+    let cancelled = false
+
+    const subscribe = async () => {
+      setMessagesLoading(true)
+      try {
+        const db = await getFirestoreInstance()
+        const { collection, doc, onSnapshot, orderBy, query } = await import(
+          "firebase/firestore"
+        )
+        const conversationRef = doc(db, "chats", activeConversationId)
+        const messagesCollection = collection(conversationRef, "messages")
+        const q = query(messagesCollection, orderBy("createdAt", "asc"))
+
+        unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            if (cancelled) {
+              return
+            }
+            const nextMessages = snapshot.docs.map((docSnap) => {
+              const data = docSnap.data()
+              return {
+                id: docSnap.id,
+                senderId: (data.senderId as string) ?? "",
+                text: typeof data.text === "string" ? data.text : "",
+                attachments: (data.attachments as ChatAttachmentMetadata[] | undefined) ?? [],
+                createdAt: toDate(data.createdAt),
+              } satisfies ChatMessage
+            })
+            setMessages(nextMessages)
+            setMessagesLoading(false)
+          },
+          (error) => {
+            console.error("Failed to subscribe to messages", error)
+            toast({
+              title: "ไม่สามารถโหลดข้อความได้",
+              description: "กรุณาลองอีกครั้ง",
+              variant: "destructive",
+            })
+            setMessagesLoading(false)
+          },
+        )
+      } catch (error) {
+        console.error("Failed to load messages", error)
+        toast({
+          title: "ไม่สามารถโหลดข้อความได้",
+          description: "กรุณาลองอีกครั้ง",
+          variant: "destructive",
+        })
+        setMessagesLoading(false)
+      }
+    }
+
+    subscribe()
+
+    return () => {
+      cancelled = true
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
+  }, [activeConversationId, open, toast])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, open])
+
+  const handleSelectConversation = (conversationId: string) => {
+    setActiveConversationId(conversationId)
+  }
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files) return
+    const files = Array.from(event.target.files)
+    setSelectedFiles((prev) => [...prev, ...files])
+    event.target.value = ""
+  }
+
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, fileIndex) => fileIndex !== index))
+  }
+
+  const handleSendMessage = async () => {
+    if (!currentUserParticipant || !activeConversation || isSending) {
+      return
+    }
+
+    const text = messageInput.trim()
+    if (!text && selectedFiles.length === 0) {
+      return
+    }
+
+    if (!activeConversation.otherUser) {
+      toast({
+        title: "ไม่พบข้อมูลผู้ติดต่อ",
+        description: "ไม่สามารถส่งข้อความได้",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSending(true)
+    try {
+      const attachments =
+        selectedFiles.length > 0
+          ? await uploadChatAttachments(activeConversation.id, selectedFiles)
+          : []
+
+      await sendMessage({
+        conversationId: activeConversation.id,
+        sender: currentUserParticipant,
+        recipient: activeConversation.otherUser,
+        text: text.length > 0 ? text : null,
+        attachments,
+      })
+
+      setMessageInput("")
+      setSelectedFiles([])
+    } catch (error) {
+      console.error("Failed to send message", error)
+      toast({
+        title: "ส่งข้อความไม่สำเร็จ",
+        description: "กรุณาลองอีกครั้ง",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleTogglePin = async () => {
+    if (!currentUserParticipant || !activeConversation) {
+      return
+    }
+
+    try {
+      await togglePinConversation(
+        currentUserParticipant.uid,
+        activeConversation.id,
+        !activeConversation.pinned,
+      )
+    } catch (error) {
+      console.error("Failed to toggle pin", error)
+      toast({
+        title: "ปักหมุดไม่สำเร็จ",
+        description: "กรุณาลองอีกครั้ง",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleClosePanel = () => {
+    onClose()
+  }
 
   return (
     <div
@@ -247,7 +377,7 @@ export function UserChatPanel({
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={handleClosePanel}>
             <X className="h-5 w-5" />
           </Button>
         </header>
@@ -268,76 +398,79 @@ export function UserChatPanel({
                 </div>
               </div>
 
-              <div className="flex-1 space-y-1 overflow-y-auto px-3 pb-4 sm:px-4 md:px-5 lg:px-6">
-                {filteredConversations.length === 0 ? (
-                  <div className="flex h-full flex-col items-center justify-center space-y-2 text-center text-sm text-muted-foreground">
-                    <MessageCircle className="h-6 w-6" />
-                    <p>ไม่พบการสนทนาที่ตรงกับคำค้นหา</p>
-                  </div>
-                ) : (
-                  filteredConversations.map((conversation) => (
-                    <button
-                      key={conversation.id}
-                      onClick={() => setActiveConversationId(conversation.id)}
-                      className={cn(
-                        "flex w-full items-center space-x-3 rounded-2xl px-3 py-2 text-left transition-colors",
-                        conversation.id === activeConversationId
-                          ? "bg-blue-50"
-                          : "hover:bg-gray-100",
-                      )}
-                    >
-                      <div className="relative">
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage
-                            src={conversation.avatar}
-                            alt={conversation.name}
-                          />
-                          <AvatarFallback>
-                            {conversation.name
-                              .split(" ")
-                              .map((segment) => segment[0])
-                              .join("")
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span
-                          className={cn(
-                            "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white",
-                            statusBadgeMap[conversation.status],
-                          )}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between">
-                          <p className="truncate text-sm font-semibold text-gray-900 lg:text-base">
-                            {conversation.name}
-                          </p>
-                          <span className="whitespace-nowrap text-xs text-muted-foreground">
-                            {conversation.updatedAt}
-                          </span>
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-1 px-3 pb-4 sm:px-4 md:px-5 lg:px-6">
+                  {loadingConversations ? (
+                    <div className="flex h-48 items-center justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : filteredConversations.length === 0 ? (
+                    <div className="flex h-48 flex-col items-center justify-center space-y-2 text-center text-sm text-muted-foreground">
+                      <MessageCircle className="h-6 w-6" />
+                      <p>ไม่พบการสนทนาที่ตรงกับคำค้นหา</p>
+                    </div>
+                  ) : (
+                    filteredConversations.map((conversation) => (
+                      <button
+                        key={conversation.id}
+                        onClick={() => handleSelectConversation(conversation.id)}
+                        className={cn(
+                          "flex w-full items-center space-x-3 rounded-2xl px-3 py-2 text-left transition-colors",
+                          conversation.id === activeConversationId
+                            ? "bg-blue-50"
+                            : "hover:bg-gray-100",
+                        )}
+                      >
+                        <div className="relative">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage
+                              src={conversation.otherUser?.photoURL}
+                              alt={conversation.otherUser?.name ?? ""}
+                            />
+                            <AvatarFallback>
+                              {conversation.otherUser?.name
+                                ?.split(" ")
+                                .map((segment) => segment[0])
+                                .join("")
+                                .slice(0, 2)
+                                .toUpperCase() ?? "DH"}
+                            </AvatarFallback>
+                          </Avatar>
+                          {conversation.pinned ? (
+                            <span className="absolute -right-1 -top-1 rounded-full bg-amber-400 p-1 text-white shadow">
+                              <Pin className="h-3 w-3" />
+                            </span>
+                          ) : null}
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground lg:text-sm">
-                          {conversation.lastMessage}
-                        </p>
-                      </div>
-                      {conversation.unreadCount ? (
-                        <Badge className="rounded-full px-2 py-0 text-xs">
-                          {conversation.unreadCount}
-                        </Badge>
-                      ) : null}
-                    </button>
-                  ))
-                )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between">
+                            <p className="truncate text-sm font-semibold text-gray-900 lg:text-base">
+                              {conversation.otherUser?.name ?? "ผู้ใช้ DreamHome"}
+                            </p>
+                            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                              {formatRelativeTime(conversation.lastMessageAt ?? conversation.updatedAt)}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-muted-foreground lg:text-sm">
+                            {conversation.lastMessageText}
+                          </p>
+                        </div>
+                        {conversation.attachments && conversation.attachments.length > 0 ? (
+                          <Badge className="rounded-full px-2 py-0 text-xs" variant="secondary">
+                            {conversation.attachments.length}
+                          </Badge>
+                        ) : null}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             </section>
 
             <section
               className={cn(
                 "absolute inset-0 z-10 flex h-full w-full flex-col bg-white transition-transform duration-300 ease-in-out md:static md:z-0 md:translate-x-0 md:bg-slate-50 md:shadow-none md:border-l md:border-gray-100",
-                activeConversation
-                  ? "translate-x-0"
-                  : "translate-x-full md:translate-x-0",
+                activeConversation ? "translate-x-0" : "translate-x-full md:translate-x-0",
               )}
             >
               {activeConversation ? (
@@ -354,21 +487,21 @@ export function UserChatPanel({
                       </Button>
                       <Avatar className="hidden h-11 w-11 md:inline-flex">
                         <AvatarImage
-                          src={activeConversation.avatar}
-                          alt={activeConversation.name}
+                          src={activeConversation.otherUser?.photoURL}
+                          alt={activeConversation.otherUser?.name ?? ""}
                         />
                         <AvatarFallback>
-                          {activeConversation.name
-                            .split(" ")
+                          {activeConversation.otherUser?.name
+                            ?.split(" ")
                             .map((segment) => segment[0])
                             .join("")
                             .slice(0, 2)
-                            .toUpperCase()}
+                            .toUpperCase() ?? "DH"}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-sm font-semibold text-gray-900 md:text-base">
-                          {activeConversation.name}
+                          {activeConversation.otherUser?.name ?? "ผู้ใช้ DreamHome"}
                         </p>
                         <div className="flex items-center space-x-1 text-xs text-emerald-600">
                           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -376,19 +509,37 @@ export function UserChatPanel({
                         </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-2 md:px-4">
-                      <Phone className="h-4 w-4" />
-                      โทรคุย
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={activeConversation.pinned ? "ยกเลิกปักหมุด" : "ปักหมุด"}
+                        onClick={handleTogglePin}
+                      >
+                        {activeConversation.pinned ? (
+                          <PinOff className="h-5 w-5" />
+                        ) : (
+                          <Pin className="h-5 w-5" />
+                        )}
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-2 md:px-4">
+                        <Phone className="h-4 w-4" />
+                        โทรคุย
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4 sm:px-5 md:px-6 md:py-6 lg:px-8">
-                    {isNewConversation ? (
+                    {messagesLoading ? (
+                      <div className="flex h-full items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : messages.length === 0 ? (
                       <div className="flex h-full flex-col items-center justify-center space-y-3 text-center text-sm text-muted-foreground">
                         <MessageCircle className="h-10 w-10 text-blue-500" />
                         <div className="space-y-1">
                           <p className="text-base font-semibold text-gray-900">
-                            เริ่มแชทกับ {activeConversation.name}
+                            เริ่มแชทกับ {activeConversation.otherUser?.name}
                           </p>
                           <p>
                             ส่งข้อความแรกเพื่อพูดคุยรายละเอียดการซื้อบ้านกับผู้ใช้นี้
@@ -396,51 +547,133 @@ export function UserChatPanel({
                         </div>
                       </div>
                     ) : (
-                      activeConversation.messages.map((message) => (
+                      messages.map((message) => (
                         <div
                           key={message.id}
                           className={cn(
-                            "flex",
-                            message.sender === "me"
-                              ? "justify-end"
-                              : "justify-start",
+                            "flex flex-col space-y-2",
+                            message.senderId === currentUserParticipant?.uid
+                              ? "items-end"
+                              : "items-start",
                           )}
                         >
                           <div
                             className={cn(
-                              "max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm",
-                              message.sender === "me"
+                              "max-w-[82%] space-y-2 rounded-2xl px-4 py-3 text-sm shadow-sm",
+                              message.senderId === currentUserParticipant?.uid
                                 ? "bg-blue-600 text-white"
                                 : "bg-white text-gray-900",
                             )}
                           >
-                            <p>{message.content}</p>
+                            {message.text ? <p className="whitespace-pre-line">{message.text}</p> : null}
+                            {message.attachments.length > 0 ? (
+                              <div className="grid gap-2">
+                                {message.attachments.map((attachment) => (
+                                  <div key={attachment.id} className="overflow-hidden rounded-xl">
+                                    {attachment.type === "video" ? (
+                                      <video
+                                        src={attachment.url}
+                                        controls
+                                        className="max-h-64 w-full rounded-xl object-cover"
+                                      />
+                                    ) : (
+                                      <Image
+                                        src={attachment.url}
+                                        alt={attachment.name}
+                                        width={320}
+                                        height={320}
+                                        className="max-h-64 w-full rounded-xl object-cover"
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
                             <span
                               className={cn(
-                                "mt-1 block text-[11px]",
-                                message.sender === "me"
+                                "block text-[11px]",
+                                message.senderId === currentUserParticipant?.uid
                                   ? "text-blue-100"
                                   : "text-gray-400",
                               )}
                             >
-                              {message.timestamp}
+                              {formatRelativeTime(message.createdAt)}
                             </span>
                           </div>
                         </div>
                       ))
                     )}
+                    <div ref={messagesEndRef} />
                   </div>
 
                   <div className="border-t bg-white px-4 py-3 sm:px-5 md:px-6">
-                    <div className="flex items-center space-x-2 rounded-full border bg-gray-50 px-3 py-1.5 sm:py-2">
-                      <input
-                        type="text"
-                        placeholder="พิมพ์ข้อความเพื่อคุยเรื่องซื้อบ้าน..."
-                        className="flex-1 bg-transparent text-sm outline-none"
-                      />
-                      <Button size="sm" className="rounded-full px-4">
-                        ส่ง
+                    {selectedFiles.length > 0 ? (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {selectedFiles.map((file, index) => (
+                          <div
+                            key={`${file.name}-${index}`}
+                            className="flex items-center space-x-2 rounded-full border border-dashed border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-700"
+                          >
+                            {file.type.startsWith("video/") ? (
+                              <FileVideo className="h-3.5 w-3.5" />
+                            ) : (
+                              <FileImage className="h-3.5 w-3.5" />
+                            )}
+                            <span className="max-w-[140px] truncate">{file.name}</span>
+                            <button
+                              type="button"
+                              className="text-blue-600 hover:text-blue-800"
+                              onClick={() => removeSelectedFile(index)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="flex items-end gap-2 rounded-3xl border bg-gray-50 px-3 py-2">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="rounded-full text-muted-foreground"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Paperclip className="h-5 w-5" />
                       </Button>
+                      <textarea
+                        rows={1}
+                        value={messageInput}
+                        onChange={(event) => setMessageInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault()
+                            handleSendMessage()
+                          }
+                        }}
+                        placeholder="พิมพ์ข้อความเพื่อคุยเรื่องซื้อบ้าน..."
+                        className="max-h-32 flex-1 resize-none bg-transparent py-1 text-sm outline-none"
+                      />
+                      <Button
+                        size="icon"
+                        className="rounded-full bg-blue-600 text-white hover:bg-blue-700"
+                        onClick={handleSendMessage}
+                        disabled={isSending || (!messageInput.trim() && selectedFiles.length === 0)}
+                      >
+                        {isSending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
                     </div>
                   </div>
                 </>
@@ -458,7 +691,7 @@ export function UserChatPanel({
                       เลือกชื่อจากรายการทางซ้ายเพื่อดูรายละเอียดการสนทนาเกี่ยวกับการซื้อบ้าน
                     </p>
                   </div>
-                  <Button onClick={onClose} variant="outline">
+                  <Button onClick={handleClosePanel} variant="outline">
                     ปิดหน้าต่างข้อความ
                   </Button>
                 </div>
@@ -468,5 +701,5 @@ export function UserChatPanel({
         </div>
       </div>
     </div>
-  );
+  )
 }
