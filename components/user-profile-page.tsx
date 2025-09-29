@@ -18,6 +18,15 @@ interface UserProfilePageProps {
   uid: string;
 }
 
+type OpenChatEventDetail = {
+  conversationId?: string | null;
+  contact?: {
+    id: string;
+    name: string;
+    avatar?: string | null;
+  } | null;
+};
+
 export function UserProfilePage({ uid }: UserProfilePageProps) {
   const {
     profile,
@@ -53,6 +62,23 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
     if (!open) {
       setSelectedProperty(null);
     }
+  };
+
+  const handleOpenChatPanel = () => {
+    if (typeof window === "undefined" || !profile) {
+      return;
+    }
+
+    const detail: OpenChatEventDetail = {
+      conversationId: profile.uid,
+      contact: {
+        id: profile.uid,
+        name: profile.name || "ผู้ขาย",
+        avatar: profile.photoURL,
+      },
+    };
+
+    window.dispatchEvent(new CustomEvent<OpenChatEventDetail>("dreamhome:open-chat", { detail }));
   };
 
   return (
@@ -118,13 +144,20 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
             </div>
 
             <div className="flex w-full flex-col gap-2 sm:w-auto">
+              <Button
+                onClick={handleOpenChatPanel}
+                className="w-full sm:w-auto"
+                disabled={!profile}
+              >
+                แชทคุยเรื่องซื้อบ้าน
+              </Button>
               {profile?.email && (
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" className="w-full sm:w-auto">
                   <a href={`mailto:${profile.email}`}>ติดต่อผู้ขายผ่านอีเมล</a>
                 </Button>
               )}
               {profile?.phoneNumber && (
-                <Button asChild>
+                <Button asChild className="w-full sm:w-auto">
                   <a href={`tel:${profile.phoneNumber}`}>โทรหาผู้ขาย</a>
                 </Button>
               )}

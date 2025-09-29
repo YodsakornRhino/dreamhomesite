@@ -43,6 +43,15 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 
+type ChatOpenEventDetail = {
+  conversationId?: string | null
+  contact?: {
+    id: string
+    name: string
+    avatar?: string | null
+  } | null
+}
+
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
@@ -53,13 +62,29 @@ const Navigation: React.FC = () => {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [chatContext, setChatContext] = useState<ChatOpenEventDetail | null>(
+    null,
+  )
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return
     }
 
-    const handleOpenChat = () => setIsChatOpen(true)
+    const handleOpenChat = (event: Event) => {
+      const detail =
+        (event as CustomEvent<ChatOpenEventDetail | undefined>).detail ?? null
+
+      setChatContext(
+        detail
+          ? {
+              conversationId: detail.conversationId ?? null,
+              contact: detail.contact ?? null,
+            }
+          : null,
+      )
+      setIsChatOpen(true)
+    }
 
     window.addEventListener("dreamhome:open-chat" as any, handleOpenChat)
 
@@ -269,7 +294,12 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setIsChatOpen(true)}>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setChatContext(null)
+                          setIsChatOpen(true)
+                        }}
+                      >
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>
@@ -370,7 +400,15 @@ const Navigation: React.FC = () => {
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
       <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
-      <UserChatPanel open={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      <UserChatPanel
+        open={isChatOpen}
+        onClose={() => {
+          setIsChatOpen(false)
+          setChatContext(null)
+        }}
+        initialConversationId={chatContext?.conversationId ?? null}
+        initialContact={chatContext?.contact ?? null}
+      />
     </>
   )
 }

@@ -33,9 +33,17 @@ type Conversation = {
   messages: ChatMessage[];
 };
 
+interface ChatContact {
+  id: string;
+  name: string;
+  avatar?: string | null;
+}
+
 interface UserChatPanelProps {
   open: boolean;
   onClose: () => void;
+  initialConversationId?: string | null;
+  initialContact?: ChatContact | null;
 }
 
 const conversations: Conversation[] = [
@@ -132,39 +140,87 @@ const statusBadgeMap: Record<Conversation["status"], string> = {
   recently: "bg-amber-400",
 };
 
-export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
+export function UserChatPanel({
+  open,
+  onClose,
+  initialConversationId,
+  initialContact,
+}: UserChatPanelProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     null,
   );
 
+  const conversationItems = useMemo<Conversation[]>(() => {
+    if (!initialContact) {
+      return conversations;
+    }
+
+    const exists = conversations.some(
+      (conversation) => conversation.id === initialContact.id,
+    );
+
+    if (exists) {
+      return conversations;
+    }
+
+    return [
+      {
+        id: initialContact.id,
+        name: initialContact.name,
+        avatar: initialContact.avatar ?? undefined,
+        status: "online",
+        lastMessage: "ยังไม่มีข้อความ — เริ่มต้นการสนทนาได้เลย",
+        updatedAt: "เพิ่งเริ่มต้น",
+        messages: [],
+      },
+      ...conversations,
+    ];
+  }, [initialContact]);
+
   useEffect(() => {
     if (!open) {
       setActiveConversationId(null);
       setSearchTerm("");
+      return;
     }
-  }, [open]);
+
+    if (initialConversationId) {
+      setActiveConversationId(initialConversationId);
+      return;
+    }
+
+    if (initialContact) {
+      setActiveConversationId(initialContact.id);
+    }
+  }, [open, initialConversationId, initialContact]);
 
   const filteredConversations = useMemo(() => {
+    const list = conversationItems;
+
     if (!searchTerm.trim()) {
-      return conversations;
+      return list;
     }
 
     const keyword = searchTerm.trim().toLowerCase();
-    return conversations.filter((conversation) =>
+    return list.filter((conversation) =>
       [conversation.name, conversation.lastMessage]
         .join(" ")
         .toLowerCase()
         .includes(keyword),
     );
-  }, [searchTerm]);
+  }, [conversationItems, searchTerm]);
 
   const activeConversation = useMemo(
     () =>
-      conversations.find((conversation) => conversation.id === activeConversationId) ||
-      null,
-    [activeConversationId],
+      conversationItems.find(
+        (conversation) => conversation.id === activeConversationId,
+      ) || null,
+    [conversationItems, activeConversationId],
   );
+
+  const isNewConversation =
+    activeConversation != null && activeConversation.messages.length === 0;
 
   return (
     <div
@@ -327,38 +383,52 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
                   </div>
 
                   <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4 sm:px-5 md:px-6 md:py-6 lg:px-8">
-                    {activeConversation.messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={cn(
-                          "flex",
-                          message.sender === "me"
-                            ? "justify-end"
-                            : "justify-start",
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            "max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm",
-                            message.sender === "me"
-                              ? "bg-blue-600 text-white"
-                              : "bg-white text-gray-900",
-                          )}
-                        >
-                          <p>{message.content}</p>
-                          <span
-                            className={cn(
-                              "mt-1 block text-[11px]",
-                              message.sender === "me"
-                                ? "text-blue-100"
-                                : "text-gray-400",
-                            )}
-                          >
-                            {message.timestamp}
-                          </span>
+                    {isNewConversation ? (
+                      <div className="flex h-full flex-col items-center justify-center space-y-3 text-center text-sm text-muted-foreground">
+                        <MessageCircle className="h-10 w-10 text-blue-500" />
+                        <div className="space-y-1">
+                          <p className="text-base font-semibold text-gray-900">
+                            เริ่มแชทกับ {activeConversation.name}
+                          </p>
+                          <p>
+                            ส่งข้อความแรกเพื่อพูดคุยรายละเอียดการซื้อบ้านกับผู้ใช้นี้
+                          </p>
                         </div>
                       </div>
-                    ))}
+                    ) : (
+                      activeConversation.messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            "flex",
+                            message.sender === "me"
+                              ? "justify-end"
+                              : "justify-start",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm",
+                              message.sender === "me"
+                                ? "bg-blue-600 text-white"
+                                : "bg-white text-gray-900",
+                            )}
+                          >
+                            <p>{message.content}</p>
+                            <span
+                              className={cn(
+                                "mt-1 block text-[11px]",
+                                message.sender === "me"
+                                  ? "text-blue-100"
+                                  : "text-gray-400",
+                              )}
+                            >
+                              {message.timestamp}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
 
                   <div className="border-t bg-white px-4 py-3 sm:px-5 md:px-6">
