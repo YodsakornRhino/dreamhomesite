@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -26,23 +25,10 @@ import { format, formatDistanceToNow } from "date-fns"
 import { th } from "date-fns/locale"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
-import {
-  ensureConversation,
-  markConversationRead,
-  sendMessage,
-  toggleConversationPin,
-  uploadChatAttachments,
-  type ChatAttachment,
-  type ChatConversation,
-  type ChatParticipant,
-} from "@/lib/chat"
-import { useUserChats } from "@/hooks/use-user-chats"
-import { useChatMessages } from "@/hooks/use-chat-messages"
 import { useAuthContext } from "@/contexts/AuthContext"
+import { cn } from "@/lib/utils"
 
 interface ChatContact {
   id: string
@@ -57,9 +43,29 @@ interface UserChatPanelProps {
   initialContact?: ChatContact | null
 }
 
-interface DisplayConversation extends ChatConversation {
-  displayName: string
-  displayAvatar?: string | null
+interface ChatAttachment {
+  id: string
+  type: "image" | "video"
+  name: string
+  url: string
+}
+
+interface ChatMessage {
+  id: string
+  senderId: string
+  text: string | null
+  attachments: ChatAttachment[]
+  createdAt: Date
+}
+
+interface Conversation {
+  id: string
+  name: string
+  avatar: string | null
+  pinned: boolean
+  unreadCount: number
+  createdAt: Date
+  messages: ChatMessage[]
 }
 
 const getInitials = (name: string): string => {
@@ -81,23 +87,88 @@ const formatMessageTime = (timestamp: Date | null): string => {
   return format(timestamp, "HH:mm น.", { locale: th })
 }
 
-const mapContactToParticipant = (contact: ChatContact): ChatParticipant => ({
-  uid: contact.id,
-  name: contact.name,
-  photoURL: contact.avatar ?? null,
-})
-
-const normaliseConversation = (
-  conversation: ChatConversation,
-): DisplayConversation => {
-  const name = conversation.otherUser?.name?.trim()
-  const displayName = name && name.length > 0 ? name : "ผู้ใช้ DreamHome"
-
-  return {
-    ...conversation,
-    displayName,
-    displayAvatar: conversation.otherUser?.photoURL ?? null,
-  }
+const createSampleConversations = (): Conversation[] => {
+  const now = new Date()
+  return [
+    {
+      id: "conv-001",
+      name: "คุณสมชาย บ้านเดี่ยวบางนา",
+      avatar: null,
+      pinned: true,
+      unreadCount: 2,
+      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 5),
+      messages: [
+        {
+          id: "conv-001-msg-001",
+          senderId: "conv-001-buyer",
+          text: "สวัสดีครับ สนใจบ้านเดี่ยว 3 ห้องนอนของคุณครับ ยังพร้อมขายอยู่ไหม?",
+          attachments: [],
+          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 4.5),
+        },
+        {
+          id: "conv-001-msg-002",
+          senderId: "current-user",
+          text: "พร้อมขายครับ บ้านเพิ่งรีโนเวทเสร็จเมื่อเดือนที่แล้ว สนใจนัดชมวันไหนได้บ้างครับ",
+          attachments: [],
+          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 4.4),
+        },
+        {
+          id: "conv-001-msg-003",
+          senderId: "conv-001-buyer",
+          text: "สุดสัปดาห์นี้ได้ไหมครับ ถ้ามีรูปเพิ่มเติมส่งมาได้เลยนะครับ",
+          attachments: [],
+          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 3),
+        },
+      ],
+    },
+    {
+      id: "conv-002",
+      name: "คุณณิชา คอนโดหรูสุขุมวิท",
+      avatar: null,
+      pinned: false,
+      unreadCount: 0,
+      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2),
+      messages: [
+        {
+          id: "conv-002-msg-001",
+          senderId: "current-user",
+          text: "สวัสดีค่ะ คอนโดยังอยู่ไหมคะ",
+          attachments: [],
+          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2),
+        },
+        {
+          id: "conv-002-msg-002",
+          senderId: "conv-002-owner",
+          text: "ยังว่างอยู่ค่ะ สามารถนัดชมได้ทุกวันหลัง 6 โมงเย็นนะคะ",
+          attachments: [],
+          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 20),
+        },
+        {
+          id: "conv-002-msg-003",
+          senderId: "current-user",
+          text: null,
+          attachments: [
+            {
+              id: "conv-002-msg-003-attach-1",
+              type: "image",
+              name: "แปลนห้อง.jpg",
+              url: "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=400&q=80",
+            },
+          ],
+          createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 19),
+        },
+      ],
+    },
+    {
+      id: "conv-003",
+      name: "คุณอรทัย บ้านสวนเชียงใหม่",
+      avatar: null,
+      pinned: false,
+      unreadCount: 0,
+      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 24),
+      messages: [],
+    },
+  ]
 }
 
 export function UserChatPanel({
@@ -116,19 +187,13 @@ export function UserChatPanel({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [messageInput, setMessageInput] = useState("")
   const [showListOnMobile, setShowListOnMobile] = useState(true)
-  const [pendingConversations, setPendingConversations] = useState<ChatConversation[]>([])
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [conversations, setConversations] = useState<Conversation[]>(
+    () => createSampleConversations(),
+  )
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
-
-  const { conversations, loading: conversationsLoading, error: conversationsError } = useUserChats(
-    user?.uid,
-  )
-
-  const { messages, loading: messagesLoading, error: messagesError } = useChatMessages(
-    activeConversationId,
-  )
 
   useEffect(() => {
     if (!open) {
@@ -136,7 +201,6 @@ export function UserChatPanel({
       setActiveConversationId(null)
       setSelectedFiles([])
       setMessageInput("")
-      setPendingConversations([])
       setShowListOnMobile(true)
       setSendingMessage(false)
       if (fileInputRef.current) {
@@ -154,139 +218,106 @@ export function UserChatPanel({
     }
   }, [open, initialConversationId, initialContact])
 
-  const ensureInitialConversation = useCallback(async () => {
-    if (!open || !user || !initialContact) {
+  useEffect(() => {
+    if (!open || !initialConversationId) {
       return
     }
 
-    try {
-      const { id, participants } = await ensureConversation({
-        currentUser: {
-          uid: user.uid,
-          name: user.displayName ?? user.email ?? "ผู้ใช้",
-          photoURL: user.photoURL ?? null,
-          email: user.email ?? null,
-        },
-        targetUser: mapContactToParticipant(initialContact),
-      })
+    setConversations((previous) => {
+      const exists = previous.some((conversation) => conversation.id === initialConversationId)
+      if (exists) {
+        return previous
+      }
 
-      setPendingConversations((previous) => {
-        const filtered = previous.filter((conversation) => conversation.id !== id)
-        return [
-          ...filtered,
-          {
-            id,
-            participants,
-            pinned: false,
-            lastMessage: null,
-            lastMessageAt: null,
-            otherUser: mapContactToParticipant(initialContact),
-            lastSenderId: null,
-            unreadCount: 0,
-            isPending: true,
-          },
-        ]
-      })
+      const now = new Date()
+      const placeholder: Conversation = {
+        id: initialConversationId,
+        name: "บทสนทนาใหม่",
+        avatar: null,
+        pinned: false,
+        unreadCount: 0,
+        createdAt: now,
+        messages: [],
+      }
 
-      setActiveConversationId(id)
-      setShowListOnMobile(false)
-    } catch (error) {
-      console.error("Failed to ensure conversation", error)
-      toast({
-        title: "ไม่สามารถเริ่มต้นบทสนทนาได้",
-        description: "กรุณาลองใหม่อีกครั้ง หรือรีเฟรชหน้า",
-        variant: "destructive",
-      })
-    }
-  }, [initialContact, open, toast, user])
+      return [placeholder, ...previous]
+    })
+  }, [initialConversationId, open])
 
   useEffect(() => {
-    if (!initialContact || !open) {
+    if (!open || !initialContact) {
       return
     }
 
-    if (!user) {
-      toast({
-        title: "ต้องเข้าสู่ระบบก่อน",
-        description: "กรุณาเข้าสู่ระบบเพื่อเริ่มคุยกับผู้ขาย",
-        variant: "destructive",
-      })
-      return
-    }
+    const conversationId = `contact-${initialContact.id}`
+    setConversations((previous) => {
+      const exists = previous.some((conversation) => conversation.id === conversationId)
+      if (exists) {
+        return previous
+      }
 
-    void ensureInitialConversation()
-  }, [ensureInitialConversation, initialContact, open, toast, user])
+      const now = new Date()
+      const newConversation: Conversation = {
+        id: conversationId,
+        name: initialContact.name?.trim() || "ผู้ใช้ DreamHome",
+        avatar: initialContact.avatar ?? null,
+        pinned: false,
+        unreadCount: 0,
+        createdAt: now,
+        messages: [],
+      }
 
-  useEffect(() => {
-    if (!conversations.length) {
-      return
-    }
+      return [newConversation, ...previous]
+    })
+    setActiveConversationId(conversationId)
+  }, [initialContact, open])
 
-    setPendingConversations((previous) =>
-      previous.filter(
-        (conversation) => !conversations.some((existing) => existing.id === conversation.id),
-      ),
-    )
-  }, [conversations])
+  const activeConversation = useMemo(() => {
+    if (!activeConversationId) return null
+    return conversations.find((conversation) => conversation.id === activeConversationId) ?? null
+  }, [activeConversationId, conversations])
+
+  const messages = activeConversation?.messages ?? []
 
   useEffect(() => {
     if (!open) return
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [open, activeConversationId, messages.length])
 
-  useEffect(() => {
-    if (!user?.uid || !activeConversationId) {
-      return
-    }
-
-    void markConversationRead(user.uid, activeConversationId)
-  }, [activeConversationId, user?.uid])
-
-  const displayConversations = useMemo(() => {
-    const conversationMap = new Map<string, ChatConversation>()
-    conversations.forEach((conversation) => {
-      conversationMap.set(conversation.id, conversation)
-    })
-    pendingConversations.forEach((conversation) => {
-      if (!conversationMap.has(conversation.id)) {
-        conversationMap.set(conversation.id, conversation)
-      }
+  const sortedConversations = useMemo(() => {
+    const withLastTimestamp = conversations.map((conversation) => {
+      const lastMessage = conversation.messages[conversation.messages.length - 1] ?? null
+      const lastTimestamp = lastMessage?.createdAt ?? conversation.createdAt
+      return { conversation, lastTimestamp }
     })
 
-    const combined = Array.from(conversationMap.values())
-
-    return combined
-      .map((conversation) => normaliseConversation(conversation))
+    return withLastTimestamp
       .sort((a, b) => {
-        if (a.pinned !== b.pinned) {
-          return a.pinned ? -1 : 1
+        if (a.conversation.pinned !== b.conversation.pinned) {
+          return a.conversation.pinned ? -1 : 1
         }
-        const timeA = a.lastMessageAt?.toMillis?.() ?? a.updatedAt?.toMillis?.() ?? a.createdAt?.toMillis?.() ?? 0
-        const timeB = b.lastMessageAt?.toMillis?.() ?? b.updatedAt?.toMillis?.() ?? b.createdAt?.toMillis?.() ?? 0
-        return timeB - timeA
+        return b.lastTimestamp.getTime() - a.lastTimestamp.getTime()
       })
-  }, [conversations, pendingConversations])
+      .map((item) => item.conversation)
+  }, [conversations])
 
   const filteredConversations = useMemo(() => {
     if (!searchTerm.trim()) {
-      return displayConversations
+      return sortedConversations
     }
 
     const keyword = searchTerm.trim().toLowerCase()
-    return displayConversations.filter((conversation) => {
-      const name = conversation.displayName.toLowerCase()
-      const lastMessage = (conversation.lastMessage ?? "").toLowerCase()
-      return name.includes(keyword) || lastMessage.includes(keyword)
-    })
-  }, [displayConversations, searchTerm])
+    return sortedConversations.filter((conversation) => {
+      if (conversation.name.toLowerCase().includes(keyword)) {
+        return true
+      }
 
-  const activeConversation = useMemo(() => {
-    if (!activeConversationId) return null
-    return (
-      displayConversations.find((conversation) => conversation.id === activeConversationId) ??
-      null
-    )
-  }, [activeConversationId, displayConversations])
+      return conversation.messages.some((message) => {
+        const text = message.text ?? ""
+        return text.toLowerCase().includes(keyword)
+      })
+    })
+  }, [searchTerm, sortedConversations])
 
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversationId(conversationId)
@@ -311,24 +342,67 @@ export function UserChatPanel({
     setSelectedFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))
   }
 
-  const handleTogglePin = async () => {
-    if (!user?.uid || !activeConversation || activeConversation.isPending) {
+  const togglePin = () => {
+    if (!activeConversation) {
       return
     }
 
-    try {
-      await toggleConversationPin(user.uid, activeConversation.id, !activeConversation.pinned)
-    } catch (error) {
-      console.error("Failed to toggle pin", error)
-      toast({
-        title: "ปักหมุดไม่สำเร็จ",
-        description: "กรุณาลองใหม่อีกครั้ง",
-        variant: "destructive",
-      })
-    }
+    setConversations((previous) =>
+      previous.map((conversation) =>
+        conversation.id === activeConversation.id
+          ? { ...conversation, pinned: !conversation.pinned }
+          : conversation,
+      ),
+    )
   }
 
-  const handleSendMessage = async () => {
+  const ensureConversationExists = (): string => {
+    if (activeConversationId) {
+      return activeConversationId
+    }
+
+    if (initialContact) {
+      const conversationId = `contact-${initialContact.id}`
+      setConversations((previous) => {
+        const exists = previous.some((conversation) => conversation.id === conversationId)
+        if (exists) {
+          return previous
+        }
+
+        const now = new Date()
+        const newConversation: Conversation = {
+          id: conversationId,
+          name: initialContact.name?.trim() || "ผู้ใช้ DreamHome",
+          avatar: initialContact.avatar ?? null,
+          pinned: false,
+          unreadCount: 0,
+          createdAt: now,
+          messages: [],
+        }
+
+        return [newConversation, ...previous]
+      })
+      setActiveConversationId(conversationId)
+      return conversationId
+    }
+
+    const generatedId = `local-${Date.now()}`
+    const now = new Date()
+    const fallbackConversation: Conversation = {
+      id: generatedId,
+      name: "ผู้ใช้ DreamHome",
+      avatar: null,
+      pinned: false,
+      unreadCount: 0,
+      createdAt: now,
+      messages: [],
+    }
+    setConversations((previous) => [fallbackConversation, ...previous])
+    setActiveConversationId(generatedId)
+    return generatedId
+  }
+
+  const handleSendMessage = () => {
     if (!user) {
       toast({
         title: "ต้องเข้าสู่ระบบก่อน",
@@ -343,51 +417,43 @@ export function UserChatPanel({
       return
     }
 
+    setSendingMessage(true)
+
     try {
-      setSendingMessage(true)
+      const conversationId = ensureConversationExists()
+      const attachments = selectedFiles.map((file, index) => ({
+        id: `${conversationId}-file-${Date.now()}-${index}`,
+        type: file.type.startsWith("video/") ? "video" : "image",
+        name: file.name,
+        url: URL.createObjectURL(file),
+      }))
 
-      let conversationId = activeConversation?.id ?? null
-      let participants = activeConversation?.participants ?? []
-      let otherParticipant =
-        activeConversation?.otherUser ??
-        (initialContact ? mapContactToParticipant(initialContact) : null)
-
-      if (!conversationId || participants.length === 0 || !otherParticipant) {
-        if (!otherParticipant) {
-          throw new Error("Missing participant information")
-        }
-
-        const ensured = await ensureConversation({
-          currentUser: {
-            uid: user.uid,
-            name: user.displayName ?? user.email ?? "ผู้ใช้",
-            photoURL: user.photoURL ?? null,
-            email: user.email ?? null,
-          },
-          targetUser: otherParticipant,
-        })
-
-        conversationId = ensured.id
-        participants = ensured.participants
-        setActiveConversationId(ensured.id)
-      }
-
-      const attachments: ChatAttachment[] = await uploadChatAttachments(
-        conversationId,
-        selectedFiles,
-      )
-
-      await sendMessage({
-        conversationId,
-        sender: {
-          uid: user.uid,
-          name: user.displayName ?? user.email ?? "ผู้ใช้",
-          photoURL: user.photoURL ?? null,
-          email: user.email ?? null,
-        },
-        participants,
+      const newMessage: ChatMessage = {
+        id: `${conversationId}-message-${Date.now()}`,
+        senderId: user.uid ?? "current-user",
         text: trimmedMessage || null,
         attachments,
+        createdAt: new Date(),
+      }
+
+      setConversations((previous) => {
+        const existingIndex = previous.findIndex(
+          (conversation) => conversation.id === conversationId,
+        )
+
+        if (existingIndex === -1) {
+          return previous
+        }
+
+        const updated = [...previous]
+        const target = updated[existingIndex]
+        updated[existingIndex] = {
+          ...target,
+          messages: [...target.messages, newMessage],
+          unreadCount: 0,
+        }
+
+        return updated
       })
 
       setMessageInput("")
@@ -396,13 +462,6 @@ export function UserChatPanel({
         fileInputRef.current.value = ""
       }
       setShowListOnMobile(false)
-    } catch (error) {
-      console.error("Failed to send message", error)
-      toast({
-        title: "ส่งข้อความไม่สำเร็จ",
-        description: "ตรวจสอบสิทธิ์การเข้าถึง Firestore/Storage แล้วลองใหม่",
-        variant: "destructive",
-      })
     } finally {
       setSendingMessage(false)
     }
@@ -412,7 +471,7 @@ export function UserChatPanel({
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       if (!sendingMessage) {
-        void handleSendMessage()
+        handleSendMessage()
       }
     }
   }
@@ -422,14 +481,15 @@ export function UserChatPanel({
     (messageInput.trim().length > 0 || selectedFiles.length > 0) &&
     !sendingMessage
 
-  const conversationListEmpty =
-    !conversationsLoading && !filteredConversations.length && !pendingConversations.length
+  const conversationListEmpty = !filteredConversations.length
 
-  const activeConversationDate =
-    activeConversation?.lastMessageAt?.toDate?.() ??
-    activeConversation?.updatedAt?.toDate?.() ??
-    activeConversation?.createdAt?.toDate?.() ??
-    null
+  const activeConversationDate = (() => {
+    if (!activeConversation) {
+      return null
+    }
+    const lastMessage = activeConversation.messages[activeConversation.messages.length - 1]
+    return lastMessage?.createdAt ?? activeConversation.createdAt
+  })()
 
   return (
     <div
@@ -440,106 +500,102 @@ export function UserChatPanel({
       )}
     >
       <div className="flex h-full flex-col">
-        <div className="relative flex h-full flex-1 overflow-hidden bg-slate-50">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 lg:hidden"
+              onClick={onClose}
+              aria-label="ปิดหน้าต่างแชท"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">ข้อความ</p>
+              <p className="text-xs text-slate-500">
+                พูดคุยเรื่องการซื้อบ้านกับเจ้าของทรัพย์สินได้ที่นี่
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden h-9 w-9 lg:flex"
+            onClick={onClose}
+            aria-label="ปิดหน้าต่างแชท"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <div
             className={cn(
-              "absolute inset-0 flex h-full w-full flex-col border-r bg-white transition-transform duration-300",
-              "lg:relative lg:w-96 lg:flex-shrink-0 lg:translate-x-0",
+              "flex w-full max-w-sm flex-col border-r bg-slate-50", 
+              "transition-transform duration-300 lg:translate-x-0",
               showListOnMobile ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
             )}
           >
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">ข้อความ</h2>
-                <p className="text-xs text-muted-foreground">
-                  พูดคุยกับผู้ขายเกี่ยวกับการซื้อบ้านได้ที่นี่
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-muted-foreground"
-                onClick={onClose}
-                aria-label="ปิดหน้าต่างแชท"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="px-4 py-3">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="border-b bg-white px-4 py-3">
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                <Search className="h-4 w-4 text-slate-400" />
                 <input
-                  type="text"
+                  type="search"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="ค้นหาผู้ใช้หรือบทสนทนา"
-                  className="w-full rounded-full border border-slate-200 bg-slate-100/60 py-2 pl-9 pr-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  placeholder="ค้นหารายชื่อหรือข้อความ"
+                  className="flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-4">
-              {conversationsLoading ? (
-                <div className="flex flex-col gap-3 px-4">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={`skeleton-${index}`}
-                      className="flex animate-pulse items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3"
-                    >
-                      <div className="h-12 w-12 rounded-full bg-slate-200" />
-                      <div className="flex flex-1 flex-col gap-2">
-                        <div className="h-4 w-32 rounded bg-slate-200" />
-                        <div className="h-3 w-40 rounded bg-slate-200" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : conversationListEmpty ? (
-                <div className="mt-10 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-muted-foreground">
-                  ยังไม่มีบทสนทนา เริ่มพูดคุยกับผู้ขายเพื่อให้แสดงในรายการนี้
+            <div className="flex-1 overflow-y-auto">
+              {conversationListEmpty ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
+                  <MessageCircle className="h-8 w-8 text-emerald-500" />
+                  <p>ยังไม่มีบทสนทนา เริ่มพูดคุยกับผู้ขายเพื่อวางแผนซื้อบ้าน</p>
                 </div>
               ) : (
                 filteredConversations.map((conversation) => {
-                  const isActive = conversation.id === activeConversationId
-                  const unreadCount = conversation.unreadCount ?? 0
-                  const lastTimestamp = conversation.lastMessageAt?.toDate?.() ?? conversation.updatedAt?.toDate?.() ?? null
-                  const lastMessagePreview = conversation.lastMessage ??
-                    (conversation.isPending ? "ส่งข้อความทักทายเพื่อเริ่มพูดคุย" : "ยังไม่มีข้อความ")
+                  const isActive = activeConversationId === conversation.id
+                  const lastMessage = conversation.messages[conversation.messages.length - 1] ?? null
+                  const lastTimestamp = lastMessage?.createdAt ?? conversation.createdAt
+                  const lastMessagePreview =
+                    lastMessage?.text?.trim() ||
+                    (lastMessage?.attachments.length
+                      ? "ส่งไฟล์แนบ"
+                      : "ยังไม่มีข้อความ")
+                  const unreadCount = conversation.unreadCount
 
                   return (
                     <button
-                      key={conversation.id}
                       type="button"
+                      key={conversation.id}
                       onClick={() => handleSelectConversation(conversation.id)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition",
+                        "flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition",
                         isActive
                           ? "bg-emerald-50 text-emerald-900 shadow-sm"
                           : "hover:bg-slate-100/70",
                       )}
                     >
                       <Avatar className="h-12 w-12 border border-white shadow-sm">
-                        {conversation.displayAvatar ? (
-                          <AvatarImage src={conversation.displayAvatar} alt={conversation.displayName} />
+                        {conversation.avatar ? (
+                          <AvatarImage src={conversation.avatar} alt={conversation.name} />
                         ) : (
                           <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                            {getInitials(conversation.displayName)}
+                            {getInitials(conversation.name)}
                           </AvatarFallback>
                         )}
                       </Avatar>
                       <div className="flex min-w-0 flex-1 flex-col">
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-semibold text-slate-900">
-                            {conversation.displayName}
+                            {conversation.name}
                           </p>
                           {conversation.pinned && (
                             <Pin className="h-3.5 w-3.5 text-emerald-500" />
-                          )}
-                          {conversation.isPending && (
-                            <Badge variant="outline" className="h-5 rounded-full border-dashed text-[10px]">
-                              กำลังสร้าง
-                            </Badge>
                           )}
                         </div>
                         <p className="truncate text-xs text-slate-500">{lastMessagePreview}</p>
@@ -558,9 +614,6 @@ export function UserChatPanel({
                   )
                 })
               )}
-              {conversationsError ? (
-                <p className="px-4 text-xs text-red-500">{conversationsError}</p>
-              ) : null}
             </div>
           </div>
 
@@ -585,20 +638,20 @@ export function UserChatPanel({
                       <ArrowLeft className="h-5 w-5" />
                     </Button>
                     <Avatar className="h-10 w-10 border">
-                      {activeConversation.displayAvatar ? (
+                      {activeConversation.avatar ? (
                         <AvatarImage
-                          src={activeConversation.displayAvatar}
-                          alt={activeConversation.displayName}
+                          src={activeConversation.avatar}
+                          alt={activeConversation.name}
                         />
                       ) : (
                         <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                          {getInitials(activeConversation.displayName)}
+                          {getInitials(activeConversation.name)}
                         </AvatarFallback>
                       )}
                     </Avatar>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
-                        {activeConversation.displayName}
+                        {activeConversation.name}
                       </p>
                       <p className="text-xs text-slate-500">
                         {activeConversationDate ? formatRelative(activeConversationDate) : "พร้อมพูดคุย"}
@@ -611,8 +664,7 @@ export function UserChatPanel({
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9"
-                      onClick={handleTogglePin}
-                      disabled={activeConversation.isPending}
+                      onClick={togglePin}
                       aria-label={activeConversation.pinned ? "ยกเลิกการปักหมุด" : "ปักหมุดบทสนทนา"}
                     >
                       {activeConversation.pinned ? (
@@ -625,19 +677,15 @@ export function UserChatPanel({
                 </div>
 
                 <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-6">
-                  {messagesLoading ? (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
-                    </div>
-                  ) : messages.length === 0 ? (
+                  {messages.length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
                       <MessageCircle className="h-8 w-8 text-emerald-500" />
                       <p>เริ่มต้นบทสนทนาโดยส่งข้อความแรกถึงผู้ใช้รายนี้</p>
                     </div>
                   ) : (
                     messages.map((message) => {
-                      const isMe = message.senderId === user?.uid
-                      const timestamp = message.createdAt?.toDate?.() ?? null
+                      const isMe = message.senderId === (user?.uid ?? "current-user")
+                      const timestamp = message.createdAt ?? null
                       return (
                         <div
                           key={message.id}
@@ -672,10 +720,8 @@ export function UserChatPanel({
                                   >
                                     {attachment.type === "video" ? (
                                       <FileVideo className="h-4 w-4" />
-                                    ) : attachment.type === "image" ? (
-                                      <FileImage className="h-4 w-4" />
                                     ) : (
-                                      <Paperclip className="h-4 w-4" />
+                                      <FileImage className="h-4 w-4" />
                                     )}
                                     <span className="max-w-[160px] truncate" title={attachment.name}>
                                       {attachment.name}
@@ -698,9 +744,6 @@ export function UserChatPanel({
                     })
                   )}
                   <div ref={messagesEndRef} />
-                  {messagesError ? (
-                    <p className="mt-4 text-center text-xs text-red-500">{messagesError}</p>
-                  ) : null}
                 </div>
 
                 <div className="border-t bg-white px-4 py-4">
@@ -774,7 +817,7 @@ export function UserChatPanel({
                         </div>
                         <Button
                           type="button"
-                          onClick={() => void handleSendMessage()}
+                          onClick={handleSendMessage}
                           disabled={!canSendMessage}
                           className="h-11 w-11 rounded-full bg-emerald-500 text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-200"
                           aria-label="ส่งข้อความ"
@@ -810,4 +853,3 @@ export function UserChatPanel({
     </div>
   )
 }
-
