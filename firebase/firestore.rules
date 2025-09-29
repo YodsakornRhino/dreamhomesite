@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasAllowedUserChatKeys(data) {
+      return data.keys().hasOnly([
+        "conversationId",
+        "participants",
+        "otherUser",
+        "createdAt",
+        "updatedAt",
+        "pinned",
+        "lastMessage",
+      ]);
+    }
+
+    function validUserChatParticipants(data, userId) {
+      return data.participants is list
+        && data.participants.size() == 2
+        && data.participants[0] is string
+        && data.participants[1] is string
+        && data.participants.hasAny([userId]);
+    }
+
+    function validUserChatOtherUser(data, userId) {
+      return !data.keys().hasAny(["otherUser"])
+        || (data.otherUser is map
+          && data.otherUser.uid is string
+          && data.otherUser.uid != userId
+          && data.participants.hasOnly([userId, data.otherUser.uid]));
+    }
+
+    function validUserChatWrite(userId, conversationId) {
+      return hasAllowedUserChatKeys(request.resource.data)
+        && request.resource.data.conversationId == conversationId
+        && validUserChatParticipants(request.resource.data, userId)
+        && validUserChatOtherUser(request.resource.data, userId)
+        && (!resource.exists()
+          || request.resource.data.participants == resource.data.participants);
+    }
+
+    function hasAllowedConversationKeys(data) {
+      return data.keys().hasOnly([
+        "participants",
+        "createdAt",
+        "updatedAt",
+        "participantSummaries",
+        "lastMessage",
+      ]);
+    }
+
+    function validConversationParticipants(data) {
+      return data.participants is list
+        && data.participants.size() == 2
+        && data.participants[0] is string
+        && data.participants[1] is string;
+    }
+
+    function participantSummariesMatchParticipants(data) {
+      return !data.keys().hasAny(["participantSummaries"])
+        || (data.participantSummaries is map
+          && data.participantSummaries.keys().hasOnly(data.participants)
+          && data.participantSummaries.keys().size() == data.participants.size()
+          && data.participantSummaries[data.participants[0]] is map
+          && data.participantSummaries[data.participants[1]] is map);
+    }
+
+    function validConversationWrite(conversationId) {
+      return hasAllowedConversationKeys(request.resource.data)
+        && validConversationParticipants(request.resource.data)
+        && participantSummariesMatchParticipants(request.resource.data)
+        && (!resource.exists()
+          || request.resource.data.participants == resource.data.participants);
+    }
+
+    function conversationSnapshot(conversationId) {
+      return get(/databases/$(database)/documents/chats/$(conversationId));
+    }
+
+    function isConversationParticipant(conversationId) {
+      let conversation = conversationSnapshot(conversationId);
+      return isSignedIn()
+        && conversation.data != null
+        && conversation.data.participants is list
+        && conversation.data.participants.hasAny([request.auth.uid]);
+    }
+
+    match /users/{userId} {
+      // Public profile reads remain open.
+      allow read: if true;
+
+      // Users may create or update their own profile document.
+      allow create, update: if isOwner(userId) && request.resource.data.uid == userId;
+      allow delete: if false;
+
+      match /user_property/{propertyId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userUid == userId;
+        allow update: if isOwner(userId)
+          && resource.data.userUid == userId
+          && request.resource.data.userUid == userId;
+        allow delete: if isOwner(userId) && resource.data.userUid == userId;
+      }
+
+      match /Chat/{conversationId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && validUserChatWrite(userId, conversationId);
+        allow update: if isOwner(userId)
+          && validUserChatWrite(userId, conversationId);
+        allow delete: if false;
+      }
+    }
+
+    match /property/{propertyId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userUid == request.auth.uid;
+      allow update: if isOwner(resource.data.userUid)
+        && request.resource.data.userUid == resource.data.userUid;
+      allow delete: if isOwner(resource.data.userUid);
+    }
+
+    match /chats/{conversationId} {
+      allow create: if isSignedIn()
+        && request.resource.data.participants.hasAny([request.auth.uid])
+        && validConversationWrite(conversationId);
+      allow read: if isConversationParticipant(conversationId);
+      allow update: if isConversationParticipant(conversationId)
+        && validConversationWrite(conversationId);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isConversationParticipant(conversationId);
+        allow create: if isConversationParticipant(conversationId)
+          && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

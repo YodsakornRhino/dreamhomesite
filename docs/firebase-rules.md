@@ -73,3 +73,35 @@ service firebase.storage {
 Replace the `allow delete` condition with whatever folder structure you actually use in Storage. The crucial part is verifying that the caller owns the listing—if you mirror Firestore ownership, fetch the property document with `get(/databases/(default)/documents/property/$(propertyId))` and check the same `userUid` / `userRef` combination before deleting files.
 
 After updating the rules in the Firebase console (or deploying via the CLI), retry the deletion flow from the Sell page. With the rules accepting both owner identifiers, Firestore should authorize the delete operation initiated by the updated UI.
+
+## Chat collections (`firestore.rules` excerpt)
+
+```rules
+// firebase/firestore.rules
+
+match /users/{userId}/Chat/{conversationId} {
+  allow read: if isOwner(userId);
+  allow create, update: if isOwner(userId)
+    && validUserChatWrite(userId, conversationId);
+  allow delete: if false;
+}
+
+match /chats/{conversationId} {
+  allow create: if isSignedIn()
+    && request.resource.data.participants.hasAny([request.auth.uid])
+    && validConversationWrite(conversationId);
+  allow read: if isConversationParticipant(conversationId);
+  allow update: if isConversationParticipant(conversationId)
+    && validConversationWrite(conversationId);
+  allow delete: if false;
+
+  match /messages/{messageId} {
+    allow read: if isConversationParticipant(conversationId);
+    allow create: if isConversationParticipant(conversationId)
+      && request.resource.data.senderId == request.auth.uid;
+    allow update, delete: if false;
+  }
+}
+```
+
+See `firebase/firestore.rules` for the helper functions referenced above. Deploy the full file alongside the existing property protections so only conversation participants can read metadata, pin chats, or send messages. After publishing the rules through the Firebase console or CLI, the in-app chat panel will be able to create conversations, stream updates, and deliver attachments without hitting `permission-denied` errors.
