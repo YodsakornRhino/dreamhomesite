@@ -495,17 +495,18 @@ export function UserChatPanel({
     <div
       className={cn(
         "fixed inset-y-0 right-0 z-50 w-full max-w-full bg-white shadow-2xl transition-transform duration-300",
-        "sm:max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-5xl",
+        "sm:max-w-md md:max-w-3xl lg:max-w-4xl xl:max-w-5xl",
+        "md:rounded-l-3xl md:border md:border-slate-200 md:border-r-0",
         open ? "translate-x-0" : "translate-x-full",
       )}
     >
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="flex items-center justify-between border-b px-4 py-3 md:px-6">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 lg:hidden"
+              className="h-9 w-9 md:hidden"
               onClick={onClose}
               aria-label="ปิดหน้าต่างแชท"
             >
@@ -521,7 +522,7 @@ export function UserChatPanel({
           <Button
             variant="ghost"
             size="icon"
-            className="hidden h-9 w-9 lg:flex"
+            className="hidden h-9 w-9 md:flex"
             onClick={onClose}
             aria-label="ปิดหน้าต่างแชท"
           >
@@ -532,12 +533,13 @@ export function UserChatPanel({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div
             className={cn(
-              "flex w-full max-w-sm flex-col border-r bg-slate-50", 
-              "transition-transform duration-300 lg:translate-x-0",
-              showListOnMobile ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+              "flex w-full flex-col bg-slate-50",
+              "transition-transform duration-300 md:translate-x-0",
+              "md:w-80 md:flex-none md:border-r md:border-slate-100 lg:w-96",
+              showListOnMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0",
             )}
           >
-            <div className="border-b bg-white px-4 py-3">
+            <div className="border-b bg-white px-4 py-3 md:px-5 md:py-4">
               <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm">
                 <Search className="h-4 w-4 text-slate-400" />
                 <input
@@ -574,7 +576,7 @@ export function UserChatPanel({
                       key={conversation.id}
                       onClick={() => handleSelectConversation(conversation.id)}
                       className={cn(
-                        "flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition",
+                        "flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition md:px-5 md:py-4",
                         isActive
                           ? "bg-emerald-50 text-emerald-900 shadow-sm"
                           : "hover:bg-slate-100/70",
@@ -621,17 +623,17 @@ export function UserChatPanel({
             className={cn(
               "flex h-full flex-1 flex-col bg-white",
               "transition-transform duration-300",
-              showListOnMobile ? "translate-x-full lg:translate-x-0" : "translate-x-0",
+              showListOnMobile ? "translate-x-full md:translate-x-0" : "translate-x-0",
             )}
           >
             {activeConversation ? (
               <>
-                <div className="flex items-center justify-between border-b px-4 py-3">
+                <div className="flex items-center justify-between border-b px-4 py-3 md:px-6 md:py-4">
                   <div className="flex items-center gap-3">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="mr-1 h-9 w-9 lg:hidden"
+                      className="mr-1 h-9 w-9 md:hidden"
                       onClick={handleBackToList}
                       aria-label="ย้อนกลับไปยังรายชื่อแชท"
                     >
@@ -676,7 +678,7 @@ export function UserChatPanel({
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-6">
+                <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 md:px-8">
                   {messages.length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
                       <MessageCircle className="h-8 w-8 text-emerald-500" />
@@ -746,7 +748,7 @@ export function UserChatPanel({
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="border-t bg-white px-4 py-4">
+                <div className="border-t bg-white px-4 py-4 md:px-6">
                   {!user && !authLoading ? (
                     <div className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-700">
                       กรุณาเข้าสู่ระบบเพื่อส่งข้อความและแนบไฟล์
@@ -784,7 +786,7 @@ export function UserChatPanel({
                         </div>
                       ) : null}
 
-                      <div className="flex items-end gap-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-emerald-200">
                           <Button
                             type="button"
@@ -819,7 +821,7 @@ export function UserChatPanel({
                           type="button"
                           onClick={handleSendMessage}
                           disabled={!canSendMessage}
-                          className="h-11 w-11 rounded-full bg-emerald-500 text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-200"
+                          className="h-11 w-full rounded-2xl bg-emerald-500 text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-200 sm:w-12 sm:rounded-full"
                           aria-label="ส่งข้อความ"
                         >
                           {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-5 w-5" />}
@@ -842,7 +844,7 @@ export function UserChatPanel({
                     เลือกผู้ติดต่อจากรายการด้านซ้ายเพื่อพูดคุยรายละเอียดการซื้อบ้านที่คุณสนใจ
                   </p>
                 </div>
-                <Button variant="outline" onClick={handleBackToList} className="mt-2 lg:hidden">
+                <Button variant="outline" onClick={handleBackToList} className="mt-2 md:hidden">
                   กลับไปรายชื่อแชท
                 </Button>
               </div>
