@@ -13,7 +13,6 @@ import {
   Trash2,
 } from "lucide-react"
 
-import ChatWidget from "@/components/chat-widget"
 import SellAuthPrompt from "@/components/sell-auth-prompt"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1270,7 +1269,6 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           </Button>
         </div>
       </div>
-      <ChatWidget />
     </div>
   )
 }

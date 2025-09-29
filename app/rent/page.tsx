@@ -1,5 +1,4 @@
 import { Inter } from "next/font/google"
-import ChatWidget from "@/components/chat-widget"
 import { Search, MapPin, Building, Calendar, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -153,7 +152,6 @@ export default function RentPage() {
         </div>
       </section>
 
-      <ChatWidget />
     </div>
   )
 }

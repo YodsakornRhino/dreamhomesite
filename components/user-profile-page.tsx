@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
-import ChatWidget from "@/components/chat-widget";
 import { UserPropertyCard } from "@/components/user-property-card";
 import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -213,7 +212,6 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
         onOpenChange={handleModalChange}
       />
 
-      <ChatWidget />
     </div>
   );
 }
