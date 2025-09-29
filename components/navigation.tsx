@@ -14,6 +14,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip"
 import ProfileModal from "./profile-modal"
+import { UserChatPanel } from "./user-chat-panel"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +52,21 @@ const Navigation: React.FC = () => {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const handleOpenChat = () => setIsChatOpen(true)
+
+    window.addEventListener("dreamhome:open-chat" as any, handleOpenChat)
+
+    return () => {
+      window.removeEventListener("dreamhome:open-chat" as any, handleOpenChat)
+    }
+  }, [])
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -253,7 +269,7 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setIsChatOpen(true)}>
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>
@@ -354,6 +370,7 @@ const Navigation: React.FC = () => {
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
       <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+      <UserChatPanel open={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </>
   )
 }
