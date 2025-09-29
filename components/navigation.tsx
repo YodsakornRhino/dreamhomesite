@@ -3,7 +3,7 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -39,15 +39,15 @@ import {
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
+import { useChatPanel } from "@/contexts/chat-panel-context"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
+  const { open, openWith, participant } = useChatPanel()
   const { toast } = useToast()
   const pathname = usePathname()
-
-  const router = useRouter()
 
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
@@ -131,6 +131,18 @@ const Navigation: React.FC = () => {
   const switchToSignIn = () => {
     setIsSignUpOpen(false)
     setIsSignInOpen(true)
+  }
+
+  const handleOpenChat = () => {
+    if (participant) {
+      open()
+      return
+    }
+
+    openWith({
+      name: "DreamHome Assistant",
+      avatarUrl: "",
+    })
   }
 
   return (
@@ -255,7 +267,12 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => router.push("/chat")}>
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          handleOpenChat()
+                        }}
+                      >
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>
