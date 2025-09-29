@@ -29,10 +29,15 @@ import {
   sendMessage,
   togglePinConversation,
   uploadChatAttachments,
+  buildConversationId,
   type ChatAttachmentMetadata,
   type ConversationParticipant,
 } from "@/lib/chat"
-import { formatRelativeTime, useUserChats } from "@/hooks/use-user-chats"
+import {
+  formatRelativeTime,
+  useUserChats,
+  type ChatPreview,
+} from "@/hooks/use-user-chats"
 import { getFirestoreInstance } from "@/lib/firestore"
 
 interface ChatContact {
@@ -98,6 +103,9 @@ export function UserChatPanel({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     null,
   )
+  const [pendingConversation, setPendingConversation] = useState<ChatPreview | null>(
+    null,
+  )
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messageInput, setMessageInput] = useState("")
@@ -107,12 +115,28 @@ export function UserChatPanel({
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const activeConversation = useMemo(
+  const activeConversationFromStore = useMemo(
     () =>
       conversations.find((conversation) => conversation.id === activeConversationId) ??
       null,
     [conversations, activeConversationId],
   )
+
+  const activeConversation = useMemo(() => {
+    if (activeConversationFromStore) {
+      return activeConversationFromStore
+    }
+
+    if (
+      pendingConversation &&
+      pendingConversation.id === activeConversationId &&
+      pendingConversation.otherUser
+    ) {
+      return pendingConversation
+    }
+
+    return null
+  }, [activeConversationFromStore, pendingConversation, activeConversationId])
 
   const filteredConversations = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -133,6 +157,7 @@ export function UserChatPanel({
       setMessages([])
       setMessageInput("")
       setSelectedFiles([])
+      setPendingConversation(null)
       return
     }
 
@@ -141,6 +166,30 @@ export function UserChatPanel({
     }
 
     if (initialContact) {
+      const ensuredConversationId = buildConversationId(
+        currentUserParticipant.uid,
+        initialContact.id,
+      )
+      const fallbackConversation: ChatPreview = {
+        id: ensuredConversationId,
+        conversationId: ensuredConversationId,
+        otherUser: {
+          uid: initialContact.id,
+          name: initialContact.name,
+          photoURL: initialContact.avatar ?? undefined,
+        },
+        lastMessageText: "เริ่มบทสนทนาใหม่",
+        lastMessageAt: null,
+        lastMessageSenderId: null,
+        attachments: [],
+        pinned: false,
+        updatedAt: new Date(),
+        createdAt: new Date(),
+      }
+
+      setActiveConversationId(ensuredConversationId)
+      setPendingConversation(fallbackConversation)
+
       ensureConversation({
         currentUser: currentUserParticipant,
         targetUser: {
@@ -159,6 +208,7 @@ export function UserChatPanel({
             description: "เกิดข้อผิดพลาดในการเริ่มต้นการสนทนา",
             variant: "destructive",
           })
+          setPendingConversation(null)
         })
     }
   }, [
@@ -180,8 +230,23 @@ export function UserChatPanel({
     )
     if (matched) {
       setActiveConversationId(matched.id)
+      setPendingConversation(matched)
     }
   }, [open, initialConversationId, conversations])
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      return
+    }
+
+    const resolved = conversations.find(
+      (conversation) => conversation.id === activeConversationId,
+    )
+
+    if (resolved) {
+      setPendingConversation(null)
+    }
+  }, [conversations, activeConversationId])
 
   useEffect(() => {
     if (!open) {
@@ -264,8 +329,9 @@ export function UserChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, open])
 
-  const handleSelectConversation = (conversationId: string) => {
-    setActiveConversationId(conversationId)
+  const handleSelectConversation = (conversation: ChatPreview) => {
+    setActiveConversationId(conversation.id)
+    setPendingConversation(conversation)
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -413,7 +479,7 @@ export function UserChatPanel({
                     filteredConversations.map((conversation) => (
                       <button
                         key={conversation.id}
-                        onClick={() => handleSelectConversation(conversation.id)}
+                        onClick={() => handleSelectConversation(conversation)}
                         className={cn(
                           "flex w-full items-center space-x-3 rounded-2xl px-3 py-2 text-left transition-colors",
                           conversation.id === activeConversationId
