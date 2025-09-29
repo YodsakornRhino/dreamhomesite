@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -35,12 +35,24 @@ import {
   Mail,
   AlertCircle,
   Loader2,
+  MessageCircle,
+  Search,
+  X,
+  ArrowLeft,
 } from "lucide-react"
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
+import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
+
+type ChatMessage = {
+  from: "me" | "them"
+  text: string
+  time: string
+}
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -51,6 +63,8 @@ const Navigation: React.FC = () => {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -59,6 +73,21 @@ const Navigation: React.FC = () => {
   useEffect(() => {
     setIsMobileOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const openChat = () => setIsChatOpen(true)
+    const closeChat = () => setIsChatOpen(false)
+
+    window.addEventListener("dreamhome:open-chat", openChat)
+    window.addEventListener("dreamhome:close-chat", closeChat)
+
+    return () => {
+      window.removeEventListener("dreamhome:open-chat", openChat)
+      window.removeEventListener("dreamhome:close-chat", closeChat)
+    }
+  }, [])
 
   const handleMobileNavClick = () => {
     setIsMobileOpen(false)
@@ -130,6 +159,67 @@ const Navigation: React.FC = () => {
     setIsSignUpOpen(false)
     setIsSignInOpen(true)
   }
+
+  const chatContacts = useMemo(
+    () => [
+      {
+        id: "1",
+        name: "วรารัตน์ กานต์พิพัฒน์",
+        lastMessage: "มีบ้านแนะนำแถวสุขุมวิทไหมคะ",
+        time: "2 ชม.",
+        unread: 2,
+        status: "ออนไลน์",
+      },
+      {
+        id: "2",
+        name: "คมกริช ใจดี",
+        lastMessage: "สนใจบ้านเดี่ยวที่ส่งมา",
+        time: "5 ชม.",
+        unread: 0,
+        status: "ออฟไลน์",
+      },
+      {
+        id: "3",
+        name: "ครอบครัว ธนภัทร",
+        lastMessage: "พรุ่งนี้นัดชมบ้านได้ไหม",
+        time: "เมื่อวาน",
+        unread: 1,
+        status: "ออนไลน์",
+      },
+    ],
+    []
+  )
+
+  const chatMessages = useMemo<Record<string, ChatMessage[]>>(
+    () => ({
+      "1": [
+        { from: "them", text: "สวัสดีค่ะ สนใจคอนโดใกล้ BTS", time: "14:02" },
+        { from: "me", text: "ได้เลยค่ะ เดี๋ยวส่งรายละเอียดให้นะครับ", time: "14:05" },
+        { from: "them", text: "ขอบคุณค่ะ", time: "14:06" },
+      ],
+      "2": [
+        { from: "them", text: "บ้านเดี่ยวที่ส่งมาราคาเท่าไหร่ครับ", time: "09:15" },
+        { from: "me", text: "เริ่มต้นที่ 4.5 ล้านครับ มีโปรโมชันพิเศษด้วย", time: "09:20" },
+      ],
+      "3": [
+        { from: "them", text: "สนใจนัดชมบ้านโครงการ A", time: "19:30" },
+        { from: "me", text: "ได้เลยครับ วันไหนสะดวกบ้างครับ", time: "19:32" },
+      ],
+    }),
+    []
+  )
+
+  useEffect(() => {
+    if (!isChatOpen) {
+      setSelectedChatId(null)
+    }
+  }, [isChatOpen])
+
+  const activeChat = selectedChatId
+    ? chatContacts.find((contact) => contact.id === selectedChatId)
+    : null
+
+  const activeMessages = selectedChatId ? chatMessages[selectedChatId] ?? [] : []
 
   return (
     <>
@@ -253,7 +343,7 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setIsChatOpen(true)}>
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>
@@ -354,6 +444,137 @@ const Navigation: React.FC = () => {
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
       <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+
+      <div
+        className={cn(
+          "fixed top-[72px] right-4 z-[60] h-[calc(100vh-96px)] w-full max-w-md transition-all duration-300",
+          isChatOpen
+            ? "translate-x-0 opacity-100"
+            : "pointer-events-none translate-x-full opacity-0"
+        )}
+        aria-hidden={!isChatOpen}
+      >
+        <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center space-x-2">
+              <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                <MessageCircle className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-slate-900">ข้อความ</span>
+                <span className="text-xs text-slate-500">พูดคุยกับลูกค้าของคุณได้จากที่นี่</span>
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="relative flex-1 overflow-hidden">
+            <div
+              className={cn(
+                "absolute inset-0 flex h-full flex-col gap-4 bg-white px-4 py-4 transition-transform duration-300",
+                selectedChatId ? "-translate-x-full" : "translate-x-0"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-sm font-medium text-slate-700">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">ทั้งหมด</span>
+                  <span className="text-xs text-slate-400">ยังไม่ได้อ่าน</span>
+                  <span className="text-xs text-slate-400">กลุ่ม</span>
+                </div>
+                <Button variant="ghost" size="icon" className="text-slate-500">
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
+              <Input placeholder="ค้นหาในข้อความ" className="h-9 bg-slate-50" />
+              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+                {chatContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    onClick={() => setSelectedChatId(contact.id)}
+                    className="flex w-full items-center space-x-3 rounded-xl bg-white p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:bg-blue-50"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
+                      {contact.name.substring(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="truncate text-sm font-semibold text-slate-900">{contact.name}</p>
+                        <span className="ml-2 text-[11px] text-slate-400">{contact.time}</span>
+                      </div>
+                      <p className="truncate text-xs text-slate-500">{contact.lastMessage}</p>
+                    </div>
+                    {contact.unread > 0 && (
+                      <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                        {contact.unread}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "absolute inset-0 flex h-full flex-col bg-white transition-transform duration-300",
+                selectedChatId ? "translate-x-0" : "translate-x-full"
+              )}
+            >
+              <div className="flex items-center gap-3 border-b px-4 py-3">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedChatId(null)}>
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
+                  {activeChat?.name.substring(0, 2) ?? ""}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-slate-900">{activeChat?.name}</span>
+                  <span className="text-xs text-slate-500">{activeChat?.status}</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4">
+                {activeMessages.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    เลือกแชทเพื่อเริ่มต้นสนทนา
+                  </div>
+                ) : (
+                  activeMessages.map((message, index) => (
+                    <div
+                      key={`${message.time}-${index}`}
+                      className={cn(
+                        "max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm",
+                        message.from === "me"
+                          ? "ml-auto bg-blue-600 text-white"
+                          : "bg-white text-slate-700"
+                      )}
+                    >
+                      <p className="whitespace-pre-line leading-relaxed">{message.text}</p>
+                      <span
+                        className={cn(
+                          "mt-1 block text-right text-[10px]",
+                          message.from === "me" ? "text-blue-100" : "text-slate-400"
+                        )}
+                      >
+                        {message.time}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="border-t bg-white px-4 py-3">
+                <div className="flex items-center space-x-2">
+                  <Input placeholder="พิมพ์ข้อความ..." className="flex-1" disabled />
+                  <Button disabled className="bg-blue-600 text-white hover:bg-blue-600">
+                    ส่ง
+                  </Button>
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400">ฟีเจอร์สนทนาจะพร้อมใช้งานเร็วๆ นี้</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   )
 }
