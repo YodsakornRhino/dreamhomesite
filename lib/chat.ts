@@ -94,30 +94,42 @@ export const ensureConversation = async ({
     doc(db, "chats", conversationId),
   ]
 
-  const existing = await getDoc(currentChatRef)
+  const [existingChat, existingConversation] = await Promise.all([
+    getDoc(currentChatRef),
+    getDoc(conversationRef),
+  ])
 
-  await Promise.all([
+  const conversationData = existingConversation.exists()
+    ? (existingConversation.data() as Record<string, unknown>)
+    : undefined
+  const participantSummaries =
+    (conversationData?.participantSummaries as
+      | Record<string, Record<string, unknown>>
+      | undefined) ?? {}
+
+  const currentSummary = participantSummaries[currentUser.uid] ?? {}
+  const targetSummary = participantSummaries[targetUser.uid] ?? {}
+
+  const currentCreatedAt = existingChat.exists()
+    ? existingChat.get("createdAt") ?? currentSummary.createdAt ?? now
+    : currentSummary.createdAt ?? now
+  const targetCreatedAt = targetSummary.createdAt ?? now
+  const conversationCreatedAt = existingConversation.exists()
+    ? existingConversation.get("createdAt") ?? now
+    : now
+
+  const writes: Promise<unknown>[] = [
     setDoc(
       currentChatRef,
       {
         conversationId,
         participants: [currentUser.uid, targetUser.uid],
         otherUser: targetUser,
-        createdAt: existing.exists() ? existing.get("createdAt") ?? now : now,
+        createdAt: currentCreatedAt,
         updatedAt: now,
-        pinned: existing.exists() ? existing.get("pinned") ?? false : false,
-      },
-      { merge: true },
-    ),
-    setDoc(
-      targetChatRef,
-      {
-        conversationId,
-        participants: [currentUser.uid, targetUser.uid],
-        otherUser: currentUser,
-        createdAt: now,
-        updatedAt: now,
-        pinned: false,
+        pinned: existingChat.exists()
+          ? existingChat.get("pinned") ?? currentSummary.pinned ?? false
+          : currentSummary.pinned ?? false,
       },
       { merge: true },
     ),
@@ -125,12 +137,52 @@ export const ensureConversation = async ({
       conversationRef,
       {
         participants: [currentUser.uid, targetUser.uid],
-        createdAt: now,
+        createdAt: conversationCreatedAt,
         updatedAt: now,
+        participantSummaries: {
+          [currentUser.uid]: {
+            ...currentSummary,
+            otherUser: targetUser,
+            createdAt: currentCreatedAt,
+            updatedAt: now,
+            pinned:
+              (currentSummary.pinned as boolean | undefined) ??
+              (existingChat.exists()
+                ? (existingChat.get("pinned") as boolean | undefined)
+                : false),
+          },
+          [targetUser.uid]: {
+            ...targetSummary,
+            otherUser: currentUser,
+            createdAt: targetCreatedAt,
+            updatedAt: now,
+            pinned: (targetSummary.pinned as boolean | undefined) ?? false,
+          },
+        },
       },
       { merge: true },
     ),
-  ])
+  ]
+
+  writes.push(
+    setDoc(
+      targetChatRef,
+      {
+        conversationId,
+        participants: [currentUser.uid, targetUser.uid],
+        otherUser: currentUser,
+        createdAt: targetCreatedAt,
+        updatedAt: now,
+        pinned: (targetSummary.pinned as boolean | undefined) ?? false,
+      },
+      { merge: true },
+    ).catch((error: unknown) => {
+      console.warn("Failed to create chat reference for target user", error)
+      return null
+    }),
+  )
+
+  await Promise.all(writes)
 
   return conversationId
 }
@@ -165,6 +217,7 @@ export const sendMessage = async ({
     addDoc,
     serverTimestamp,
     setDoc,
+    getDoc,
   } = await import("firebase/firestore")
 
   const timestamp = serverTimestamp()
@@ -187,6 +240,19 @@ export const sendMessage = async ({
   const messagesCollection = collection(doc(db, "chats", conversationId), "messages")
   await addDoc(messagesCollection, messageData)
 
+  const conversationRef = doc(db, "chats", conversationId)
+  const existingConversation = await getDoc(conversationRef)
+  const conversationData = existingConversation.exists()
+    ? (existingConversation.data() as Record<string, unknown>)
+    : undefined
+  const participantSummaries =
+    (conversationData?.participantSummaries as
+      | Record<string, Record<string, unknown>>
+      | undefined) ?? {}
+
+  const senderSummary = participantSummaries[sender.uid] ?? {}
+  const recipientSummary = participantSummaries[recipient.uid] ?? {}
+
   await Promise.all([
     setDoc(
       doc(db, "users", sender.uid, "Chat", conversationId),
@@ -207,12 +273,31 @@ export const sendMessage = async ({
         ...conversationMetaForRecipient,
       },
       { merge: true },
-    ),
+    ).catch((error: unknown) => {
+      console.warn("Failed to update recipient chat metadata", error)
+      return null
+    }),
     setDoc(
-      doc(db, "chats", conversationId),
+      conversationRef,
       {
         participants: [sender.uid, recipient.uid],
         updatedAt: timestamp,
+        participantSummaries: {
+          [sender.uid]: {
+            ...senderSummary,
+            otherUser: recipient,
+            lastMessage: messageData,
+            updatedAt: timestamp,
+            createdAt: senderSummary.createdAt ?? timestamp,
+          },
+          [recipient.uid]: {
+            ...recipientSummary,
+            otherUser: sender,
+            lastMessage: messageData,
+            updatedAt: timestamp,
+            createdAt: recipientSummary.createdAt ?? timestamp,
+          },
+        },
       },
       { merge: true },
     ),
@@ -225,9 +310,29 @@ export const togglePinConversation = async (
   pin: boolean,
 ): Promise<void> => {
   const db = await getFirestoreInstance()
-  const { doc, updateDoc } = await import("firebase/firestore")
-  const conversationRef = doc(db, "users", userId, "Chat", conversationId)
-  await updateDoc(conversationRef, {
-    pinned: pin,
-  })
+  const {
+    doc,
+    updateDoc,
+    setDoc,
+    serverTimestamp,
+  } = await import("firebase/firestore")
+  const userConversationRef = doc(db, "users", userId, "Chat", conversationId)
+  const summaryConversationRef = doc(db, "chats", conversationId)
+  const timestamp = serverTimestamp()
+  await Promise.all([
+    updateDoc(userConversationRef, {
+      pinned: pin,
+    }).catch((error: unknown) => {
+      console.warn("Failed to update pin state in user chat collection", error)
+      return null
+    }),
+    setDoc(
+      summaryConversationRef,
+      {
+        [`participantSummaries.${userId}.pinned`]: pin,
+        [`participantSummaries.${userId}.updatedAt`]: timestamp,
+      } as Record<string, unknown>,
+      { merge: true },
+    ),
+  ])
 }
