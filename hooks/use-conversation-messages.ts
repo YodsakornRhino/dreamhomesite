@@ -51,9 +51,9 @@ export function useConversationMessages(
     const subscribe = async () => {
       try {
         const { orderBy } = await import("firebase/firestore")
-        unsubscribe = await subscribeToCollection(
-          `conversations/${conversationId}/messages`,
-          (docs) => {
+        unsubscribe = await subscribeToCollection({
+          collectionPath: `conversations/${conversationId}/messages`,
+          onNext: (docs) => {
             if (!isActive) return
 
             const nextMessages = docs.map((docSnap) => {
@@ -79,8 +79,14 @@ export function useConversationMessages(
             setMessages(nextMessages)
             setLoading(false)
           },
-          orderBy("createdAt", "asc"),
-        )
+          queryConstraints: [orderBy("createdAt", "asc")],
+          onError: () => {
+            if (!isActive) return
+            setMessages([])
+            setError("ไม่สามารถโหลดข้อความได้")
+            setLoading(false)
+          },
+        })
       } catch (err) {
         if (!isActive) return
         console.error("Failed to subscribe to conversation messages", err)

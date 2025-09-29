@@ -29,18 +29,27 @@ export function useAllUserProperties(): UseAllUserPropertiesResult {
       setError(null)
 
       try {
-        unsubscribe = await subscribeToCollection("property", (docs) => {
-          if (!isActive) return
+        unsubscribe = await subscribeToCollection({
+          collectionPath: "property",
+          onNext: (docs) => {
+            if (!isActive) return
 
-          const mapped = docs.map(mapDocumentToUserProperty)
-          mapped.sort(
-            (a, b) =>
-              parseUserPropertyCreatedAt(b.createdAt) -
-              parseUserPropertyCreatedAt(a.createdAt),
-          )
+            const mapped = docs.map(mapDocumentToUserProperty)
+            mapped.sort(
+              (a, b) =>
+                parseUserPropertyCreatedAt(b.createdAt) -
+                parseUserPropertyCreatedAt(a.createdAt),
+            )
 
-          setProperties(mapped)
-          setLoading(false)
+            setProperties(mapped)
+            setLoading(false)
+          },
+          onError: () => {
+            if (!isActive) return
+            setProperties([])
+            setError("ไม่สามารถโหลดรายการอสังหาริมทรัพย์ได้ กรุณาลองใหม่อีกครั้ง")
+            setLoading(false)
+          },
         })
       } catch (error) {
         console.error("Failed to load properties:", error)

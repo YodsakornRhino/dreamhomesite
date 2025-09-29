@@ -139,56 +139,84 @@ export const deleteDocument = async (collectionPath: string, docId: string): Pro
 }
 
 // Listen to real-time updates
+type SubscribeToDocumentOptions = {
+  onError?: (error: Error) => void
+}
+
 export const subscribeToDocument = async (
-  collectionPath: string,
-  docId: string,
-  callback: (doc: QueryDocumentSnapshot<DocumentData> | null) => void,
+  params: {
+    collectionPath: string
+    docId: string
+    onNext: (doc: QueryDocumentSnapshot<DocumentData> | null) => void
+  } & SubscribeToDocumentOptions,
 ): Promise<() => void> => {
+  const { collectionPath, docId, onNext, onError } = params
+
   try {
     const { doc, onSnapshot } = await import("firebase/firestore")
     const db = await getFirestoreInstance()
     const docRef = doc(db, ...collectionPath.split("/"), docId)
 
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        callback(docSnap as QueryDocumentSnapshot<DocumentData>)
-      } else {
-        callback(null)
-      }
-    })
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          onNext(docSnap as QueryDocumentSnapshot<DocumentData>)
+        } else {
+          onNext(null)
+        }
+      },
+      (error) => {
+        console.error("Error in document subscription:", error)
+        onError?.(error as Error)
+      },
+    )
 
     return unsubscribe
   } catch (error) {
     console.error("Error subscribing to document:", error)
+    onError?.(error as Error)
     throw error
   }
 }
 
+type SubscribeToCollectionOptions = {
+  queryConstraints?: QueryConstraint[]
+  onError?: (error: Error) => void
+}
+
 // Listen to collection updates
 export const subscribeToCollection = async (
-  collectionPath: string,
-  callback: (docs: QueryDocumentSnapshot<DocumentData>[]) => void,
-  ...queryConstraints: QueryConstraint[]
+  params: {
+    collectionPath: string
+    onNext: (docs: QueryDocumentSnapshot<DocumentData>[]) => void
+  } & SubscribeToCollectionOptions,
 ): Promise<() => void> => {
+  const { collectionPath, onNext, queryConstraints = [], onError } = params
+
   try {
     const { collection, query, onSnapshot } = await import("firebase/firestore")
     const db = await getFirestoreInstance()
     const collectionRef = collection(db, ...collectionPath.split("/"))
 
-    let q: Query<DocumentData>
-    if (queryConstraints.length > 0) {
-      q = query(collectionRef, ...queryConstraints)
-    } else {
-      q = collectionRef
-    }
+    const q: Query<DocumentData> =
+      queryConstraints.length > 0 ? query(collectionRef, ...queryConstraints) : collectionRef
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      callback(querySnapshot.docs)
-    })
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        onNext(querySnapshot.docs)
+      },
+      (error) => {
+        console.error("Error in collection subscription:", error)
+        onError?.(error as Error)
+      },
+    )
 
     return unsubscribe
   } catch (error) {
     console.error("Error subscribing to collection:", error)
+    onError?.(error as Error)
     throw error
   }
 }

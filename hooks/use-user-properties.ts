@@ -39,9 +39,9 @@ export function useUserProperties(
     const loadProperties = async () => {
       try {
         const { where } = await import("firebase/firestore");
-        unsubscribe = await subscribeToCollection(
-          "property",
-          (docs) => {
+        unsubscribe = await subscribeToCollection({
+          collectionPath: "property",
+          onNext: (docs) => {
             if (!isActive) return;
 
             const mapped = docs.map(mapDocumentToUserProperty);
@@ -54,8 +54,14 @@ export function useUserProperties(
             setProperties(mapped);
             setLoading(false);
           },
-          where("userUid", "==", userUid),
-        );
+          queryConstraints: [where("userUid", "==", userUid)],
+          onError: () => {
+            if (!isActive) return;
+            setProperties([]);
+            setError("ไม่สามารถโหลดประกาศของผู้ขายได้");
+            setLoading(false);
+          },
+        });
       } catch (err) {
         console.error("Failed to load user listings:", err);
         if (!isActive) return;

@@ -101,22 +101,37 @@ export function useConversations(userId: string | null): UseConversationsResult 
       let unsub: (() => void) | undefined
       const subscribe = async () => {
         try {
-          unsub = await subscribeToDocument("users", uid, (doc) => {
-            setParticipants((prev) => {
-              const next = { ...prev }
-              if (doc) {
-                const profile = mapDocumentToUserProfile(doc)
-                next[uid] = normalizeParticipant({
-                  uid: profile.uid,
-                  name: profile.name,
-                  email: profile.email,
-                  photoURL: profile.photoURL,
-                })
-              } else if (!next[uid]) {
-                next[uid] = { uid, name: "ผู้ใช้งาน", email: null, photoURL: null }
-              }
-              return next
-            })
+          unsub = await subscribeToDocument({
+            collectionPath: "users",
+            docId: uid,
+            onNext: (doc) => {
+              setParticipants((prev) => {
+                const next = { ...prev }
+                if (doc) {
+                  const profile = mapDocumentToUserProfile(doc)
+                  next[uid] = normalizeParticipant({
+                    uid: profile.uid,
+                    name: profile.name,
+                    email: profile.email,
+                    photoURL: profile.photoURL,
+                  })
+                } else if (!next[uid]) {
+                  next[uid] = { uid, name: "ผู้ใช้งาน", email: null, photoURL: null }
+                }
+                return next
+              })
+            },
+            onError: () => {
+              setParticipants((prev) => {
+                if (prev[uid]) {
+                  return prev
+                }
+                return {
+                  ...prev,
+                  [uid]: { uid, name: "ผู้ใช้งาน", email: null, photoURL: null },
+                }
+              })
+            },
           })
           participantUnsubscribers.current.set(uid, () => {
             unsub?.()
@@ -154,9 +169,9 @@ export function useConversations(userId: string | null): UseConversationsResult 
     const subscribe = async () => {
       try {
         const { orderBy, where } = await import("firebase/firestore")
-        unsubscribeConversations = await subscribeToCollection(
-          "conversations",
-          (docs) => {
+        unsubscribeConversations = await subscribeToCollection({
+          collectionPath: "conversations",
+          onNext: (docs) => {
             if (!isActive) return
 
             const nextRaw: RawConversation[] = []
@@ -223,9 +238,17 @@ export function useConversations(userId: string | null): UseConversationsResult 
             syncParticipants(nextRaw)
             setLoading(false)
           },
-          where("participantIds", "array-contains", userId),
-          orderBy("updatedAt", "desc"),
-        )
+          queryConstraints: [
+            where("participantIds", "array-contains", userId),
+            orderBy("updatedAt", "desc"),
+          ],
+          onError: () => {
+            if (!isActive) return
+            setRawConversations([])
+            setError("ไม่สามารถโหลดรายการสนทนาได้")
+            setLoading(false)
+          },
+        })
       } catch (err) {
         if (!isActive) return
         console.error("Failed to subscribe to conversations", err)

@@ -33,15 +33,25 @@ export function useUserProfile(userUid: string | null): UseUserProfileResult {
 
     const loadProfile = async () => {
       try {
-        unsubscribe = await subscribeToDocument("users", userUid, (doc) => {
-          if (!isActive) return;
+        unsubscribe = await subscribeToDocument({
+          collectionPath: "users",
+          docId: userUid,
+          onNext: (doc) => {
+            if (!isActive) return;
 
-          if (doc) {
-            setProfile(mapDocumentToUserProfile(doc));
-          } else {
+            if (doc) {
+              setProfile(mapDocumentToUserProfile(doc));
+            } else {
+              setProfile(null);
+            }
+            setLoading(false);
+          },
+          onError: () => {
+            if (!isActive) return;
             setProfile(null);
-          }
-          setLoading(false);
+            setError("ไม่สามารถโหลดข้อมูลผู้ขายได้");
+            setLoading(false);
+          },
         });
       } catch (err) {
         console.error("Failed to load user profile:", err);

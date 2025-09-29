@@ -53,9 +53,9 @@ export default function SellDashboardPage() {
 
     const loadProperties = async () => {
       try {
-        unsubscribe = await subscribeToCollection(
-          `users/${user.uid}/user_property`,
-          (docs) => {
+        unsubscribe = await subscribeToCollection({
+          collectionPath: `users/${user.uid}/user_property`,
+          onNext: (docs) => {
             if (!isActive) return
             const mapped = docs.map(mapDocumentToUserProperty)
             mapped.sort(
@@ -66,7 +66,13 @@ export default function SellDashboardPage() {
             setProperties(mapped)
             setPropertiesLoading(false)
           },
-        )
+          onError: () => {
+            if (!isActive) return
+            setProperties([])
+            setPropertiesError("ไม่สามารถโหลดประกาศของคุณได้ กรุณาลองใหม่อีกครั้ง")
+            setPropertiesLoading(false)
+          },
+        })
       } catch (error) {
         console.error("Failed to load user properties:", error)
         if (!isActive) return
