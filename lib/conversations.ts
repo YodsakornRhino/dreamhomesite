@@ -1,3 +1,5 @@
+import type { DocumentSnapshot } from "firebase/firestore"
+
 import { getDocument, getFirestoreInstance } from "./firestore"
 import { mapDocumentToUserProfile } from "./user-profile-mapper"
 import type { ConversationParticipant } from "@/types/conversation"
@@ -79,11 +81,22 @@ export const sendConversationMessage = async ({
   )
 
   const conversationRef = doc(db, "conversations", conversationId)
-  const snapshot = await getDoc(conversationRef)
+  let snapshot: DocumentSnapshot<Record<string, unknown>> | null = null
+
+  try {
+    snapshot = await getDoc(conversationRef)
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code
+    if (code && code !== "permission-denied") {
+      throw error
+    }
+  }
+
+  const snapshotExists = snapshot?.exists() ?? false
   const now = serverTimestamp()
 
   let participantsInfo: ConversationParticipant[] | undefined
-  if (!snapshot.exists()) {
+  if (!snapshotExists || !snapshot) {
     participantsInfo = await fetchParticipantsInfo(sortedParticipantIds)
   } else {
     const data = snapshot.data() as Record<string, unknown>
@@ -102,7 +115,7 @@ export const sendConversationMessage = async ({
     },
   }
 
-  if (!snapshot.exists()) {
+  if (!snapshotExists || !snapshot) {
     dataToMerge.createdAt = now
   } else {
     const existingData = snapshot.data() as Record<string, unknown>
@@ -148,7 +161,18 @@ export const ensureDirectConversation = async ({
   const { doc, getDoc, serverTimestamp, setDoc } = await import("firebase/firestore")
 
   const conversationRef = doc(db, "conversations", conversationId)
-  const snapshot = await getDoc(conversationRef)
+  let snapshot: DocumentSnapshot<Record<string, unknown>> | null = null
+
+  try {
+    snapshot = await getDoc(conversationRef)
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code
+    if (code && code !== "permission-denied") {
+      throw error
+    }
+  }
+
+  const snapshotExists = snapshot?.exists() ?? false
   const now = serverTimestamp()
 
   const dataToMerge: Record<string, unknown> = {
@@ -156,7 +180,7 @@ export const ensureDirectConversation = async ({
     updatedAt: now,
   }
 
-  if (!snapshot.exists()) {
+  if (!snapshotExists || !snapshot) {
     dataToMerge.createdAt = now
     dataToMerge.lastMessage = null
     dataToMerge.participantsInfo = await fetchParticipantsInfo(participantIds)
