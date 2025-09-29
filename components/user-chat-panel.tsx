@@ -197,13 +197,8 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
         </header>
 
         <div className="relative flex-1 overflow-hidden">
-          <div
-            className={cn(
-              "absolute inset-0 flex transition-transform duration-300 ease-in-out",
-              activeConversation ? "-translate-x-full" : "translate-x-0",
-            )}
-          >
-            <section className="flex w-full flex-1 flex-col overflow-hidden">
+          <div className="relative flex h-full md:grid md:grid-cols-[320px,1fr]">
+            <section className="flex w-full flex-1 flex-col overflow-hidden md:border-r md:border-gray-100">
               <div className="border-b px-5 py-4">
                 <div className="flex items-center rounded-full border bg-gray-50 px-3">
                   <Search className="mr-2 h-4 w-4 text-gray-400" />
@@ -281,7 +276,14 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
               </div>
             </section>
 
-            <section className="flex w-full flex-1 flex-col">
+            <section
+              className={cn(
+                "absolute inset-0 z-10 flex h-full w-full flex-col bg-white transition-transform duration-300 ease-in-out md:static md:z-0 md:translate-x-0 md:bg-transparent md:shadow-none md:border-l md:border-gray-100",
+                activeConversation
+                  ? "translate-x-0"
+                  : "translate-x-full md:translate-x-0",
+              )}
+            >
               {activeConversation ? (
                 <>
                   <div className="flex items-center justify-between border-b px-4 py-3">
