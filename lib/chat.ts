@@ -21,8 +21,15 @@ export interface ConversationParticipant {
   photoURL?: string | null
 }
 
+const sortParticipantIds = (userA: string, userB: string): [string, string] => {
+  return [userA, userB].sort((a, b) => {
+    if (a === b) return 0
+    return a < b ? -1 : 1
+  }) as [string, string]
+}
+
 export const buildConversationId = (userA: string, userB: string): string => {
-  return [userA, userB].sort().join("__")
+  return sortParticipantIds(userA, userB).join("__")
 }
 
 const isPermissionDeniedError = (error: unknown): error is FirebaseError => {
@@ -84,6 +91,7 @@ export const ensureConversation = async ({
   }
 
   const conversationId = buildConversationId(currentUser.uid, targetUser.uid)
+  const participants = sortParticipantIds(currentUser.uid, targetUser.uid)
   const db = await getFirestoreInstance()
   const {
     doc,
@@ -137,7 +145,7 @@ export const ensureConversation = async ({
       currentChatRef,
       {
         conversationId,
-        participants: [currentUser.uid, targetUser.uid],
+        participants,
         otherUser: targetUser,
         createdAt: currentCreatedAt,
         updatedAt: now,
@@ -150,7 +158,7 @@ export const ensureConversation = async ({
     setDoc(
       conversationRef,
       {
-        participants: [currentUser.uid, targetUser.uid],
+        participants,
         createdAt: conversationCreatedAt,
         updatedAt: now,
         participantSummaries: {
@@ -224,6 +232,8 @@ export const sendMessage = async ({
   } = await import("firebase/firestore")
 
   const timestamp = serverTimestamp()
+  const participants = sortParticipantIds(sender.uid, recipient.uid)
+
   const messageData = {
     senderId: sender.uid,
     text: text ?? "",
@@ -267,7 +277,7 @@ export const sendMessage = async ({
       doc(db, "users", sender.uid, "Chat", conversationId),
       {
         conversationId,
-        participants: [sender.uid, recipient.uid],
+        participants,
         otherUser: recipient,
         ...conversationMetaForSender,
       },
@@ -276,7 +286,7 @@ export const sendMessage = async ({
     setDoc(
       conversationRef,
       {
-        participants: [sender.uid, recipient.uid],
+        participants,
         updatedAt: timestamp,
         participantSummaries: {
           [sender.uid]: {
