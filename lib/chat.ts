@@ -90,6 +90,15 @@ const ensureParticipantDetails = (
   }, {})
 }
 
+const isPermissionDeniedError = (error: unknown): boolean => {
+  if (typeof error !== "object" || error === null) {
+    return false
+  }
+
+  const code = (error as { code?: unknown }).code
+  return code === "permission-denied" || code === "PERMISSION_DENIED"
+}
+
 export const ensureConversation = async ({
   currentUser,
   targetUser,
@@ -144,11 +153,23 @@ export const ensureConversation = async ({
 
   const ensureUserChatDoc = async (owner: ChatParticipant, other: ChatParticipant) => {
     const chatDocRef = doc(db, "users", owner.uid, "Chat", conversationId)
-    const chatDocSnap = await getDoc(chatDocRef)
-    const defaultPinned = chatDocSnap.exists() ? chatDocSnap.data()?.pinned ?? false : false
-    const createdAt = chatDocSnap.exists()
-      ? chatDocSnap.data()?.createdAt ?? now
-      : now
+    let pinned = false
+    let createdAt = now
+
+    try {
+      const chatDocSnap = await getDoc(chatDocRef)
+      if (chatDocSnap.exists()) {
+        const data = chatDocSnap.data()
+        pinned = Boolean(data?.pinned)
+        createdAt = data?.createdAt ?? createdAt
+      }
+    } catch (error) {
+      if (!isPermissionDeniedError(error)) {
+        throw error
+      }
+      // If we cannot read the other user's chat doc due to security rules,
+      // fall back to the defaults so we can still write our own metadata.
+    }
 
     await setDoc(
       chatDocRef,
@@ -160,7 +181,7 @@ export const ensureConversation = async ({
           photoURL: other.photoURL ?? null,
           email: other.email ?? null,
         },
-        pinned: defaultPinned,
+        pinned,
         createdAt,
         updatedAt: now,
       },
@@ -168,10 +189,20 @@ export const ensureConversation = async ({
     )
   }
 
-  await Promise.all([
-    ensureUserChatDoc(currentUser, targetUser),
-    ensureUserChatDoc(targetUser, currentUser),
-  ])
+  await ensureUserChatDoc(currentUser, targetUser)
+
+  try {
+    await ensureUserChatDoc(targetUser, currentUser)
+  } catch (error) {
+    if (!isPermissionDeniedError(error)) {
+      throw error
+    }
+
+    console.warn(
+      "Skipped creating chat metadata for the other participant due to Firestore permissions.",
+      { conversationId, targetUser: targetUser.uid },
+    )
+  }
 
   return { id: conversationId, participants: participants.slice().sort((a, b) => a.localeCompare(b)) }
 }
@@ -358,19 +389,35 @@ export const sendMessage = async ({
             }
           : null)
 
-      await setDoc(
-        chatDoc,
-        {
-          participants: participantIds,
-          lastMessage: summary,
-          lastMessageAt: now,
-          lastSenderId: sender.uid,
-          updatedAt: now,
-          unreadCount: participantUid === sender.uid ? 0 : 1,
-          otherUser: otherDetails,
-        },
-        { merge: true },
-      )
+      try {
+        await setDoc(
+          chatDoc,
+          {
+            participants: participantIds,
+            lastMessage: summary,
+            lastMessageAt: now,
+            lastSenderId: sender.uid,
+            updatedAt: now,
+            unreadCount: participantUid === sender.uid ? 0 : 1,
+            otherUser: otherDetails,
+          },
+          { merge: true },
+        )
+      } catch (error) {
+        if (!isPermissionDeniedError(error)) {
+          throw error
+        }
+
+        if (participantUid === sender.uid) {
+          // If we cannot update our own doc we should surface the error.
+          throw error
+        }
+
+        console.warn(
+          "Skipped updating chat metadata for a participant due to Firestore permissions.",
+          { conversationId, participantUid },
+        )
+      }
     }),
   )
 }
