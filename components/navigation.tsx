@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -47,12 +47,9 @@ import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-
-type ChatMessage = {
-  from: "me" | "them"
-  text: string
-  time: string
-}
+import { useConversations } from "@/hooks/use-conversations"
+import { useConversationMessages } from "@/hooks/use-conversation-messages"
+import { sendConversationMessage } from "@/lib/conversations"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -64,10 +61,13 @@ const Navigation: React.FC = () => {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
+  const [messageDraft, setMessageDraft] = useState("")
+  const [sendingMessage, setSendingMessage] = useState(false)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
 
   // ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -160,66 +160,111 @@ const Navigation: React.FC = () => {
     setIsSignInOpen(true)
   }
 
-  const chatContacts = useMemo(
-    () => [
-      {
-        id: "1",
-        name: "วรารัตน์ กานต์พิพัฒน์",
-        lastMessage: "มีบ้านแนะนำแถวสุขุมวิทไหมคะ",
-        time: "2 ชม.",
-        unread: 2,
-        status: "ออนไลน์",
-      },
-      {
-        id: "2",
-        name: "คมกริช ใจดี",
-        lastMessage: "สนใจบ้านเดี่ยวที่ส่งมา",
-        time: "5 ชม.",
-        unread: 0,
-        status: "ออฟไลน์",
-      },
-      {
-        id: "3",
-        name: "ครอบครัว ธนภัทร",
-        lastMessage: "พรุ่งนี้นัดชมบ้านได้ไหม",
-        time: "เมื่อวาน",
-        unread: 1,
-        status: "ออนไลน์",
-      },
-    ],
-    []
+  const conversationsState = useConversations(user?.uid ?? null)
+  const { messages, loading: messagesLoading, error: messagesError } =
+    useConversationMessages(selectedConversationId)
+
+  const selectedConversation = useMemo(
+    () =>
+      conversationsState.conversations.find(
+        (conversation) => conversation.id === selectedConversationId,
+      ) ?? null,
+    [conversationsState.conversations, selectedConversationId],
   )
 
-  const chatMessages = useMemo<Record<string, ChatMessage[]>>(
-    () => ({
-      "1": [
-        { from: "them", text: "สวัสดีค่ะ สนใจคอนโดใกล้ BTS", time: "14:02" },
-        { from: "me", text: "ได้เลยค่ะ เดี๋ยวส่งรายละเอียดให้นะครับ", time: "14:05" },
-        { from: "them", text: "ขอบคุณค่ะ", time: "14:06" },
-      ],
-      "2": [
-        { from: "them", text: "บ้านเดี่ยวที่ส่งมาราคาเท่าไหร่ครับ", time: "09:15" },
-        { from: "me", text: "เริ่มต้นที่ 4.5 ล้านครับ มีโปรโมชันพิเศษด้วย", time: "09:20" },
-      ],
-      "3": [
-        { from: "them", text: "สนใจนัดชมบ้านโครงการ A", time: "19:30" },
-        { from: "me", text: "ได้เลยครับ วันไหนสะดวกบ้างครับ", time: "19:32" },
-      ],
-    }),
-    []
+  const activeParticipant = selectedConversation?.participants.find(
+    (participant) => participant.uid !== user?.uid,
   )
 
   useEffect(() => {
     if (!isChatOpen) {
-      setSelectedChatId(null)
+      setSelectedConversationId(null)
     }
   }, [isChatOpen])
 
-  const activeChat = selectedChatId
-    ? chatContacts.find((contact) => contact.id === selectedChatId)
-    : null
+  useEffect(() => {
+    if (!selectedConversationId) return
+    const exists = conversationsState.conversations.some(
+      (conversation) => conversation.id === selectedConversationId,
+    )
+    if (!exists) {
+      setSelectedConversationId(null)
+    }
+  }, [conversationsState.conversations, selectedConversationId])
 
-  const activeMessages = selectedChatId ? chatMessages[selectedChatId] ?? [] : []
+  useEffect(() => {
+    if (!messagesContainerRef.current) return
+    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+  }, [messages, selectedConversationId, isChatOpen])
+
+  useEffect(() => {
+    setMessageDraft("")
+  }, [selectedConversationId])
+
+  const formatRelativeTime = (isoString: string | null) => {
+    if (!isoString) return ""
+    const date = new Date(isoString)
+    if (Number.isNaN(date.getTime())) return ""
+
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMinutes = Math.floor(diffMs / 60000)
+
+    if (diffMinutes < 1) return "เมื่อสักครู่"
+    if (diffMinutes < 60) return `${diffMinutes} นาทีที่แล้ว`
+
+    const diffHours = Math.floor(diffMinutes / 60)
+    if (diffHours < 24) return `${diffHours} ชม.ที่แล้ว`
+
+    return new Intl.DateTimeFormat("th-TH", { dateStyle: "short" }).format(date)
+  }
+
+  const formatMessageTime = (isoString: string | null) => {
+    if (!isoString) return ""
+    const date = new Date(isoString)
+    if (Number.isNaN(date.getTime())) return ""
+
+    return new Intl.DateTimeFormat("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date)
+  }
+
+  const getParticipantInitials = (name: string | null | undefined, email: string | null | undefined) => {
+    const source = name?.trim() || email?.trim() || "ผู้ใช้"
+    const parts = source.split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return source.slice(0, 2).toUpperCase()
+  }
+
+  const handleSendMessage = async () => {
+    if (!user || !selectedConversation) return
+    const trimmed = messageDraft.trim()
+    if (!trimmed) return
+
+    setSendingMessage(true)
+    try {
+      await sendConversationMessage({
+        conversationId: selectedConversation.id,
+        participantIds: selectedConversation.participantIds,
+        senderId: user.uid,
+        text: trimmed,
+      })
+      setMessageDraft("")
+    } catch (error) {
+      console.error("Failed to send message", error)
+      toast({
+        variant: "destructive",
+        title: "ส่งข้อความไม่สำเร็จ",
+        description: "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setSendingMessage(false)
+    }
+  }
 
   return (
     <>
@@ -473,7 +518,7 @@ const Navigation: React.FC = () => {
             <div
               className={cn(
                 "absolute inset-0 flex h-full flex-col gap-4 bg-white px-4 py-4 transition-transform duration-300",
-                selectedChatId ? "-translate-x-full" : "translate-x-0"
+                selectedConversationId ? "-translate-x-full" : "translate-x-0",
               )}
             >
               <div className="flex items-center justify-between">
@@ -488,88 +533,158 @@ const Navigation: React.FC = () => {
               </div>
               <Input placeholder="ค้นหาในข้อความ" className="h-9 bg-slate-50" />
               <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-                {chatContacts.map((contact) => (
-                  <button
-                    key={contact.id}
-                    type="button"
-                    onClick={() => setSelectedChatId(contact.id)}
-                    className="flex w-full items-center space-x-3 rounded-xl bg-white p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:bg-blue-50"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
-                      {contact.name.substring(0, 2)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="truncate text-sm font-semibold text-slate-900">{contact.name}</p>
-                        <span className="ml-2 text-[11px] text-slate-400">{contact.time}</span>
-                      </div>
-                      <p className="truncate text-xs text-slate-500">{contact.lastMessage}</p>
-                    </div>
-                    {contact.unread > 0 && (
-                      <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
-                        {contact.unread}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                {conversationsState.loading ? (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    กำลังโหลด...
+                  </div>
+                ) : conversationsState.conversations.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    ยังไม่มีประวัติการสนทนา
+                  </div>
+                ) : (
+                  conversationsState.conversations.map((conversation) => {
+                    const participant =
+                      conversation.otherParticipant ??
+                      conversation.participants.find((item) => item.uid !== user?.uid) ??
+                      null
+                    const isActive = conversation.id === selectedConversationId
+                    const initials = getParticipantInitials(
+                      participant?.name,
+                      participant?.email ?? null,
+                    )
+                    const displayName = participant?.name ?? "ผู้ใช้งาน"
+                    const lastMessageText = conversation.lastMessage?.text || "ยังไม่มีข้อความ"
+                    const lastMessageTime = formatRelativeTime(
+                      conversation.lastMessage?.createdAt ?? conversation.updatedAt,
+                    )
+
+                    return (
+                      <button
+                        key={conversation.id}
+                        type="button"
+                        onClick={() => setSelectedConversationId(conversation.id)}
+                        className={cn(
+                          "flex w-full items-center space-x-3 rounded-xl border border-transparent bg-white p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:bg-blue-50",
+                          isActive && "border-blue-200 bg-blue-50",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600",
+                            isActive && "bg-blue-600 text-white",
+                          )}
+                        >
+                          {initials}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
+                            <span className="ml-2 text-[11px] text-slate-400">{lastMessageTime}</span>
+                          </div>
+                          <p className="truncate text-xs text-slate-500">{lastMessageText}</p>
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
               </div>
+              {conversationsState.error ? (
+                <p className="text-xs text-destructive">{conversationsState.error}</p>
+              ) : null}
             </div>
 
             <div
               className={cn(
                 "absolute inset-0 flex h-full flex-col bg-white transition-transform duration-300",
-                selectedChatId ? "translate-x-0" : "translate-x-full"
+                selectedConversationId ? "translate-x-0" : "translate-x-full",
               )}
             >
               <div className="flex items-center gap-3 border-b px-4 py-3">
-                <Button variant="ghost" size="icon" onClick={() => setSelectedChatId(null)}>
+                <Button variant="ghost" size="icon" onClick={() => setSelectedConversationId(null)}>
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
-                  {activeChat?.name.substring(0, 2) ?? ""}
+                  {getParticipantInitials(activeParticipant?.name, activeParticipant?.email ?? null)}
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-slate-900">{activeChat?.name}</span>
-                  <span className="text-xs text-slate-500">{activeChat?.status}</span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {activeParticipant?.name ?? "เลือกการสนทนา"}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {activeParticipant?.email ?? "สนทนา 1 ต่อ 1"}
+                  </span>
                 </div>
               </div>
-              <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4">
-                {activeMessages.length === 0 ? (
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4"
+              >
+                {!selectedConversation ? (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
                     เลือกแชทเพื่อเริ่มต้นสนทนา
                   </div>
+                ) : messagesLoading ? (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    กำลังโหลดข้อความ...
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    ยังไม่มีข้อความในแชทนี้
+                  </div>
                 ) : (
-                  activeMessages.map((message, index) => (
-                    <div
-                      key={`${message.time}-${index}`}
-                      className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm",
-                        message.from === "me"
-                          ? "ml-auto bg-blue-600 text-white"
-                          : "bg-white text-slate-700"
-                      )}
-                    >
-                      <p className="whitespace-pre-line leading-relaxed">{message.text}</p>
-                      <span
+                  messages.map((message) => {
+                    const isMine = message.senderId === user?.uid
+                    return (
+                      <div
+                        key={message.id}
                         className={cn(
-                          "mt-1 block text-right text-[10px]",
-                          message.from === "me" ? "text-blue-100" : "text-slate-400"
+                          "max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm",
+                          isMine ? "ml-auto bg-blue-600 text-white" : "bg-white text-slate-700",
                         )}
                       >
-                        {message.time}
-                      </span>
-                    </div>
-                  ))
+                        <p className="whitespace-pre-line leading-relaxed">{message.text}</p>
+                        <span
+                          className={cn(
+                            "mt-1 block text-right text-[10px]",
+                            isMine ? "text-blue-100" : "text-slate-400",
+                          )}
+                        >
+                          {formatMessageTime(message.createdAt)}
+                        </span>
+                      </div>
+                    )
+                  })
                 )}
               </div>
+              {messagesError ? (
+                <p className="px-4 text-xs text-destructive">{messagesError}</p>
+              ) : null}
               <div className="border-t bg-white px-4 py-3">
                 <div className="flex items-center space-x-2">
-                  <Input placeholder="พิมพ์ข้อความ..." className="flex-1" disabled />
-                  <Button disabled className="bg-blue-600 text-white hover:bg-blue-600">
-                    ส่ง
+                  <Input
+                    placeholder={selectedConversation ? "พิมพ์ข้อความ..." : "เลือกแชทก่อน"}
+                    className="flex-1"
+                    value={messageDraft}
+                    onChange={(event) => setMessageDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault()
+                        void handleSendMessage()
+                      }
+                    }}
+                    disabled={!selectedConversation || sendingMessage}
+                  />
+                  <Button
+                    onClick={() => void handleSendMessage()}
+                    disabled={
+                      !selectedConversation || sendingMessage || messageDraft.trim().length === 0
+                    }
+                    className="bg-blue-600 text-white hover:bg-blue-600"
+                  >
+                    {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : "ส่ง"}
                   </Button>
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">ฟีเจอร์สนทนาจะพร้อมใช้งานเร็วๆ นี้</p>
+                <p className="mt-2 text-[11px] text-slate-400">ข้อความจะถูกบันทึกไว้ในระบบเพื่อใช้งานต่อ</p>
               </div>
             </div>
           </div>
