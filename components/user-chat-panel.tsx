@@ -175,11 +175,11 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
     >
       <div
         className={cn(
-          "relative flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl transition-transform duration-300 ease-out",
+          "relative flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl transition-transform duration-300 ease-out sm:max-w-xl md:max-w-3xl md:rounded-l-3xl lg:max-w-4xl xl:max-w-5xl",
           open ? "translate-x-0" : "translate-x-full",
         )}
       >
-        <header className="flex items-center justify-between border-b px-5 py-4">
+        <header className="flex items-center justify-between border-b px-4 py-3 sm:px-5 sm:py-4 md:px-6">
           <div className="flex items-center space-x-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600">
               <MessageCircle className="h-5 w-5" />
@@ -197,10 +197,10 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
         </header>
 
         <div className="relative flex-1 overflow-hidden">
-          <div className="relative flex h-full md:grid md:grid-cols-[320px,1fr]">
+          <div className="relative flex h-full md:grid md:grid-cols-[300px,minmax(0,1fr)] lg:grid-cols-[340px,minmax(0,1fr)] xl:grid-cols-[380px,minmax(0,1fr)]">
             <section className="flex w-full flex-1 flex-col overflow-hidden md:border-r md:border-gray-100">
-              <div className="border-b px-5 py-4">
-                <div className="flex items-center rounded-full border bg-gray-50 px-3">
+              <div className="border-b px-4 py-3 sm:px-5 sm:py-4 md:px-6">
+                <div className="flex items-center rounded-full border bg-gray-50 px-3 py-1.5 sm:py-2">
                   <Search className="mr-2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
@@ -212,7 +212,7 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
                 </div>
               </div>
 
-              <div className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+              <div className="flex-1 space-y-1 overflow-y-auto px-3 pb-4 sm:px-4 md:px-5 lg:px-6">
                 {filteredConversations.length === 0 ? (
                   <div className="flex h-full flex-col items-center justify-center space-y-2 text-center text-sm text-muted-foreground">
                     <MessageCircle className="h-6 w-6" />
@@ -254,14 +254,14 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between">
-                          <p className="truncate text-sm font-semibold text-gray-900">
+                          <p className="truncate text-sm font-semibold text-gray-900 lg:text-base">
                             {conversation.name}
                           </p>
                           <span className="whitespace-nowrap text-xs text-muted-foreground">
                             {conversation.updatedAt}
                           </span>
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                        <p className="mt-1 truncate text-xs text-muted-foreground lg:text-sm">
                           {conversation.lastMessage}
                         </p>
                       </div>
@@ -278,7 +278,7 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
 
             <section
               className={cn(
-                "absolute inset-0 z-10 flex h-full w-full flex-col bg-white transition-transform duration-300 ease-in-out md:static md:z-0 md:translate-x-0 md:bg-transparent md:shadow-none md:border-l md:border-gray-100",
+                "absolute inset-0 z-10 flex h-full w-full flex-col bg-white transition-transform duration-300 ease-in-out md:static md:z-0 md:translate-x-0 md:bg-slate-50 md:shadow-none md:border-l md:border-gray-100",
                 activeConversation
                   ? "translate-x-0"
                   : "translate-x-full md:translate-x-0",
@@ -286,7 +286,7 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
             >
               {activeConversation ? (
                 <>
-                  <div className="flex items-center justify-between border-b px-4 py-3">
+                  <div className="flex items-center justify-between border-b bg-white px-4 py-3 sm:px-5 md:px-6">
                     <div className="flex items-center space-x-3">
                       <Button
                         variant="ghost"
@@ -311,7 +311,7 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-gray-900 md:text-base">
                           {activeConversation.name}
                         </p>
                         <div className="flex items-center space-x-1 text-xs text-emerald-600">
@@ -320,13 +320,13 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
                         </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-2">
+                    <Button variant="outline" size="sm" className="gap-2 md:px-4">
                       <Phone className="h-4 w-4" />
                       โทรคุย
                     </Button>
                   </div>
 
-                  <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4">
+                  <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4 sm:px-5 md:px-6 md:py-6 lg:px-8">
                     {activeConversation.messages.map((message) => (
                       <div
                         key={message.id}
@@ -361,21 +361,21 @@ export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
                     ))}
                   </div>
 
-                  <div className="border-t bg-white px-4 py-3">
-                    <div className="flex items-center space-x-2 rounded-full border bg-gray-50 px-3 py-1.5">
+                  <div className="border-t bg-white px-4 py-3 sm:px-5 md:px-6">
+                    <div className="flex items-center space-x-2 rounded-full border bg-gray-50 px-3 py-1.5 sm:py-2">
                       <input
                         type="text"
                         placeholder="พิมพ์ข้อความเพื่อคุยเรื่องซื้อบ้าน..."
                         className="flex-1 bg-transparent text-sm outline-none"
                       />
-                      <Button size="sm" className="rounded-full">
+                      <Button size="sm" className="rounded-full px-4">
                         ส่ง
                       </Button>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="flex flex-1 flex-col items-center justify-center space-y-3 px-6 text-center">
+                <div className="flex flex-1 flex-col items-center justify-center space-y-3 px-6 text-center md:px-10">
                   <Avatar className="h-20 w-20 border-4 border-blue-100">
                     <AvatarImage src="https://i.pravatar.cc/100?img=65" alt="DreamHome Assistant" />
                     <AvatarFallback>DH</AvatarFallback>
