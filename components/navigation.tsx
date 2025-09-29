@@ -68,6 +68,7 @@ const Navigation: React.FC = () => {
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
+  const chatContainerRef = useRef<HTMLDivElement | null>(null)
 
   // ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -200,6 +201,27 @@ const Navigation: React.FC = () => {
   useEffect(() => {
     setMessageDraft("")
   }, [selectedConversationId])
+
+  useEffect(() => {
+    if (!isChatOpen) return
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target
+      if (!chatContainerRef.current) return
+      if (target instanceof Node && chatContainerRef.current.contains(target)) {
+        return
+      }
+      setIsChatOpen(false)
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("touchstart", handlePointerDown)
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("touchstart", handlePointerDown)
+    }
+  }, [isChatOpen])
 
   const formatRelativeTime = (isoString: string | null) => {
     if (!isoString) return ""
@@ -498,6 +520,7 @@ const Navigation: React.FC = () => {
             : "pointer-events-none translate-x-full opacity-0"
         )}
         aria-hidden={!isChatOpen}
+        ref={chatContainerRef}
       >
         <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b px-4 py-3">
