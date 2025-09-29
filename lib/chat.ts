@@ -1,3 +1,5 @@
+import { FirebaseError } from "firebase/app"
+
 import { getFirestoreInstance } from "./firestore"
 import { uploadFile, getDownloadURL } from "./storage"
 
@@ -21,6 +23,10 @@ export interface ConversationParticipant {
 
 export const buildConversationId = (userA: string, userB: string): string => {
   return [userA, userB].sort().join("__")
+}
+
+const isPermissionDeniedError = (error: unknown): error is FirebaseError => {
+  return error instanceof FirebaseError && error.code === "permission-denied"
 }
 
 const normaliseAttachmentType = (fileType: string): ChatAttachmentType => {
@@ -96,10 +102,19 @@ export const ensureConversation = async ({
 
   const [existingChat, existingConversation] = await Promise.all([
     getDoc(currentChatRef),
-    getDoc(conversationRef),
+    getDoc(conversationRef).catch((error: unknown) => {
+      if (isPermissionDeniedError(error)) {
+        console.warn(
+          "Failed to read shared conversation metadata due to permissions",
+          error,
+        )
+        return null
+      }
+      throw error
+    }),
   ])
 
-  const conversationData = existingConversation.exists()
+  const conversationData = existingConversation?.exists()
     ? (existingConversation.data() as Record<string, unknown>)
     : undefined
   const participantSummaries =
@@ -114,7 +129,7 @@ export const ensureConversation = async ({
     ? existingChat.get("createdAt") ?? currentSummary.createdAt ?? now
     : currentSummary.createdAt ?? now
   const targetCreatedAt = targetSummary.createdAt ?? now
-  const conversationCreatedAt = existingConversation.exists()
+  const conversationCreatedAt = existingConversation?.exists()
     ? existingConversation.get("createdAt") ?? now
     : now
 
@@ -161,7 +176,16 @@ export const ensureConversation = async ({
         },
       },
       { merge: true },
-    ),
+    ).catch((error: unknown) => {
+      if (isPermissionDeniedError(error)) {
+        console.warn(
+          "Failed to create shared conversation metadata due to permissions",
+          error,
+        )
+        return null
+      }
+      throw error
+    }),
   ]
 
   writes.push(
@@ -241,8 +265,19 @@ export const sendMessage = async ({
   await addDoc(messagesCollection, messageData)
 
   const conversationRef = doc(db, "chats", conversationId)
-  const existingConversation = await getDoc(conversationRef)
-  const conversationData = existingConversation.exists()
+  const existingConversation = await getDoc(conversationRef).catch(
+    (error: unknown) => {
+      if (isPermissionDeniedError(error)) {
+        console.warn(
+          "Failed to read shared conversation metadata before sending message",
+          error,
+        )
+        return null
+      }
+      throw error
+    },
+  )
+  const conversationData = existingConversation?.exists()
     ? (existingConversation.data() as Record<string, unknown>)
     : undefined
   const participantSummaries =
@@ -300,7 +335,16 @@ export const sendMessage = async ({
         },
       },
       { merge: true },
-    ),
+    ).catch((error: unknown) => {
+      if (isPermissionDeniedError(error)) {
+        console.warn(
+          "Failed to update shared conversation metadata due to permissions",
+          error,
+        )
+        return null
+      }
+      throw error
+    }),
   ])
 }
 
