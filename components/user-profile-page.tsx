@@ -146,7 +146,7 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
             <div className="flex w-full flex-col gap-2 sm:w-auto">
               <Button
                 onClick={handleOpenChatPanel}
-                className="w-full sm:w-auto"
+                className="w-full bg-emerald-500 text-white hover:bg-emerald-600 sm:w-auto"
                 disabled={!profile}
               >
                 แชทคุยเรื่องซื้อบ้าน
