@@ -5,42 +5,7 @@ This project expects both Firestore and Cloud Storage security rules to allow a 
 ## Cloud Firestore (`firestore.rules`)
 
 ```rules
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwnerByUid(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function hasOwnerRef(data) {
-      return data.userRef is document && data.userRef.path.size() == 2 && data.userRef.path[0] == "users";
-    }
-
-    function isOwnerByRef(data) {
-      return hasOwnerRef(data) && request.auth.uid == data.userRef.id;
-    }
-
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isOwnerByUid(userId);
-    }
-
-    match /property/{propertyId} {
-      allow read: if true;
-      allow create: if isOwnerByUid(request.resource.data.userUid);
-      allow update: if isOwnerByUid(request.resource.data.userUid) || isOwnerByRef(resource.data) || isOwnerByRef(request.resource.data);
-      allow delete: if isOwnerByUid(resource.data.userUid) || isOwnerByRef(resource.data);
-    }
-
-    match /users/{userId}/properties/{propertyId} {
-      allow read, write: if isOwnerByUid(userId);
-    }
-  }
-}
+Update storage.rules
 ```
 
 **Why these changes?**
