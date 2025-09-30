@@ -373,7 +373,7 @@ export function UserPropertyModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="relative w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
+      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
         <DialogHeader className="space-y-4">
           <div className="space-y-2">
             <DialogTitle className="text-xl font-bold text-gray-900 sm:text-2xl">
