@@ -41,6 +41,7 @@ import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
+import ChatPanel from "./chat-panel"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -51,6 +52,8 @@ const Navigation: React.FC = () => {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [requestedParticipantId, setRequestedParticipantId] = useState<string | null>(null)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -63,6 +66,27 @@ const Navigation: React.FC = () => {
   const handleMobileNavClick = () => {
     setIsMobileOpen(false)
   }
+
+  useEffect(() => {
+    if (!user) {
+      setIsChatOpen(false)
+      setRequestedParticipantId(null)
+    }
+  }, [user])
+
+  useEffect(() => {
+    const handleOpenChat = (event: Event) => {
+      const detail = (event as CustomEvent<{ participantId?: string }>).detail
+      setRequestedParticipantId(detail?.participantId ?? null)
+      setIsChatOpen(true)
+    }
+
+    window.addEventListener("dreamhome:open-chat", handleOpenChat)
+
+    return () => {
+      window.removeEventListener("dreamhome:open-chat", handleOpenChat)
+    }
+  }, [])
 
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text
@@ -253,7 +277,7 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setIsChatOpen(true)}>
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>
@@ -354,6 +378,12 @@ const Navigation: React.FC = () => {
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
       <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+      <ChatPanel
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        requestedParticipantId={requestedParticipantId}
+        onRequestParticipantHandled={() => setRequestedParticipantId(null)}
+      />
     </>
   )
 }

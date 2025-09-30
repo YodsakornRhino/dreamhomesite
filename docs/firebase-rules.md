@@ -57,19 +57,56 @@ Once all property documents contain a valid `userRef`, you can simplify the rule
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
+    /* Helpers */
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Pair-style chat ids look like "uidA__uidB" for 1:1 threads
+    function chatIdPairsWithMe(chatId) {
+      return isSignedIn()
+        && (
+          chatId == request.auth.uid
+          || chatId.matches('^' + request.auth.uid + '__[^/]+$')
+          || chatId.matches('^[^/]+__' + request.auth.uid + '$')
+        );
+    }
+
+    // Fall back to Firestore chat documents to confirm membership
+    function isInChatDoc(chatId) {
+      return isSignedIn()
+        && exists(/databases/(default)/documents/chats/$(chatId))
+        && let chat = get(/databases/(default)/documents/chats/$(chatId));
+           (
+             (
+               chat.data.participants is list
+               && chat.data.participants.hasAny([request.auth.uid])
+             ) || (
+               chat.data.participantIds is list
+               && chat.data.participantIds.hasAny([request.auth.uid])
+             )
+           );
+    }
+
+    function isChatParticipant(chatId) {
+      return isInChatDoc(chatId) || chatIdPairsWithMe(chatId);
+    }
+
     match /propertyImages/{propertyId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow write: if isSignedIn(); // write = create/update/delete
+    }
+
+    match /chat-attachments/{chatId}/{allPaths=**} {
+      allow read, write: if isChatParticipant(chatId);
+
+      // If you need to restrict types, add:
+      // allow write: if isChatParticipant(chatId)
+      //              && request.resource.contentType.matches('image/.*|application/pdf');
     }
   }
 }
 ```
 
-Replace the `allow delete` condition with whatever folder structure you actually use in Storage. The crucial part is verifying that the caller owns the listing—if you mirror Firestore ownership, fetch the property document with `get(/databases/(default)/documents/property/$(propertyId))` and check the same `userUid` / `userRef` combination before deleting files.
-
-After updating the rules in the Firebase console (or deploying via the CLI), retry the deletion flow from the Sell page. With the rules accepting both owner identifiers, Firestore should authorize the delete operation initiated by the updated UI.
+With these changes, the existing property image permissions remain intact while chat attachments stored under `chat-attachments/{chatId}` are only accessible to authenticated participants in that conversation.
