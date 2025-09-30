@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 
 import ChatWidget from "@/components/chat-widget";
@@ -17,9 +17,10 @@ import type { UserProperty } from "@/types/user-property";
 
 interface UserProfilePageProps {
   uid: string;
+  initialPropertyId?: string;
 }
 
-export function UserProfilePage({ uid }: UserProfilePageProps) {
+export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps) {
   const { user } = useAuthContext();
   const {
     profile,
@@ -34,6 +35,14 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
+
+  useEffect(() => {
+    if (!initialPropertyId || selectedProperty) return;
+    const found = properties.find((item) => item.id === initialPropertyId);
+    if (found) {
+      setSelectedProperty(found);
+    }
+  }, [initialPropertyId, properties, selectedProperty]);
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";
