@@ -705,22 +705,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     })
   }, [filteredThreads, user?.uid])
 
-  const suggestedUsers = useMemo(() => {
-    if (!user?.uid) return [] as UserProfileSummary[]
-
-    const threadIds = new Set(threadEntries.map((entry) => entry.otherId))
-
-    return Object.values(userMap)
-      .filter((profile) => profile.uid !== user.uid && !threadIds.has(profile.uid))
-      .filter((profile) => {
-        if (!normalizedSearch) return true
-        const name = (profile.name || "").toLowerCase()
-        const email = (profile.email || "").toLowerCase()
-        return name.includes(normalizedSearch) || email.includes(normalizedSearch)
-      })
-      .slice(0, 10)
-  }, [normalizedSearch, threadEntries, user?.uid, userMap])
-
   const handleSelectParticipant = (targetUid: string) => {
     if (!user?.uid) return
     setActiveParticipantId(targetUid)
@@ -1114,34 +1098,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   )}
                 </div>
 
-                {suggestedUsers.length > 0 && (
-                  <div className="border-t border-slate-100 p-3 md:p-4">
-                    <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      เริ่มแชทใหม่
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {suggestedUsers.map((profile) => (
-                        <button
-                          key={profile.uid}
-                          type="button"
-                          onClick={() => handleSelectParticipant(profile.uid)}
-                          className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-slate-100/80"
-                        >
-                          <Avatar className="h-9 w-9 border border-slate-200">
-                            <AvatarImage src={profile.photoURL || ""} alt={getDisplayName(profile)} />
-                            <AvatarFallback className="bg-blue-100 text-xs font-semibold text-blue-600">
-                              {getAvatarFallback(profile)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-800">{getDisplayName(profile)}</span>
-                            {profile.email && <span className="text-xs text-gray-500">{profile.email}</span>}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div
