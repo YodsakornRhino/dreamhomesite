@@ -323,11 +323,13 @@ export function UserPropertyModal({
     );
 
     setHasSentInterest(true);
+
+    onOpenChange(false);
     toast({
       title: "ส่งความสนใจให้ผู้ขายแล้ว",
       description: "เราได้ส่งรายละเอียดประกาศนี้ให้ผู้ขายทราบผ่านระบบแชท",
     });
-  }, [property, toast, user]);
+  }, [onOpenChange, property, toast, user]);
 
   if (!property && !loading) return null;
 
