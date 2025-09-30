@@ -253,31 +253,17 @@ export function UserPropertyModal({
   }, [property?.sellerName, sellerProfile?.name]);
   const sellerListingsCount = sellerListings.length;
 
-  if (!property) return null;
-
-  const sellerRoleLabel =
-    SELLER_ROLE_LABELS[property.sellerRole] ?? property.sellerRole;
-  const transactionLabel =
-    TRANSACTION_LABELS[property.transactionType] ?? property.transactionType;
-  const typeLabel =
-    PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType;
-  const sellerDisplayName = sellerProfile?.name || property.sellerName;
-  const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
-  const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
-  const isOwnListing = Boolean(user?.uid && property.userUid && user.uid === property.userUid);
-  const interestButtonLabel = isOwnListing
-    ? "ประกาศของคุณ"
-    : hasSentInterest
-      ? "แจ้งผู้ขายอีกครั้ง"
-      : "ต้องการอสังหาริมทรัพย์นี้";
-
-  const mapUrl =
-    typeof property.lat === "number" && typeof property.lng === "number"
-      ? `https://www.google.com/maps?q=${property.lat},${property.lng}&hl=th&z=16&output=embed`
-      : null;
-
   const handleExpressInterest = useCallback(() => {
-    if (!property?.userUid) {
+    if (!property) {
+      toast({
+        variant: "destructive",
+        title: "ไม่พบรายละเอียดประกาศ",
+        description: "ไม่สามารถส่งความสนใจได้ในขณะนี้",
+      });
+      return;
+    }
+
+    if (!property.userUid) {
       toast({
         variant: "destructive",
         title: "ไม่พบข้อมูลผู้ขาย",
@@ -307,7 +293,8 @@ export function UserPropertyModal({
       return;
     }
 
-    const firstPhoto = property.photos.find(
+    const photos = Array.isArray(property.photos) ? property.photos : [];
+    const firstPhoto = photos.find(
       (photo): photo is string => typeof photo === "string" && photo.trim().length > 0,
     );
 
@@ -328,7 +315,9 @@ export function UserPropertyModal({
       propertyPreview: preview,
     };
 
-    window.dispatchEvent(new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", { detail }));
+    window.dispatchEvent(
+      new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", { detail }),
+    );
 
     setHasSentInterest(true);
     toast({
@@ -336,6 +325,31 @@ export function UserPropertyModal({
       description: "เราได้ส่งรายละเอียดประกาศนี้ให้ผู้ขายทราบผ่านระบบแชท",
     });
   }, [property, toast, user]);
+
+  if (!property) return null;
+
+  const sellerRoleLabel =
+    SELLER_ROLE_LABELS[property.sellerRole] ?? property.sellerRole;
+  const transactionLabel =
+    TRANSACTION_LABELS[property.transactionType] ?? property.transactionType;
+  const typeLabel =
+    PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType;
+  const sellerDisplayName = sellerProfile?.name || property.sellerName;
+  const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
+  const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
+  const isOwnListing = Boolean(
+    user?.uid && property.userUid && user.uid === property.userUid,
+  );
+  const interestButtonLabel = isOwnListing
+    ? "ประกาศของคุณ"
+    : hasSentInterest
+      ? "แจ้งผู้ขายอีกครั้ง"
+      : "ต้องการอสังหาริมทรัพย์นี้";
+
+  const mapUrl =
+    typeof property.lat === "number" && typeof property.lng === "number"
+      ? `https://www.google.com/maps?q=${property.lat},${property.lng}&hl=th&z=16&output=embed`
+      : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
