@@ -17,6 +17,7 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
@@ -172,6 +173,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     { id: string; url: string; kind: "image" | "video"; name: string }
   >([])
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
+  const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false)
+  const [selectedAttachment, setSelectedAttachment] = useState<ChatMessageAttachment | null>(null)
 
   const panelRef = useRef<HTMLDivElement>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
@@ -319,6 +322,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       setMessageDraft("")
       setHighlightedThreadIds([])
       setHighlightedMessageId(null)
+      setIsGalleryOpen(false)
+      setIsMediaViewerOpen(false)
+      setSelectedAttachment(null)
       lastThreadTimestampsRef.current = {}
       initialThreadSnapshotRef.current = true
       return
@@ -798,6 +804,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setIsGalleryOpen((prev) => !prev)
   }
 
+  const handleAttachmentClick = (attachment: ChatMessageAttachment) => {
+    setSelectedAttachment(attachment)
+    setIsMediaViewerOpen(true)
+  }
+
+  const handleMediaViewerOpenChange = (open: boolean) => {
+    if (!open) {
+      setIsMediaViewerOpen(false)
+      setSelectedAttachment(null)
+    }
+  }
+
   const handleSendMessage = async () => {
     if (!user?.uid || !activeParticipantId) return
 
@@ -1177,24 +1195,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
 
                     {isGalleryOpen && (
-                      <div className="max-h-52 overflow-y-auto border-b border-slate-200 bg-white/75 px-4 py-3 backdrop-blur md:px-6 md:py-4">
+                      <div className="max-h-80 overflow-y-auto border-b border-slate-200 bg-white/75 px-4 py-3 backdrop-blur md:px-6 md:py-4">
                         {mediaAttachments.length === 0 ? (
                           <p className="text-sm text-gray-500">ยังไม่มีไฟล์รูปภาพหรือวิดีโอในบทสนทนานี้</p>
                         ) : (
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:gap-3 lg:grid-cols-5">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                             {mediaAttachments.map((attachment) => (
-                              <a
+                              <button
                                 key={`${attachment.messageId}-${attachment.storagePath}`}
-                                href={attachment.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="group relative block overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                                type="button"
+                                onClick={() => handleAttachmentClick(attachment)}
+                                className="group relative block overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                aria-label={attachment.name || (attachment.type === "image" ? "ดูรูปภาพ" : "ดูวิดีโอ")}
                               >
                                 {attachment.type === "image" ? (
                                   <img
                                     src={attachment.url}
                                     alt={attachment.name || "ไฟล์รูปภาพ"}
-                                    className="h-24 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-28"
+                                    className="h-32 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-36 md:h-44"
                                   />
                                 ) : (
                                   <>
@@ -1203,7 +1221,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                       muted
                                       loop
                                       playsInline
-                                      className="h-24 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-28"
+                                      className="h-32 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-36 md:h-44"
                                     />
                                     <div className="absolute inset-0 flex items-center justify-center">
                                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">
@@ -1212,7 +1230,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                     </div>
                                   </>
                                 )}
-                              </a>
+                              </button>
                             ))}
                           </div>
                         )}
@@ -1458,6 +1476,40 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
       </div>
       </div>
+      <Dialog open={isMediaViewerOpen && !!selectedAttachment} onOpenChange={handleMediaViewerOpenChange}>
+        <DialogContent className="w-[92vw] max-w-3xl bg-white/95 p-0 shadow-2xl backdrop-blur sm:w-[90vw] sm:max-w-4xl">
+          {selectedAttachment && (
+            <div className="flex flex-col gap-4 p-4 sm:p-6">
+              <DialogHeader className="space-y-1 text-left">
+                <DialogTitle className="text-base font-semibold text-gray-900 sm:text-lg">
+                  {selectedAttachment.name || (selectedAttachment.type === "image" ? "รูปภาพ" : "วิดีโอ")}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-gray-500 sm:text-sm">
+                  แสดงจากคลังสื่อของบทสนทนา
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center justify-center">
+                {selectedAttachment.type === "image" ? (
+                  <img
+                    src={selectedAttachment.url}
+                    alt={selectedAttachment.name || "ไฟล์รูปภาพ"}
+                    className="max-h-[70vh] w-full rounded-2xl bg-slate-100 object-contain"
+                  />
+                ) : (
+                  <video
+                    key={selectedAttachment.url}
+                    src={selectedAttachment.url}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="max-h-[70vh] w-full rounded-2xl bg-black object-contain"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
