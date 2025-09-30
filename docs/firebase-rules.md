@@ -61,10 +61,21 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isChatParticipant(chatId) {
+      let chat = get(/databases/(default)/documents/chats/$(chatId));
+      return isSignedIn() &&
+        chat.data.participants is list &&
+        chat.data.participants.hasAny([request.auth.uid]);
+    }
+
     match /propertyImages/{propertyId}/{allPaths=**} {
       allow read: if true;
       allow write: if isSignedIn();
       allow delete: if isSignedIn();
+    }
+
+    match /chat-attachments/{chatId}/{allPaths=**} {
+      allow read, write, delete: if isChatParticipant(chatId);
     }
   }
 }
