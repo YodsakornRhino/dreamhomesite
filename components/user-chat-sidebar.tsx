@@ -10,17 +10,14 @@ import {
   Send,
   X,
 } from "lucide-react"
+import { FirebaseError } from "firebase/app"
 import type { DocumentData } from "firebase/firestore"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useAuthContext } from "@/contexts/AuthContext"
-import {
-  getDocument,
-  getFirestoreInstance,
-  subscribeToCollection,
-} from "@/lib/firestore"
+import { getDocument, getFirestoreInstance } from "@/lib/firestore"
 import { cn } from "@/lib/utils"
 
 interface UserChatSidebarProps {
@@ -50,6 +47,11 @@ interface ChatMessage {
   senderId: string
   text: string
   createdAt: Date | null
+}
+
+interface FirestoreErrorState {
+  title: string
+  description: string
 }
 
 const FALLBACK_PROFILE: ParticipantProfile = {
@@ -157,6 +159,8 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
   const [isConversationsLoading, setIsConversationsLoading] = useState(false)
   const [isMessagesLoading, setIsMessagesLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [conversationsError, setConversationsError] = useState<FirestoreErrorState | null>(null)
+  const [messagesError, setMessagesError] = useState<FirestoreErrorState | null>(null)
 
   const profileCache = useRef<Map<string, ParticipantProfile>>(new Map())
   const conversationsRef = useRef<ConversationSummary[]>([])
@@ -164,6 +168,33 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
   useEffect(() => {
     conversationsRef.current = conversations
   }, [conversations])
+
+  const resolveFirestoreError = useCallback(
+    (
+      error: unknown,
+      fallback: FirestoreErrorState,
+    ): FirestoreErrorState => {
+      if (error instanceof FirebaseError) {
+        if (error.code === "permission-denied") {
+          return {
+            title: "ไม่มีสิทธิ์เข้าถึงข้อมูล",
+            description:
+              "บัญชีของคุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้ กรุณาตรวจสอบการกำหนดสิทธิ์หรือปรับ Firebase Security Rules",
+          }
+        }
+
+        if (error.code === "unauthenticated") {
+          return {
+            title: "กรุณาเข้าสู่ระบบ",
+            description: "คุณจำเป็นต้องเข้าสู่ระบบเพื่อดูข้อมูลนี้",
+          }
+        }
+      }
+
+      return fallback
+    },
+    [],
+  )
 
   const fetchParticipantProfile = useCallback(
     async (participantId: string, existingProfile?: ParticipantProfile | null): Promise<ParticipantProfile> => {
@@ -245,6 +276,7 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
     if (!user || !isOpen) {
       setConversations([])
       setSelectedConversationId(null)
+      setConversationsError(null)
       return
     }
 
@@ -253,82 +285,122 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
 
     const subscribe = async () => {
       setIsConversationsLoading(true)
+      setConversationsError(null)
       try {
-        const { orderBy, where } = await import("firebase/firestore")
-        unsubscribe = await subscribeToCollection(
-          "conversations",
-          (docs) => {
+        const db = await getFirestoreInstance()
+        const { collection, onSnapshot, orderBy, query, where } = await import("firebase/firestore")
+        const conversationsQuery = query(
+          collection(db, "conversations"),
+          where("participants", "array-contains", user.uid),
+          orderBy("updatedAt", "desc"),
+        )
+
+        unsubscribe = onSnapshot(
+          conversationsQuery,
+          (snapshot) => {
             void (async () => {
-              const mapped = await Promise.all(
-                docs.map(async (docSnapshot) => {
-                  const data = docSnapshot.data()
-                  const participants = Array.isArray(data.participants)
-                    ? (data.participants as string[])
-                    : []
+              try {
+                const mapped = await Promise.all(
+                  snapshot.docs.map(async (docSnapshot) => {
+                    const data = docSnapshot.data()
+                    const participants = Array.isArray(data.participants)
+                      ? (data.participants as string[])
+                      : []
 
-                  if (!participants.includes(user.uid)) {
-                    return null
-                  }
+                    if (!participants.includes(user.uid)) {
+                      return null
+                    }
 
-                  const otherParticipantId =
-                    participants.find((participantId) => participantId !== user.uid) ?? user.uid
+                    const otherParticipantId =
+                      participants.find((participantId) => participantId !== user.uid) ?? user.uid
 
-                  const profileFromDoc = (data.participantProfiles?.[otherParticipantId] ?? null) as
-                    | ParticipantProfile
-                    | null
-                    | undefined
+                    const profileFromDoc = (data.participantProfiles?.[otherParticipantId] ?? null) as
+                      | ParticipantProfile
+                      | null
+                      | undefined
 
-                  const profile = await fetchParticipantProfile(
-                    otherParticipantId,
-                    profileFromDoc ?? undefined,
-                  )
+                    const profile = await fetchParticipantProfile(
+                      otherParticipantId,
+                      profileFromDoc ?? undefined,
+                    )
 
-                  const conversation: ConversationSummary = {
-                    id: docSnapshot.id,
-                    participants,
-                    otherParticipantId,
-                    profile,
-                    lastMessageText: (data.lastMessageText as string | undefined)?.trim() ?? "",
-                    lastMessageAt:
-                      toDate(data.lastMessageAt) || toDate(data.updatedAt) || toDate(data.createdAt),
-                    unreadCount: Number((data.unreadCounts?.[user.uid] as number | undefined) ?? 0),
-                  }
+                    const conversation: ConversationSummary = {
+                      id: docSnapshot.id,
+                      participants,
+                      otherParticipantId,
+                      profile,
+                      lastMessageText: (data.lastMessageText as string | undefined)?.trim() ?? "",
+                      lastMessageAt:
+                        toDate(data.lastMessageAt) || toDate(data.updatedAt) || toDate(data.createdAt),
+                      unreadCount: Number((data.unreadCounts?.[user.uid] as number | undefined) ?? 0),
+                    }
 
-                  return conversation
-                }),
-              )
-
-              if (cancelled) {
-                return
-              }
-
-              const filtered = mapped.filter((item): item is ConversationSummary => item !== null)
-
-              setConversations(filtered)
-              setIsConversationsLoading(false)
-
-              if (
-                filtered.length > 0 &&
-                filtered.every((conversation) => conversation.id !== selectedConversationId)
-              ) {
-                setSelectedConversationId((current) =>
-                  current && filtered.some((conversation) => conversation.id === current)
-                    ? current
-                    : null,
+                    return conversation
+                  }),
                 )
+
+                if (cancelled) {
+                  return
+                }
+
+                const filtered = mapped.filter((item): item is ConversationSummary => item !== null)
+
+                setConversations(filtered)
+                setConversationsError(null)
+                setIsConversationsLoading(false)
+
+                if (
+                  filtered.length > 0 &&
+                  filtered.every((conversation) => conversation.id !== selectedConversationId)
+                ) {
+                  setSelectedConversationId((current) =>
+                    current && filtered.some((conversation) => conversation.id === current)
+                      ? current
+                      : null,
+                  )
+                }
+              } catch (error) {
+                console.error("Failed to process conversations snapshot", error)
               }
             })
           },
-          where("participants", "array-contains", user.uid),
-          orderBy("updatedAt", "desc"),
+          (error) => {
+            if (cancelled) {
+              return
+            }
+
+            console.error("Failed to subscribe to conversations", error)
+            const errorState = resolveFirestoreError(error, {
+              title: "ไม่สามารถโหลดรายการสนทนาได้",
+              description: "โปรดลองใหม่อีกครั้ง",
+            })
+            setConversations([])
+            setConversationsError(errorState)
+            setIsConversationsLoading(false)
+            toast({
+              variant: "destructive",
+              title: errorState.title,
+              description: errorState.description,
+            })
+          },
         )
       } catch (error) {
         console.error("Failed to subscribe to conversations", error)
         setIsConversationsLoading(false)
-        toast({
-          variant: "destructive",
+        if (cancelled) {
+          return
+        }
+
+        const errorState = resolveFirestoreError(error, {
           title: "ไม่สามารถโหลดรายการสนทนาได้",
           description: "โปรดลองใหม่อีกครั้ง",
+        })
+        setConversations([])
+        setConversationsError(errorState)
+        toast({
+          variant: "destructive",
+          title: errorState.title,
+          description: errorState.description,
         })
       }
     }
@@ -339,12 +411,13 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
       cancelled = true
       unsubscribe?.()
     }
-  }, [fetchParticipantProfile, isOpen, selectedConversationId, toast, user])
+  }, [fetchParticipantProfile, isOpen, resolveFirestoreError, selectedConversationId, toast, user])
 
   useEffect(() => {
     if (!user || !isOpen || !selectedConversationId) {
       setMessages([])
       setIsMessagesLoading(false)
+      setMessagesError(null)
       return
     }
 
@@ -353,12 +426,21 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
 
     const subscribeToMessages = async () => {
       setIsMessagesLoading(true)
+      setMessagesError(null)
       try {
-        const { orderBy } = await import("firebase/firestore")
-        unsubscribe = await subscribeToCollection(
-          `conversations/${selectedConversationId}/messages`,
-          (docs) => {
-            const parsed = docs
+        const db = await getFirestoreInstance()
+        const { collection, doc, onSnapshot, orderBy, query } = await import("firebase/firestore")
+        const conversationRef = doc(db, "conversations", selectedConversationId)
+        const messagesQuery = query(collection(conversationRef, "messages"), orderBy("createdAt", "asc"))
+
+        unsubscribe = onSnapshot(
+          messagesQuery,
+          (snapshot) => {
+            if (cancelled) {
+              return
+            }
+
+            const parsed = snapshot.docs
               .map((docSnapshot) => {
                 const data = docSnapshot.data()
                 const message: ChatMessage = {
@@ -375,24 +457,49 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
                 return aTime - bTime
               })
 
+            setMessages(parsed)
+            setMessagesError(null)
+            setIsMessagesLoading(false)
+          },
+          (error) => {
             if (cancelled) {
               return
             }
 
-            setMessages(parsed)
+            console.error("Failed to subscribe to messages", error)
+            const errorState = resolveFirestoreError(error, {
+              title: "ไม่สามารถโหลดข้อความได้",
+              description: "โปรดลองใหม่อีกครั้ง",
+            })
+            setMessages([])
+            setMessagesError(errorState)
             setIsMessagesLoading(false)
+            toast({
+              variant: "destructive",
+              title: errorState.title,
+              description: errorState.description,
+            })
           },
-          orderBy("createdAt", "asc"),
         )
 
         await markConversationAsRead(selectedConversationId)
       } catch (error) {
         console.error("Failed to subscribe to messages", error)
         setIsMessagesLoading(false)
-        toast({
-          variant: "destructive",
+        if (cancelled) {
+          return
+        }
+
+        const errorState = resolveFirestoreError(error, {
           title: "ไม่สามารถโหลดข้อความได้",
           description: "โปรดลองใหม่อีกครั้ง",
+        })
+        setMessages([])
+        setMessagesError(errorState)
+        toast({
+          variant: "destructive",
+          title: errorState.title,
+          description: errorState.description,
         })
       }
     }
@@ -403,10 +510,11 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
       cancelled = true
       unsubscribe?.()
     }
-  }, [isOpen, markConversationAsRead, selectedConversationId, toast, user])
+  }, [isOpen, markConversationAsRead, resolveFirestoreError, selectedConversationId, toast, user])
 
   useEffect(() => {
     setMessageInput("")
+    setMessagesError(null)
   }, [selectedConversationId])
 
   const handleSelectConversation = useCallback(
@@ -482,10 +590,14 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
     } catch (error) {
       console.error("Failed to send message", error)
       setMessageInput(trimmed)
-      toast({
-        variant: "destructive",
+      const errorState = resolveFirestoreError(error, {
         title: "ส่งข้อความไม่สำเร็จ",
         description: "โปรดลองอีกครั้งในภายหลัง",
+      })
+      toast({
+        variant: "destructive",
+        title: errorState.title,
+        description: errorState.description,
       })
     } finally {
       setIsSending(false)
@@ -578,7 +690,15 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-2 pb-6">
-                  {isConversationsLoading ? (
+                  {conversationsError ? (
+                    <div className="flex h-full flex-col items-center justify-center space-y-2 px-6 text-center text-red-500">
+                      <MessageCircle className="h-10 w-10 text-red-300" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-600">{conversationsError.title}</p>
+                        <p className="mt-1 text-xs text-red-500">{conversationsError.description}</p>
+                      </div>
+                    </div>
+                  ) : isConversationsLoading ? (
                     <div className="flex h-full items-center justify-center text-gray-500">
                       <Loader2 className="h-5 w-5 animate-spin" />
                     </div>
@@ -685,7 +805,15 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
                     </div>
 
                     <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6">
-                      {isMessagesLoading ? (
+                      {messagesError ? (
+                        <div className="flex h-full flex-col items-center justify-center space-y-3 text-center text-red-500">
+                          <MessageCircle className="h-12 w-12 text-red-300" />
+                          <div>
+                            <p className="text-sm font-semibold text-red-600">{messagesError.title}</p>
+                            <p className="mt-1 text-xs text-red-500">{messagesError.description}</p>
+                          </div>
+                        </div>
+                      ) : isMessagesLoading ? (
                         <div className="flex h-full items-center justify-center text-gray-500">
                           <Loader2 className="h-5 w-5 animate-spin" />
                         </div>
@@ -743,13 +871,13 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
                           }}
                           placeholder="พิมพ์ข้อความ..."
                           className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none"
-                          disabled={isSending}
+                          disabled={isSending || !!messagesError}
                         />
                         <Button
                           size="icon"
                           className="h-9 w-9 rounded-full bg-blue-600 hover:bg-blue-700"
                           onClick={handleSendMessage}
-                          disabled={isSending}
+                          disabled={isSending || !!messagesError}
                         >
                           {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                           <span className="sr-only">ส่งข้อความ</span>
