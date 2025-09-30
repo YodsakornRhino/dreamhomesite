@@ -373,12 +373,13 @@ const Navigation: React.FC = () => {
   }, [conversationsState.conversations, pendingConversation])
 
   useEffect(() => {
-    if (isChatOpen) {
+    if (user) {
       return
     }
+
     setPendingConversation(null)
     pendingConversationIdRef.current = null
-  }, [isChatOpen])
+  }, [user])
 
   useEffect(() => {
     if (!isChatOpen || !conversationForMessaging) {
