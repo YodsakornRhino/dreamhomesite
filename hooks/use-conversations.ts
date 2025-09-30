@@ -9,6 +9,11 @@ import type {
   ConversationSummary,
   ConversationLastMessage,
 } from "@/types/conversation"
+import {
+  loadConversationsFromCache,
+  saveConversationsToCache,
+  type CachedConversation,
+} from "@/lib/conversation-cache"
 
 interface RawConversation {
   id: string
@@ -166,6 +171,23 @@ export function useConversations(userId: string | null): UseConversationsResult 
       })
     }
 
+    const cached = loadConversationsFromCache(userId)
+    if (cached && cached.conversations.length > 0) {
+      const restoredConversations: RawConversation[] = cached.conversations.map(
+        (conversation: CachedConversation) => ({
+          id: conversation.id,
+          participantIds: [...conversation.participantIds],
+          lastMessage: conversation.lastMessage,
+          updatedAt: conversation.updatedAt,
+        }),
+      )
+
+      setParticipants(cached.participants)
+      setRawConversations(restoredConversations)
+      syncParticipants(restoredConversations)
+      setLoading(false)
+    }
+
     const subscribe = async () => {
       try {
         const { orderBy, where } = await import("firebase/firestore")
@@ -268,6 +290,22 @@ export function useConversations(userId: string | null): UseConversationsResult 
       participantUnsubscribers.current.clear()
     }
   }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+    if (loading) return
+
+    const conversationsToPersist: CachedConversation[] = rawConversations.map(
+      (conversation) => ({
+        id: conversation.id,
+        participantIds: [...conversation.participantIds],
+        lastMessage: conversation.lastMessage,
+        updatedAt: conversation.updatedAt,
+      }),
+    )
+
+    saveConversationsToCache(userId, conversationsToPersist, participants)
+  }, [loading, participants, rawConversations, userId])
 
   const conversations = useMemo<ConversationSummary[]>(() => {
     if (!userId) return []
