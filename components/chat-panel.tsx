@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
   Loader2,
   MessageSquareText,
+  Pin,
+  PinOff,
   Search,
   Send,
   X,
@@ -19,6 +21,7 @@ import {
   addDocument,
   setDocument,
   subscribeToCollection,
+  updateDocument,
 } from "@/lib/firestore"
 import { cn } from "@/lib/utils"
 
@@ -33,6 +36,7 @@ interface ChatThread {
   lastMessage?: string
   lastSenderId?: string
   updatedAt?: Date | null
+  pinnedBy?: string[]
 }
 
 interface ChatMessage {
@@ -107,9 +111,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   const [messageDraft, setMessageDraft] = useState("")
   const [sending, setSending] = useState(false)
   const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null)
+  const [highlightedThreadIds, setHighlightedThreadIds] = useState<string[]>([])
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
 
   const messageEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const lastThreadTimestampsRef = useRef<Record<string, number>>({})
+  const initialThreadSnapshotRef = useRef(true)
+  const lastMessageIdRef = useRef<string | null>(null)
 
   const activeChatId = useMemo(() => {
     if (!user?.uid || !activeParticipantId) return null
@@ -156,6 +166,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
       setMessages([])
       setSearchTerm("")
       setMessageDraft("")
+      setHighlightedThreadIds([])
+      setHighlightedMessageId(null)
+      lastThreadTimestampsRef.current = {}
+      initialThreadSnapshotRef.current = true
       return
     }
   }, [isOpen])
@@ -228,10 +242,51 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                   data.updatedAt && typeof data.updatedAt.toDate === "function"
                     ? (data.updatedAt.toDate() as Date)
                     : null,
+                pinnedBy: Array.isArray(data.pinnedBy) ? (data.pinnedBy as string[]) : [],
               }
             })
 
+            if (initialThreadSnapshotRef.current) {
+              const timestampMap: Record<string, number> = {}
+              mapped.forEach((thread) => {
+                if (thread.updatedAt) {
+                  timestampMap[thread.id] = thread.updatedAt.getTime()
+                }
+              })
+              lastThreadTimestampsRef.current = timestampMap
+              initialThreadSnapshotRef.current = false
+            } else {
+              const updatedTimestamps: Record<string, number> = {}
+              const newThreadIds: string[] = []
+
+              mapped.forEach((thread) => {
+                const updatedAtMs = thread.updatedAt ? thread.updatedAt.getTime() : 0
+                const previous = lastThreadTimestampsRef.current[thread.id] ?? 0
+                updatedTimestamps[thread.id] = updatedAtMs
+
+                if (
+                  updatedAtMs > previous &&
+                  thread.lastSenderId &&
+                  thread.lastSenderId !== user?.uid
+                ) {
+                  newThreadIds.push(thread.id)
+                }
+              })
+
+              lastThreadTimestampsRef.current = updatedTimestamps
+
+              if (newThreadIds.length > 0) {
+                setHighlightedThreadIds((prev) => {
+                  const merged = new Set(prev)
+                  newThreadIds.forEach((id) => merged.add(id))
+                  return Array.from(merged)
+                })
+                void playNotificationSound()
+              }
+            }
+
             setThreads(mapped)
+            setHighlightedThreadIds((prev) => prev.filter((id) => mapped.some((thread) => thread.id === id)))
             setLoadingThreads(false)
           },
           where("participants", "array-contains", user.uid),
@@ -252,7 +307,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
       cancelled = true
       unsubThreads?.()
     }
-  }, [isOpen, toast, user?.uid])
+  }, [isOpen, playNotificationSound, toast, user?.uid])
 
   useEffect(() => {
     if (!isOpen || !activeChatId) {
@@ -289,6 +344,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
             setMessages(mapped)
             setLoadingMessages(false)
+
+            if (mapped.length === 0) {
+              lastMessageIdRef.current = null
+              return
+            }
+
+            const latestMessage = mapped[mapped.length - 1]
+            if (latestMessage.id !== lastMessageIdRef.current) {
+              lastMessageIdRef.current = latestMessage.id
+              if (latestMessage.senderId !== user?.uid) {
+                setHighlightedMessageId(latestMessage.id)
+              }
+            }
           },
           orderBy("createdAt", "asc"),
         )
@@ -321,7 +389,63 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     setMessageDraft("")
+    setHighlightedMessageId(null)
+    lastMessageIdRef.current = null
   }, [activeChatId])
+
+  useEffect(() => {
+    if (!activeChatId) return
+    setHighlightedThreadIds((current) => current.filter((id) => id !== activeChatId))
+  }, [activeChatId])
+
+  useEffect(() => {
+    if (!highlightedMessageId) return
+
+    const timeoutId = window.setTimeout(() => {
+      setHighlightedMessageId((current) => (current === highlightedMessageId ? null : current))
+    }, 3500)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [highlightedMessageId])
+
+  const playNotificationSound = useCallback(async () => {
+    try {
+      if (typeof window === "undefined") return
+
+      const AudioContextConstructor =
+        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioContextConstructor) return
+
+      const audioContext = audioContextRef.current ?? new AudioContextConstructor()
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume()
+      }
+
+      const now = audioContext.currentTime
+      const oscillator = audioContext.createOscillator()
+      const gain = audioContext.createGain()
+
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(880, now)
+
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5)
+
+      oscillator.connect(gain)
+      gain.connect(audioContext.destination)
+
+      oscillator.start(now)
+      oscillator.stop(now + 0.5)
+
+      audioContextRef.current = audioContext
+    } catch (error) {
+      console.error("Failed to play notification sound", error)
+    }
+  }, [])
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
 
@@ -360,7 +484,28 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     }[]
   }, [normalizedSearch, threads, user?.uid, userMap])
 
-  const filteredThreads = threadEntries.filter((entry) => entry.matches)
+  const filteredThreads = useMemo(
+    () => threadEntries.filter((entry) => entry.matches),
+    [threadEntries],
+  )
+
+  const visibleThreads = useMemo(() => {
+    if (!user?.uid) return filteredThreads
+
+    return [...filteredThreads].sort((a, b) => {
+      const aPinned = a.thread.pinnedBy?.includes(user.uid) ?? false
+      const bPinned = b.thread.pinnedBy?.includes(user.uid) ?? false
+
+      if (aPinned !== bPinned) {
+        return aPinned ? -1 : 1
+      }
+
+      const aTime = a.thread.updatedAt ? a.thread.updatedAt.getTime() : 0
+      const bTime = b.thread.updatedAt ? b.thread.updatedAt.getTime() : 0
+
+      return bTime - aTime
+    })
+  }, [filteredThreads, user?.uid])
 
   const suggestedUsers = useMemo(() => {
     if (!user?.uid) return [] as UserProfileSummary[]
@@ -381,6 +526,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   const handleSelectParticipant = (targetUid: string) => {
     if (!user?.uid) return
     setActiveParticipantId(targetUid)
+    const chatId = createChatId(user.uid, targetUid)
+    setHighlightedThreadIds((prev) => prev.filter((id) => id !== chatId))
   }
 
   const handleSendMessage = async () => {
@@ -433,6 +580,30 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   const handleBackToThreads = () => {
     if (!isMobile) return
     setActiveParticipantId(null)
+  }
+
+  const handleTogglePin = async (threadId: string, shouldPin: boolean) => {
+    if (!user?.uid) return
+
+    try {
+      const { arrayRemove, arrayUnion } = await import("firebase/firestore")
+      await updateDocument("chats", threadId, {
+        pinnedBy: shouldPin ? arrayUnion(user.uid) : arrayRemove(user.uid),
+      })
+      toast({
+        title: shouldPin ? "ปักหมุดการสนทนาแล้ว" : "ยกเลิกการปักหมุดแล้ว",
+        description: shouldPin
+          ? "บทสนทนานี้จะอยู่ด้านบนสุดเพื่อให้เข้าถึงได้ง่าย"
+          : "บทสนทนานี้จะกลับมาจัดเรียงตามเวลาล่าสุด",
+      })
+    } catch (error) {
+      console.error("Failed to toggle pin", error)
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถเปลี่ยนสถานะปักหมุดได้",
+        description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+      })
+    }
   }
 
   if (!isOpen) {
@@ -513,47 +684,88 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                         </div>
                       ))}
                     </div>
-                  ) : filteredThreads.length === 0 ? (
+                  ) : visibleThreads.length === 0 ? (
                     <p className="px-2 py-6 text-center text-sm text-gray-500">
                       {normalizedSearch
                         ? "ไม่พบรายชื่อที่ตรงกับการค้นหา"
                         : "ยังไม่มีบทสนทนา เริ่มต้นแชทกับผู้ใช้งานได้เลย"}
                     </p>
                   ) : (
-                    filteredThreads.map(({ thread, otherId, profile }) => {
-                      const isActive = activeChatId === thread.id
-                      const previewPrefix = thread.lastSenderId === user.uid ? "คุณ: " : ""
+                    visibleThreads.map(({ thread, otherId, profile }) => {
+                      const chatId = thread.id
+                      const isActive = activeChatId === chatId
+                      const isPinned = user?.uid ? thread.pinnedBy?.includes(user.uid) : false
+                      const isHighlighted = highlightedThreadIds.includes(chatId)
+                      const previewPrefix = thread.lastSenderId === user?.uid ? "คุณ: " : ""
                       return (
                         <button
-                          key={thread.id}
+                          key={chatId}
                           type="button"
                           onClick={() => handleSelectParticipant(otherId)}
                           className={cn(
-                            "flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors",
-                            isActive
-                              ? "bg-blue-50/90 ring-1 ring-blue-200"
-                              : "hover:bg-slate-100/80",
+                            "group flex w-full items-center gap-3 rounded-2xl border bg-white/70 p-3 text-left transition",
+                            "hover:border-blue-100 hover:bg-blue-50/70",
+                            isActive && "border-blue-200 bg-blue-50 shadow-inner",
+                            !isActive && "border-slate-100 shadow-sm",
+                            isHighlighted && !isActive && "border-blue-300 bg-blue-50/90",
+                            isHighlighted && !isActive && "animate-pulse",
                           )}
                         >
-                          <Avatar className="h-10 w-10 border border-slate-200">
+                          <Avatar className="h-11 w-11 border border-slate-200">
                             <AvatarImage src={profile?.photoURL || ""} alt={getDisplayName(profile)} />
                             <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
                               {getAvatarFallback(profile)}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex flex-1 flex-col overflow-hidden">
-                            <div className="flex items-center justify-between">
-                              <span className="truncate text-sm font-semibold text-gray-900">
-                                {getDisplayName(profile)}
-                              </span>
-                              <span className="ml-3 flex-shrink-0 text-xs text-gray-400">
+                          <div className="flex min-w-0 flex-1 flex-col">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex flex-col">
+                                <span
+                                  className={cn(
+                                    "truncate text-sm font-semibold text-gray-900",
+                                    isHighlighted && "text-blue-700",
+                                  )}
+                                >
+                                  {getDisplayName(profile)}
+                                </span>
+                                {isPinned && (
+                                  <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-blue-500">
+                                    <Pin className="h-3 w-3 -rotate-45" /> ปักหมุดแล้ว
+                                  </span>
+                                )}
+                              </div>
+                              <span className="mt-0.5 text-[11px] uppercase tracking-wide text-gray-400">
                                 {formatThreadTime(thread.updatedAt)}
                               </span>
                             </div>
-                            <span className="truncate text-xs text-gray-500">
+                            <span
+                              className={cn(
+                                "truncate text-xs text-gray-500",
+                                isActive && "text-gray-600",
+                                isHighlighted && !isActive && "font-medium text-blue-600",
+                              )}
+                            >
                               {thread.lastMessage ? `${previewPrefix}${thread.lastMessage}` : "ยังไม่มีข้อความ"}
                             </span>
                           </div>
+                          {user?.uid && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleTogglePin(chatId, !isPinned)
+                              }}
+                              className={cn(
+                                "h-8 w-8 rounded-full text-gray-400 transition",
+                                "hover:text-blue-600",
+                                isPinned && "text-blue-600",
+                              )}
+                            >
+                              {isPinned ? <Pin className="h-4 w-4 -rotate-45" /> : <PinOff className="h-4 w-4" />}
+                            </Button>
+                          )}
                         </button>
                       )
                     })
@@ -648,22 +860,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                         <div className="flex flex-col gap-3">
                           {messages.map((message) => {
                             const isMine = message.senderId === user.uid
+                            const isHighlightedMessage = highlightedMessageId === message.id && !isMine
                             return (
-                              <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}
-                              >
+                              <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
                                 <div
                                   className={cn(
-                                    "max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm",
+                                    "max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm transition",
                                     isMine
                                       ? "bg-blue-600 text-white"
                                       : "bg-white text-gray-900",
+                                    isHighlightedMessage && "ring-2 ring-blue-400",
                                   )}
                                 >
                                   <p>{message.text}</p>
-                                  <span className={cn(
-                                    "mt-1 block text-[11px]",
-                                    isMine ? "text-blue-100/80" : "text-gray-400",
-                                  )}
+                                  <span
+                                    className={cn(
+                                      "mt-1 block text-[11px]",
+                                      isMine ? "text-blue-100/80" : "text-gray-400",
+                                    )}
                                   >
                                     {formatMessageTime(message.createdAt)}
                                   </span>
