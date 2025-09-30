@@ -1,12 +1,15 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
+  Images,
   Loader2,
   MessageSquareText,
+  Paperclip,
   Pin,
   PinOff,
+  Play,
   Search,
   Send,
   X,
@@ -23,6 +26,7 @@ import {
   subscribeToCollection,
   updateDocument,
 } from "@/lib/firestore"
+import { getDownloadURL, uploadFile } from "@/lib/storage"
 import { cn } from "@/lib/utils"
 
 interface ChatPanelProps {
@@ -41,11 +45,23 @@ interface ChatThread {
   pinnedBy?: string[]
 }
 
+type AttachmentKind = "image" | "video" | "file"
+
+interface ChatMessageAttachment {
+  url: string
+  storagePath: string
+  contentType?: string
+  name?: string
+  size?: number
+  type: AttachmentKind
+}
+
 interface ChatMessage {
   id: string
   text: string
   senderId: string
   createdAt?: Date | null
+  attachments?: ChatMessageAttachment[]
 }
 
 interface UserProfileSummary {
@@ -58,6 +74,34 @@ interface UserProfileSummary {
 const createChatId = (first: string, second: string) => {
   return [first, second].sort().join("__")
 }
+
+const resolveAttachmentKind = (contentType?: string | null): AttachmentKind => {
+  if (!contentType) return "file"
+  if (contentType.startsWith("image/")) return "image"
+  if (contentType.startsWith("video/")) return "video"
+  return "file"
+}
+
+const describeAttachmentSummary = (attachments: { type: AttachmentKind }[]) => {
+  const hasImages = attachments.some((attachment) => attachment.type === "image")
+  const hasVideos = attachments.some((attachment) => attachment.type === "video")
+
+  if (hasImages && hasVideos) {
+    return "ส่งรูปและวิดีโอ"
+  }
+
+  if (hasImages) {
+    return attachments.length > 1 ? `ส่งรูปภาพ ${attachments.length} รูป` : "ส่งรูปภาพ"
+  }
+
+  if (hasVideos) {
+    return attachments.length > 1 ? `ส่งวิดีโอ ${attachments.length} รายการ` : "ส่งวิดีโอ"
+  }
+
+  return attachments.length > 1 ? `ส่งไฟล์ ${attachments.length} รายการ` : "ส่งไฟล์"
+}
+
+const sanitizeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_")
 
 const getDisplayName = (profile?: UserProfileSummary | null) => {
   if (!profile) return "ผู้ใช้ DreamHome"
@@ -108,6 +152,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const { user } = useAuthContext()
   const { toast } = useToast()
 
+  const MAX_PENDING_ATTACHMENTS = 6
+
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [isMobile, setIsMobile] = useState(false)
   const [threads, setThreads] = useState<ChatThread[]>([])
@@ -121,10 +167,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null)
   const [highlightedThreadIds, setHighlightedThreadIds] = useState<string[]>([])
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([])
+  const [attachmentPreviews, setAttachmentPreviews] = useState<
+    { id: string; url: string; kind: "image" | "video"; name: string }
+  >([])
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false)
 
   const panelRef = useRef<HTMLDivElement>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const lastThreadTimestampsRef = useRef<Record<string, number>>({})
   const initialThreadSnapshotRef = useRef(true)
@@ -147,6 +199,26 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     })
     onRequestParticipantHandled?.()
   }, [requestedParticipantId, onRequestParticipantHandled, user?.uid])
+
+  useEffect(() => {
+    if (pendingAttachments.length === 0) {
+      setAttachmentPreviews([])
+      return
+    }
+
+    const previews = pendingAttachments.map((file) => ({
+      id: `${file.name}-${file.lastModified}-${file.size}`,
+      url: URL.createObjectURL(file),
+      kind: file.type.startsWith("video/") ? "video" : "image",
+      name: file.name,
+    }))
+
+    setAttachmentPreviews(previews)
+
+    return () => {
+      previews.forEach((preview) => URL.revokeObjectURL(preview.url))
+    }
+  }, [pendingAttachments])
 
   const activeChatId = useMemo(() => {
     if (!user?.uid || !activeParticipantId) return null
@@ -447,6 +519,34 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
             const mapped = docs.map((doc) => {
               const data = doc.data() as Record<string, any>
+              const attachments = Array.isArray(data.attachments)
+                ? data.attachments
+                    .map((raw) => {
+                      if (!raw || typeof raw !== "object") return null
+
+                      const url = typeof raw.url === "string" ? raw.url : ""
+                      if (!url) return null
+
+                      const storagePath = typeof raw.storagePath === "string" ? raw.storagePath : ""
+                      const contentType = typeof raw.contentType === "string" ? raw.contentType : null
+                      const typeValue = typeof raw.type === "string" ? raw.type : undefined
+                      const resolvedType =
+                        typeValue === "image" || typeValue === "video" || typeValue === "file"
+                          ? typeValue
+                          : resolveAttachmentKind(contentType)
+
+                      return {
+                        url,
+                        storagePath,
+                        contentType: contentType ?? undefined,
+                        name: typeof raw.name === "string" ? raw.name : undefined,
+                        size: typeof raw.size === "number" ? raw.size : undefined,
+                        type: resolvedType,
+                      } satisfies ChatMessageAttachment
+                    })
+                    .filter((value): value is ChatMessageAttachment => Boolean(value))
+                : []
+
               return {
                 id: doc.id,
                 text: typeof data.text === "string" ? data.text : "",
@@ -455,6 +555,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   data.createdAt && typeof data.createdAt.toDate === "function"
                     ? (data.createdAt.toDate() as Date)
                     : null,
+                attachments,
               }
             })
 
@@ -507,6 +608,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setMessageDraft("")
     setHighlightedMessageId(null)
     lastMessageIdRef.current = null
+    setPendingAttachments([])
+    setAttachmentPreviews([])
+    setIsGalleryOpen(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
   }, [activeChatId])
 
   useEffect(() => {
@@ -609,11 +716,94 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setHighlightedThreadIds((prev) => prev.filter((id) => id !== chatId))
   }
 
+  const handleFileButtonClick = () => {
+    if (sending) return
+    fileInputRef.current?.click()
+  }
+
+  const handleAttachmentChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ""
+
+    if (files.length === 0) return
+
+    const acceptedFiles = files.filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/"))
+    const rejectedCount = files.length - acceptedFiles.length
+
+    if (rejectedCount > 0) {
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถแนบไฟล์ได้",
+        description: "รองรับเฉพาะไฟล์รูปภาพหรือวิดีโอเท่านั้น",
+      })
+    }
+
+    if (acceptedFiles.length === 0) {
+      return
+    }
+
+    const limitMessage = `สามารถแนบไฟล์ได้สูงสุด ${MAX_PENDING_ATTACHMENTS} ไฟล์ต่อครั้ง`
+
+    if (pendingAttachments.length >= MAX_PENDING_ATTACHMENTS) {
+      toast({
+        title: "จำกัดจำนวนไฟล์",
+        description: limitMessage,
+      })
+      return
+    }
+
+    const availableSlots = MAX_PENDING_ATTACHMENTS - pendingAttachments.length
+    const filesToAdd = acceptedFiles.slice(0, availableSlots)
+
+    if (filesToAdd.length === 0) {
+      toast({
+        title: "จำกัดจำนวนไฟล์",
+        description: limitMessage,
+      })
+      return
+    }
+
+    if (filesToAdd.length < acceptedFiles.length) {
+      toast({
+        title: "จำกัดจำนวนไฟล์",
+        description: limitMessage,
+      })
+    }
+
+    setPendingAttachments((prev) => [...prev, ...filesToAdd])
+  }
+
+  const handleRemoveAttachment = (index: number) => {
+    setPendingAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
+  }
+
+  const mediaAttachments = useMemo(() => {
+    return messages
+      .flatMap((message) =>
+        (message.attachments || []).map((attachment) => ({
+          ...attachment,
+          createdAt: message.createdAt ?? null,
+          messageId: message.id,
+        })),
+      )
+      .filter((attachment) => attachment.type === "image" || attachment.type === "video")
+      .sort((a, b) => {
+        const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 0
+        const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : 0
+        return bTime - aTime
+      })
+  }, [messages])
+
+  const handleToggleGallery = () => {
+    setIsGalleryOpen((prev) => !prev)
+  }
+
   const handleSendMessage = async () => {
     if (!user?.uid || !activeParticipantId) return
 
     const trimmed = messageDraft.trim()
-    if (!trimmed) return
+    const hasAttachments = pendingAttachments.length > 0
+    if (!trimmed && !hasAttachments) return
 
     setSending(true)
 
@@ -622,21 +812,60 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const chatId = createChatId(user.uid, activeParticipantId)
       const participants = [user.uid, activeParticipantId].sort()
 
+      let attachmentsPayload: ChatMessageAttachment[] = []
+
+      if (hasAttachments) {
+        const baseTimestamp = Date.now()
+        attachmentsPayload = await Promise.all(
+          pendingAttachments.map(async (file, index) => {
+            const safeOriginalName = file.name || `attachment-${index + 1}`
+            const storagePath = `chat-attachments/${chatId}/${baseTimestamp}-${index}-${sanitizeFileName(safeOriginalName)}`
+            const metadata =
+              file.type && file.type.length > 0
+                ? { contentType: file.type, customMetadata: { originalName: safeOriginalName } }
+                : { customMetadata: { originalName: safeOriginalName } }
+
+            const uploadResult = await uploadFile(storagePath, file, metadata)
+            const fullPath = uploadResult.metadata.fullPath ?? storagePath
+            const downloadURL = await getDownloadURL(fullPath)
+            const contentType = uploadResult.metadata.contentType ?? file.type ?? null
+
+            return {
+              url: downloadURL,
+              storagePath: fullPath,
+              contentType: contentType ?? undefined,
+              name: uploadResult.metadata.name ?? safeOriginalName,
+              size: uploadResult.metadata.size ?? file.size,
+              type: resolveAttachmentKind(contentType),
+            }
+          }),
+        )
+      }
+
+      const messagePreview = trimmed || (attachmentsPayload.length > 0 ? describeAttachmentSummary(attachmentsPayload) : "")
+      const timestamp = serverTimestamp()
+
       await Promise.all([
         addDocument(`chats/${chatId}/messages`, {
           text: trimmed,
           senderId: user.uid,
-          createdAt: serverTimestamp(),
+          createdAt: timestamp,
+          attachments: attachmentsPayload,
         }),
         setDocument("chats", chatId, {
           participants,
-          lastMessage: trimmed,
+          lastMessage: messagePreview,
           lastSenderId: user.uid,
           updatedAt: serverTimestamp(),
         }),
       ])
 
       setMessageDraft("")
+      setPendingAttachments([])
+      setAttachmentPreviews([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     } catch (error) {
       console.error("Failed to send message", error)
       toast({
@@ -649,7 +878,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!sending) {
       void handleSendMessage()
@@ -927,7 +1156,68 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           <span className="text-xs text-gray-500">พูดคุยเกี่ยวกับการซื้อบ้าน</span>
                         </div>
                       </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleToggleGallery}
+                        className={cn(
+                          "ml-3 inline-flex h-9 items-center gap-2 rounded-full px-3 text-xs font-medium text-gray-500 transition hover:text-gray-900 sm:text-sm",
+                          isGalleryOpen && "bg-blue-50 text-blue-700 hover:text-blue-700",
+                          mediaAttachments.length === 0 && "text-gray-400 hover:text-gray-600",
+                        )}
+                        aria-pressed={isGalleryOpen}
+                      >
+                        <Images className="h-4 w-4" />
+                        <span className="hidden sm:inline">คลังสื่อ</span>
+                        <span className="inline-flex h-5 min-w-[1.5rem] items-center justify-center rounded-full bg-blue-100 px-1 text-[10px] font-semibold text-blue-600 sm:text-[11px]">
+                          {mediaAttachments.length}
+                        </span>
+                      </Button>
                     </div>
+
+                    {isGalleryOpen && (
+                      <div className="max-h-52 overflow-y-auto border-b border-slate-200 bg-white/75 px-4 py-3 backdrop-blur md:px-6 md:py-4">
+                        {mediaAttachments.length === 0 ? (
+                          <p className="text-sm text-gray-500">ยังไม่มีไฟล์รูปภาพหรือวิดีโอในบทสนทนานี้</p>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:gap-3 lg:grid-cols-5">
+                            {mediaAttachments.map((attachment) => (
+                              <a
+                                key={`${attachment.messageId}-${attachment.storagePath}`}
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="group relative block overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                              >
+                                {attachment.type === "image" ? (
+                                  <img
+                                    src={attachment.url}
+                                    alt={attachment.name || "ไฟล์รูปภาพ"}
+                                    className="h-24 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-28"
+                                  />
+                                ) : (
+                                  <>
+                                    <video
+                                      src={attachment.url}
+                                      muted
+                                      loop
+                                      playsInline
+                                      className="h-24 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-28"
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">
+                                        <Play className="h-4 w-4" />
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div
                       className={cn(
@@ -950,6 +1240,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           {messages.map((message) => {
                             const isMine = message.senderId === user.uid
                             const isHighlightedMessage = highlightedMessageId === message.id && !isMine
+                            const attachments = message.attachments ?? []
+                            const hasAttachments = attachments.length > 0
+                            const textContent = message.text ?? ""
+                            const showText = textContent.trim().length > 0
+
                             return (
                               <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
                                 <div
@@ -961,11 +1256,84 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                     isHighlightedMessage && "ring-2 ring-blue-400",
                                   )}
                                 >
-                                  <p>{message.text}</p>
+                                  <div className="flex flex-col gap-2">
+                                    {hasAttachments && (
+                                      <div className="flex flex-col gap-2">
+                                        {attachments.map((attachment, index) => {
+                                          const key = `${attachment.storagePath || message.id}-${index}`
+                                          if (attachment.type === "image") {
+                                            return (
+                                              <a
+                                                key={key}
+                                                href={attachment.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className={cn(
+                                                  "block overflow-hidden rounded-xl border",
+                                                  isMine ? "border-white/30" : "border-slate-200",
+                                                )}
+                                              >
+                                                <img
+                                                  src={attachment.url}
+                                                  alt={attachment.name || "ไฟล์รูปภาพ"}
+                                                  className="max-h-64 w-full object-cover"
+                                                />
+                                              </a>
+                                            )
+                                          }
+
+                                          if (attachment.type === "video") {
+                                            return (
+                                              <div
+                                                key={key}
+                                                className={cn(
+                                                  "overflow-hidden rounded-xl border",
+                                                  isMine ? "border-white/30" : "border-slate-200",
+                                                )}
+                                              >
+                                                <video
+                                                  controls
+                                                  playsInline
+                                                  preload="metadata"
+                                                  className="max-h-64 w-full bg-black object-cover"
+                                                >
+                                                  <source src={attachment.url} type={attachment.contentType} />
+                                                </video>
+                                              </div>
+                                            )
+                                          }
+
+                                          return (
+                                            <a
+                                              key={key}
+                                              href={attachment.url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className={cn(
+                                                "flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition",
+                                                isMine
+                                                  ? "border-white/30 bg-white/10 text-white hover:bg-white/20"
+                                                  : "border-slate-200 bg-slate-100 text-gray-700 hover:bg-slate-200/80",
+                                              )}
+                                            >
+                                              <Paperclip className="h-4 w-4" />
+                                              <span className="truncate text-xs md:text-sm">
+                                                {attachment.name || "ไฟล์แนบ"}
+                                              </span>
+                                            </a>
+                                          )
+                                        })}
+                                      </div>
+                                    )}
+
+                                    {showText && (
+                                      <p className="whitespace-pre-wrap break-words">{textContent}</p>
+                                    )}
+                                  </div>
                                   <span
                                     className={cn(
                                       "mt-1 block text-[11px] md:text-xs",
-                                      isMine ? "text-blue-100/80" : "text-gray-400",
+                                      isMine ? "text-right text-blue-100/80" : "text-gray-400",
                                     )}
                                   >
                                     {formatMessageTime(message.createdAt)}
@@ -996,30 +1364,90 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="border-t border-slate-200 bg-white/90 px-4 py-3 md:px-6 md:py-4">
               {activeParticipantId ? (
-                <form onSubmit={handleSubmit} className="flex items-center gap-2 md:gap-3">
-                  <Input
-                    ref={inputRef}
-                    value={messageDraft}
-                    onChange={(event) => setMessageDraft(event.target.value)}
-                    placeholder="พิมพ์ข้อความของคุณ..."
-                    className="h-10 flex-1 rounded-full bg-slate-100 px-4 text-sm md:h-11 md:px-5 md:text-base"
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault()
-                        if (!sending) {
-                          void handleSendMessage()
+                <>
+                  {attachmentPreviews.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-3">
+                      {attachmentPreviews.map((preview, index) => (
+                        <div
+                          key={`${preview.id}-${index}`}
+                          className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 md:h-24 md:w-24"
+                        >
+                          {preview.kind === "image" ? (
+                            <img src={preview.url} alt={preview.name || "ไฟล์แนบ"} className="h-full w-full object-cover" />
+                          ) : (
+                            <>
+                              <video
+                                src={preview.url}
+                                muted
+                                loop
+                                playsInline
+                                className="h-full w-full object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white">
+                                  <Play className="h-3.5 w-3.5" />
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(index)}
+                            className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70"
+                            aria-label="ลบไฟล์แนบ"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} className="flex items-center gap-2 md:gap-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,video/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleAttachmentChange}
+                      disabled={sending}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleFileButtonClick}
+                      className="h-10 w-10 rounded-full text-gray-500 transition hover:text-gray-900 md:h-11 md:w-11"
+                      aria-label="แนบไฟล์"
+                      disabled={sending}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      ref={inputRef}
+                      value={messageDraft}
+                      onChange={(event) => setMessageDraft(event.target.value)}
+                      placeholder="พิมพ์ข้อความของคุณ..."
+                      className="h-10 flex-1 rounded-full bg-slate-100 px-4 text-sm md:h-11 md:px-5 md:text-base"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault()
+                          if (!sending) {
+                            void handleSendMessage()
+                          }
                         }
-                      }
-                    }}
-                  />
-                  <Button
-                    type="submit"
-                    disabled={sending || !messageDraft.trim()}
-                    className="h-10 w-10 rounded-full bg-blue-600 p-0 hover:bg-blue-700 md:h-11 md:w-11"
-                  >
-                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 md:h-5 md:w-5" />}
-                  </Button>
-                </form>
+                      }}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={sending || (!messageDraft.trim() && pendingAttachments.length === 0)}
+                      className="h-10 w-10 rounded-full bg-blue-600 p-0 hover:bg-blue-700 md:h-11 md:w-11"
+                    >
+                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 md:h-5 md:w-5" />}
+                    </Button>
+                  </form>
+                </>
               ) : (
                 <p className="text-center text-sm text-gray-500">
                   เลือกผู้ใช้เพื่อเริ่มต้นการสนทนาเกี่ยวกับการซื้อบ้านของคุณ
