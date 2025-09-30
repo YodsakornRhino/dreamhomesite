@@ -63,6 +63,7 @@ service firebase.storage {
       return request.auth != null;
     }
 
+
     // Pair-style chat ids look like "uidA__uidB" for 1:1 threads
     function chatIdPairsWithMe(chatId) {
       return isSignedIn()
@@ -91,6 +92,7 @@ service firebase.storage {
 
     function isChatParticipant(chatId) {
       return isInChatDoc(chatId) || chatIdPairsWithMe(chatId);
+
     }
 
     match /propertyImages/{propertyId}/{allPaths=**} {
@@ -104,6 +106,10 @@ service firebase.storage {
       // If you need to restrict types, add:
       // allow write: if isChatParticipant(chatId)
       //              && request.resource.contentType.matches('image/.*|application/pdf');
+    }
+
+    match /chat-attachments/{chatId}/{allPaths=**} {
+      allow read, write, delete: if isChatParticipant(chatId);
     }
   }
 }

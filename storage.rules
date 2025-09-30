@@ -2,10 +2,13 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+
     /* Helpers */
+
     function isSignedIn() {
       return request.auth != null;
     }
+
 
     // กรณี chat แบบ 1:1 ใช้ id = "uidA__uidB"
     function chatIdPairsWithMe(chatId) {
@@ -51,6 +54,7 @@ service firebase.storage {
       // ถ้าจะจำกัดชนิดไฟล์ ให้ใช้บรรทัดล่างแทน:
       // allow write: if isChatParticipant(chatId)
       //              && request.resource.contentType.matches('image/.*|application/pdf');
+
     }
   }
 }
