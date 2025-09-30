@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ImageIcon,
+  Loader2,
   MapPin,
   Phone,
   Mail,
@@ -54,12 +55,14 @@ interface UserPropertyModalProps {
   open: boolean;
   property: UserProperty | null;
   onOpenChange: (open: boolean) => void;
+  loading?: boolean;
 }
 
 export function UserPropertyModal({
   open,
   property,
   onOpenChange,
+  loading = false,
 }: UserPropertyModalProps) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [pointerStartX, setPointerStartX] = useState<number | null>(null);
@@ -326,7 +329,22 @@ export function UserPropertyModal({
     });
   }, [property, toast, user]);
 
-  if (!property) return null;
+  if (!property && !loading) return null;
+
+  if (!property && loading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex w-full max-w-[calc(100vw-2rem)] flex-col items-center justify-center gap-4 py-12 text-center sm:max-w-3xl">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+          <p className="text-sm text-muted-foreground">กำลังโหลดรายละเอียดประกาศ...</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!property) {
+    return null;
+  }
 
   const sellerRoleLabel =
     SELLER_ROLE_LABELS[property.sellerRole] ?? property.sellerRole;
@@ -353,7 +371,7 @@ export function UserPropertyModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
+      <DialogContent className="relative w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
         <DialogHeader className="space-y-4">
           <div className="space-y-2">
             <DialogTitle className="text-xl font-bold text-gray-900 sm:text-2xl">
@@ -672,6 +690,12 @@ export function UserPropertyModal({
             </section>
           </aside>
         </div>
+        {loading && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/70 backdrop-blur-sm">
+            <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
+            <p className="text-sm text-muted-foreground">กำลังโหลดรายละเอียดล่าสุด...</p>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

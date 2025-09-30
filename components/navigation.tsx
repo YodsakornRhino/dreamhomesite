@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip"
 import ProfileModal from "./profile-modal"
+import { UserPropertyModal } from "./user-property-modal"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +43,14 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import ChatPanel from "./chat-panel"
-import type { ChatOpenEventDetail, PropertyPreviewPayload } from "@/types/chat"
+import type {
+  ChatOpenEventDetail,
+  PropertyPreviewOpenEventDetail,
+  PropertyPreviewPayload,
+} from "@/types/chat"
+import type { UserProperty } from "@/types/user-property"
+import { getDocument } from "@/lib/firestore"
+import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -57,6 +65,10 @@ const Navigation: React.FC = () => {
   const [requestedParticipantId, setRequestedParticipantId] = useState<string | null>(null)
   const [requestedPropertyPreview, setRequestedPropertyPreview] =
     useState<PropertyPreviewPayload | null>(null)
+  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false)
+  const [propertyModalLoading, setPropertyModalLoading] = useState(false)
+  const [propertyModalProperty, setPropertyModalProperty] = useState<UserProperty | null>(null)
+  const activePropertyRequestIdRef = useRef<string | null>(null)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -77,6 +89,116 @@ const Navigation: React.FC = () => {
     }
   }, [user])
 
+  const buildPlaceholderProperty = useCallback(
+    (preview: PropertyPreviewPayload, fallbackOwner?: string | null): UserProperty => {
+      const safeOwner = preview.ownerUid || fallbackOwner || ""
+      const priceValue =
+        typeof preview.price === "number" && Number.isFinite(preview.price) ? preview.price : 0
+
+      return {
+        id: preview.propertyId,
+        userUid: safeOwner,
+        sellerName: "",
+        sellerPhone: "",
+        sellerEmail: "",
+        sellerRole: "",
+        title: preview.title || "ประกาศอสังหาริมทรัพย์",
+        propertyType: "",
+        transactionType: preview.transactionType ?? "",
+        price: priceValue,
+        address: preview.address ?? "",
+        city: preview.city ?? "",
+        province: preview.province ?? "",
+        postal: "",
+        lat: null,
+        lng: null,
+        landArea: "",
+        usableArea: "",
+        bedrooms: "",
+        bathrooms: "",
+        parking: null,
+        yearBuilt: null,
+        description: "",
+        photos:
+          preview.thumbnailUrl && preview.thumbnailUrl.trim().length > 0
+            ? [preview.thumbnailUrl]
+            : [],
+        video: null,
+        createdAt: new Date().toISOString(),
+      }
+    },
+    [],
+  )
+
+  const resetPropertyModal = useCallback(() => {
+    setIsPropertyModalOpen(false)
+    setPropertyModalProperty(null)
+    setPropertyModalLoading(false)
+    activePropertyRequestIdRef.current = null
+  }, [])
+
+  const loadPropertyById = useCallback(
+    async (propertyId: string) => {
+      try {
+        const doc = await getDocument("property", propertyId)
+        if (activePropertyRequestIdRef.current !== propertyId) {
+          return
+        }
+
+        if (!doc) {
+          setPropertyModalLoading(false)
+          toast({
+            variant: "destructive",
+            title: "ไม่พบรายละเอียดประกาศ",
+            description: "ประกาศอาจถูกลบหรือไม่พร้อมแสดงแล้ว",
+          })
+          return
+        }
+
+        const mapped = mapDocumentToUserProperty(doc)
+        setPropertyModalProperty(mapped)
+        setPropertyModalLoading(false)
+      } catch (error) {
+        console.error("Failed to load property for preview", error)
+        if (activePropertyRequestIdRef.current !== propertyId) {
+          return
+        }
+
+        setPropertyModalLoading(false)
+        toast({
+          variant: "destructive",
+          title: "โหลดรายละเอียดประกาศไม่สำเร็จ",
+          description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+        })
+      }
+    },
+    [toast],
+  )
+
+  const handleOpenPropertyPreview = useCallback(
+    (detail: PropertyPreviewOpenEventDetail | undefined) => {
+      if (!detail?.propertyId) {
+        return
+      }
+
+      activePropertyRequestIdRef.current = detail.propertyId
+      if (detail.preview) {
+        setPropertyModalProperty(buildPlaceholderProperty(detail.preview, detail.ownerUid ?? null))
+      } else if (
+        !propertyModalProperty ||
+        propertyModalProperty.id !== detail.propertyId
+      ) {
+        setPropertyModalProperty(null)
+      }
+
+      setIsPropertyModalOpen(true)
+      setPropertyModalLoading(true)
+
+      void loadPropertyById(detail.propertyId)
+    },
+    [buildPlaceholderProperty, loadPropertyById, propertyModalProperty],
+  )
+
   useEffect(() => {
     const handleOpenChat = (event: Event) => {
       const detail = (event as CustomEvent<ChatOpenEventDetail>).detail
@@ -93,6 +215,19 @@ const Navigation: React.FC = () => {
       window.removeEventListener("dreamhome:open-chat", handleOpenChat)
     }
   }, [])
+
+  useEffect(() => {
+    const handlePreview = (event: Event) => {
+      const detail = (event as CustomEvent<PropertyPreviewOpenEventDetail>).detail
+      handleOpenPropertyPreview(detail)
+    }
+
+    window.addEventListener("dreamhome:open-property-preview", handlePreview)
+
+    return () => {
+      window.removeEventListener("dreamhome:open-property-preview", handlePreview)
+    }
+  }, [handleOpenPropertyPreview])
 
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text
@@ -391,6 +526,18 @@ const Navigation: React.FC = () => {
         onRequestParticipantHandled={() => setRequestedParticipantId(null)}
         requestedPropertyPreview={requestedPropertyPreview}
         onRequestPropertyPreviewHandled={() => setRequestedPropertyPreview(null)}
+      />
+      <UserPropertyModal
+        open={isPropertyModalOpen}
+        property={propertyModalProperty}
+        loading={propertyModalLoading}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetPropertyModal()
+          } else {
+            setIsPropertyModalOpen(true)
+          }
+        }}
       />
     </>
   )
