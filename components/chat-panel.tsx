@@ -278,7 +278,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     if (!isOpen) return
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!panelRef.current) {
+      const panelElement = panelRef.current
+      if (!panelElement) {
         return
       }
 
@@ -295,11 +296,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         return
       }
 
-      if (panelRef.current.contains(targetElement)) {
+      if (panelElement.contains(targetElement)) {
         return
       }
 
       if (targetElement.closest("[data-chat-panel-keep-open]")) {
+        return
+      }
+
+      const composedPath = typeof event.composedPath === "function" ? event.composedPath() : []
+      if (composedPath.some((node) => node instanceof Element && node.hasAttribute("data-chat-panel-keep-open"))) {
         return
       }
 
