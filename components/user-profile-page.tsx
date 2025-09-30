@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle } from "lucide-react";
 
 import ChatWidget from "@/components/chat-widget";
 import { UserPropertyCard } from "@/components/user-property-card";
@@ -10,6 +10,9 @@ import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { useUserChatContext } from "@/contexts/UserChatContext";
+import { useToast } from "@/hooks/use-toast";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
@@ -19,6 +22,7 @@ interface UserProfilePageProps {
 }
 
 export function UserProfilePage({ uid }: UserProfilePageProps) {
+  const { user } = useAuthContext();
   const {
     profile,
     loading: profileLoading,
@@ -32,6 +36,10 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
+  const { openChatWithUser, isInitializingChat } = useUserChatContext();
+  const { toast } = useToast();
+
+  const isOwnProfile = user?.uid === uid;
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";
@@ -47,6 +55,19 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
 
   const handleViewDetails = (property: UserProperty) => {
     setSelectedProperty(property);
+  };
+
+  const handleStartChat = async () => {
+    if (!profile) {
+      toast({
+        title: "ไม่สามารถเริ่มแชทได้",
+        description: "ข้อมูลผู้ขายยังไม่พร้อม กรุณาลองใหม่อีกครั้ง",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await openChatWithUser(uid);
   };
 
   const handleModalChange = (open: boolean) => {
@@ -118,6 +139,21 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
             </div>
 
             <div className="flex w-full flex-col gap-2 sm:w-auto">
+              {!isOwnProfile && (
+                <Button
+                  variant="secondary"
+                  onClick={() => void handleStartChat()}
+                  disabled={isInitializingChat}
+                  className="flex items-center justify-center gap-2"
+                >
+                  {isInitializingChat ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-4 w-4" />
+                  )}
+                  <span>ส่งข้อความหาเจ้าของประกาศ</span>
+                </Button>
+              )}
               {profile?.email && (
                 <Button asChild variant="outline">
                   <a href={`mailto:${profile.email}`}>ติดต่อผู้ขายผ่านอีเมล</a>

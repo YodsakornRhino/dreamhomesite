@@ -39,11 +39,13 @@ import {
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
+import { useUserChatContext } from "@/contexts/UserChatContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
+  const { openChatPanel } = useUserChatContext()
   const { toast } = useToast()
   const pathname = usePathname()
 
@@ -253,7 +255,7 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openChatPanel()}>
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>

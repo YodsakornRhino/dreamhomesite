@@ -8,9 +8,11 @@ import "./globals.css";
 import ClientOnly from "@/components/ClientOnly";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { UserChatProvider } from "@/contexts/UserChatContext";
 import { Toaster } from "@/components/ui/toaster";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
+import UserChatPanel from "@/components/user-chat-panel";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -66,20 +68,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             disableTransitionOnChange
           >
              <AuthProvider>
-              {/* ✅ reCAPTCHA container แบบถาวร: ใช้ id นี้ให้ตรงกับใน profile-modal */}
-              <div
-                id="recaptcha-container-root"
-                // มองไม่เห็น แต่ยังอยู่ใน DOM ตลอดอายุเพจ (อย่าใช้ display:none)
-                className="sr-only"
-                aria-hidden="true"
-              />
+              <UserChatProvider>
+                {/* ✅ reCAPTCHA container แบบถาวร: ใช้ id นี้ให้ตรงกับใน profile-modal */}
+                <div
+                  id="recaptcha-container-root"
+                  // มองไม่เห็น แต่ยังอยู่ใน DOM ตลอดอายุเพจ (อย่าใช้ display:none)
+                  className="sr-only"
+                  aria-hidden="true"
+                />
 
-              <div className="min-h-screen flex flex-col">
-                <Navigation />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-              <Toaster />
+                <div className="min-h-screen flex flex-col">
+                  <Navigation />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                </div>
+                <Toaster />
+                <UserChatPanel />
+              </UserChatProvider>
             </AuthProvider>
           </ThemeProvider>
         </ClientOnly>
