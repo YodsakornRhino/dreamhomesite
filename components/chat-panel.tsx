@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
@@ -13,6 +14,7 @@ import {
   Search,
   Send,
   X,
+  ImageIcon,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -21,6 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
+import type { PropertyPreviewPayload } from "@/types/chat"
 import {
   addDocument,
   setDocument,
@@ -29,12 +32,15 @@ import {
 } from "@/lib/firestore"
 import { getDownloadURL, uploadFile } from "@/lib/storage"
 import { cn } from "@/lib/utils"
+import { formatPropertyPrice, TRANSACTION_LABELS } from "@/lib/property"
 
 interface ChatPanelProps {
   isOpen: boolean
   onClose: () => void
   requestedParticipantId?: string | null
   onRequestParticipantHandled?: () => void
+  requestedPropertyPreview?: PropertyPreviewPayload | null
+  onRequestPropertyPreviewHandled?: () => void
 }
 
 interface ChatThread {
@@ -57,12 +63,15 @@ interface ChatMessageAttachment {
   type: AttachmentKind
 }
 
+type ChatMessagePropertyPreview = PropertyPreviewPayload
+
 interface ChatMessage {
   id: string
   text: string
   senderId: string
   createdAt?: Date | null
   attachments?: ChatMessageAttachment[]
+  propertyPreview?: ChatMessagePropertyPreview
 }
 
 interface UserProfileSummary {
@@ -144,11 +153,51 @@ const formatMessageTime = (date?: Date | null) => {
   }).format(date)
 }
 
+interface SendMessageOptions {
+  text?: string
+  attachments?: ChatMessageAttachment[]
+  propertyPreview?: PropertyPreviewPayload | null
+}
+
+const sanitizePropertyPreview = (preview: PropertyPreviewPayload) => {
+  return {
+    propertyId: preview.propertyId,
+    ownerUid: preview.ownerUid,
+    title: preview.title,
+    price: typeof preview.price === "number" ? preview.price : null,
+    transactionType:
+      typeof preview.transactionType === "string" ? preview.transactionType : null,
+    thumbnailUrl:
+      typeof preview.thumbnailUrl === "string" && preview.thumbnailUrl.trim().length > 0
+        ? preview.thumbnailUrl
+        : null,
+    address:
+      typeof preview.address === "string" && preview.address.trim().length > 0
+        ? preview.address
+        : null,
+    city:
+      typeof preview.city === "string" && preview.city.trim().length > 0
+        ? preview.city
+        : null,
+    province:
+      typeof preview.province === "string" && preview.province.trim().length > 0
+        ? preview.province
+        : null,
+  }
+}
+
+const formatPropertyPreviewSummary = (preview: PropertyPreviewPayload) => {
+  const title = preview.title.trim()
+  return title ? `สนใจประกาศ: ${title}` : "สนใจประกาศนี้"
+}
+
 const ChatPanel: React.FC<ChatPanelProps> = ({
   isOpen,
   onClose,
   requestedParticipantId,
   onRequestParticipantHandled,
+  requestedPropertyPreview,
+  onRequestPropertyPreviewHandled,
 }) => {
   const { user } = useAuthContext()
   const { toast } = useToast()
@@ -172,6 +221,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [attachmentPreviews, setAttachmentPreviews] = useState<
     { id: string; url: string; kind: "image" | "video"; name: string }
   >([])
+  const [queuedPropertyPreview, setQueuedPropertyPreview] =
+    useState<PropertyPreviewPayload | null>(null)
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false)
   const [selectedAttachment, setSelectedAttachment] = useState<ChatMessageAttachment | null>(null)
@@ -212,6 +263,34 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     })
     onRequestParticipantHandled?.()
   }, [requestedParticipantId, onRequestParticipantHandled, user?.uid])
+
+  useEffect(() => {
+    if (!requestedPropertyPreview) {
+      return
+    }
+
+    if (!user?.uid) {
+      onRequestPropertyPreviewHandled?.()
+      return
+    }
+
+    if (requestedPropertyPreview.ownerUid === user.uid) {
+      onRequestPropertyPreviewHandled?.()
+      return
+    }
+
+    setQueuedPropertyPreview(requestedPropertyPreview)
+    setActiveParticipantId(requestedPropertyPreview.ownerUid)
+    setHighlightedThreadIds((current) => {
+      const chatId = createChatId(user.uid, requestedPropertyPreview.ownerUid)
+      return current.filter((id) => id !== chatId)
+    })
+    onRequestPropertyPreviewHandled?.()
+  }, [
+    onRequestPropertyPreviewHandled,
+    requestedPropertyPreview,
+    user?.uid,
+  ])
 
   useEffect(() => {
     if (pendingAttachments.length === 0) {
@@ -588,6 +667,54 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     .filter((value): value is ChatMessageAttachment => Boolean(value))
                 : []
 
+              let propertyPreview: ChatMessagePropertyPreview | undefined
+              const rawPreview = data.propertyPreview
+              if (rawPreview && typeof rawPreview === "object") {
+                const previewRecord = rawPreview as Record<string, unknown>
+                const propertyId =
+                  typeof previewRecord.propertyId === "string"
+                    ? previewRecord.propertyId
+                    : ""
+                const ownerUid =
+                  typeof previewRecord.ownerUid === "string"
+                    ? previewRecord.ownerUid
+                    : ""
+                const title =
+                  typeof previewRecord.title === "string" ? previewRecord.title : ""
+
+                if (propertyId && ownerUid && title) {
+                  propertyPreview = {
+                    propertyId,
+                    ownerUid,
+                    title,
+                    price:
+                      typeof previewRecord.price === "number"
+                        ? previewRecord.price
+                        : null,
+                    transactionType:
+                      typeof previewRecord.transactionType === "string"
+                        ? previewRecord.transactionType
+                        : null,
+                    thumbnailUrl:
+                      typeof previewRecord.thumbnailUrl === "string"
+                        ? previewRecord.thumbnailUrl
+                        : null,
+                    address:
+                      typeof previewRecord.address === "string"
+                        ? previewRecord.address
+                        : null,
+                    city:
+                      typeof previewRecord.city === "string"
+                        ? previewRecord.city
+                        : null,
+                    province:
+                      typeof previewRecord.province === "string"
+                        ? previewRecord.province
+                        : null,
+                  }
+                }
+              }
+
               return {
                 id: doc.id,
                 text: typeof data.text === "string" ? data.text : "",
@@ -597,6 +724,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     ? (data.createdAt.toDate() as Date)
                     : null,
                 attachments,
+                propertyPreview,
               }
             })
 
@@ -835,6 +963,56 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }
 
+  const sendMessageToChat = useCallback(
+    async (targetUid: string, options: SendMessageOptions) => {
+      if (!user?.uid) {
+        throw new Error("กรุณาเข้าสู่ระบบก่อนส่งข้อความ")
+      }
+
+      const { serverTimestamp } = await import("firebase/firestore")
+      const chatId = createChatId(user.uid, targetUid)
+      const participants = [user.uid, targetUid].sort()
+
+      const trimmedText = options.text?.trim() ?? ""
+      const attachments = options.attachments ?? []
+      const propertyPreview = options.propertyPreview ?? null
+
+      let messagePreview = trimmedText
+      if (!messagePreview && propertyPreview) {
+        messagePreview = formatPropertyPreviewSummary(propertyPreview)
+      }
+      if (!messagePreview && attachments.length > 0) {
+        messagePreview = describeAttachmentSummary(attachments)
+      }
+
+      const timestamp = serverTimestamp()
+      const messageData: Record<string, unknown> = {
+        text: trimmedText,
+        senderId: user.uid,
+        createdAt: timestamp,
+      }
+
+      if (attachments.length > 0) {
+        messageData.attachments = attachments
+      }
+
+      if (propertyPreview) {
+        messageData.propertyPreview = sanitizePropertyPreview(propertyPreview)
+      }
+
+      await Promise.all([
+        addDocument(`chats/${chatId}/messages`, messageData),
+        setDocument("chats", chatId, {
+          participants,
+          lastMessage: messagePreview,
+          lastSenderId: user.uid,
+          updatedAt: serverTimestamp(),
+        }),
+      ])
+    },
+    [user?.uid],
+  )
+
   const handleSendMessage = async () => {
     if (!user?.uid || !activeParticipantId) return
 
@@ -845,10 +1023,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setSending(true)
 
     try {
-      const { serverTimestamp } = await import("firebase/firestore")
       const chatId = createChatId(user.uid, activeParticipantId)
-      const participants = [user.uid, activeParticipantId].sort()
-
       let attachmentsPayload: ChatMessageAttachment[] = []
 
       if (hasAttachments) {
@@ -879,23 +1054,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         )
       }
 
-      const messagePreview = trimmed || (attachmentsPayload.length > 0 ? describeAttachmentSummary(attachmentsPayload) : "")
-      const timestamp = serverTimestamp()
-
-      await Promise.all([
-        addDocument(`chats/${chatId}/messages`, {
-          text: trimmed,
-          senderId: user.uid,
-          createdAt: timestamp,
-          attachments: attachmentsPayload,
-        }),
-        setDocument("chats", chatId, {
-          participants,
-          lastMessage: messagePreview,
-          lastSenderId: user.uid,
-          updatedAt: serverTimestamp(),
-        }),
-      ])
+      await sendMessageToChat(activeParticipantId, {
+        text: trimmed,
+        attachments: attachmentsPayload,
+      })
 
       setMessageDraft("")
       setPendingAttachments([])
@@ -914,6 +1076,57 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       setSending(false)
     }
   }
+
+  useEffect(() => {
+    if (!queuedPropertyPreview) return
+    if (!user?.uid) {
+      setQueuedPropertyPreview(null)
+      return
+    }
+
+    const targetUid = queuedPropertyPreview.ownerUid
+    if (!targetUid || targetUid === user.uid) {
+      setQueuedPropertyPreview(null)
+      return
+    }
+
+    if (activeParticipantId !== targetUid) {
+      return
+    }
+
+    if (sending) {
+      return
+    }
+
+    setSending(true)
+
+    void (async () => {
+      try {
+        await sendMessageToChat(targetUid, {
+          text: "ฉันสนใจประกาศนี้",
+          propertyPreview: queuedPropertyPreview,
+        })
+      } catch (error) {
+        console.error("Failed to send property interest", error)
+        toast({
+          variant: "destructive",
+          title: "ส่งการแจ้งความสนใจไม่สำเร็จ",
+          description:
+            error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+        })
+      } finally {
+        setSending(false)
+        setQueuedPropertyPreview(null)
+      }
+    })()
+  }, [
+    activeParticipantId,
+    queuedPropertyPreview,
+    sending,
+    sendMessageToChat,
+    toast,
+    user?.uid,
+  ])
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1253,6 +1466,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             const hasAttachments = attachments.length > 0
                             const textContent = message.text ?? ""
                             const showText = textContent.trim().length > 0
+                            const propertyPreview = message.propertyPreview
 
                             return (
                               <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
@@ -1266,6 +1480,98 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                   )}
                                 >
                                   <div className="flex flex-col gap-2">
+                                    {propertyPreview && (
+                                      <div
+                                        className={cn(
+                                          "overflow-hidden rounded-xl border",
+                                          isMine
+                                            ? "border-white/30 bg-white/10"
+                                            : "border-slate-200 bg-white",
+                                        )}
+                                      >
+                                        {propertyPreview.thumbnailUrl ? (
+                                          <img
+                                            src={propertyPreview.thumbnailUrl}
+                                            alt={propertyPreview.title}
+                                            className="h-40 w-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="flex h-40 w-full items-center justify-center bg-slate-100 text-slate-400">
+                                            <ImageIcon className="h-10 w-10" />
+                                          </div>
+                                        )}
+                                        <div className="space-y-2 px-3 py-3">
+                                          <p
+                                            className={cn(
+                                              "text-sm font-semibold leading-snug",
+                                              isMine ? "text-white" : "text-gray-900",
+                                            )}
+                                          >
+                                            {propertyPreview.title}
+                                          </p>
+                                          {propertyPreview.transactionType && (
+                                            <p
+                                              className={cn(
+                                                "text-xs font-medium uppercase tracking-wide",
+                                                isMine ? "text-white/80" : "text-blue-600",
+                                              )}
+                                            >
+                                              {TRANSACTION_LABELS[propertyPreview.transactionType] ??
+                                                propertyPreview.transactionType}
+                                            </p>
+                                          )}
+                                          {typeof propertyPreview.price === "number" &&
+                                          Number.isFinite(propertyPreview.price) ? (
+                                            <p
+                                              className={cn(
+                                                "text-sm font-semibold",
+                                                isMine ? "text-white" : "text-blue-600",
+                                              )}
+                                            >
+                                              {formatPropertyPrice(
+                                                propertyPreview.price,
+                                                propertyPreview.transactionType ?? "sale",
+                                              )}
+                                            </p>
+                                          ) : null}
+                                          {(() => {
+                                            const location =
+                                              propertyPreview.address && propertyPreview.address.trim().length > 0
+                                                ? propertyPreview.address
+                                                : [propertyPreview.city, propertyPreview.province]
+                                                    .filter((value): value is string => Boolean(value && value.trim()))
+                                                    .join(" ")
+                                            if (!location) return null
+                                            return (
+                                              <p
+                                                className={cn(
+                                                  "text-xs",
+                                                  isMine ? "text-white/75" : "text-gray-500",
+                                                )}
+                                              >
+                                                {location}
+                                              </p>
+                                            )
+                                          })()}
+                                          {propertyPreview.ownerUid && (
+                                            <Link
+                                              href={`/users/${propertyPreview.ownerUid}?propertyId=${encodeURIComponent(propertyPreview.propertyId)}`}
+                                              prefetch={false}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className={cn(
+                                                "mt-2 inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
+                                                isMine
+                                                  ? "bg-white text-blue-600 hover:bg-blue-50"
+                                                  : "bg-blue-600 text-white hover:bg-blue-700",
+                                              )}
+                                            >
+                                              ดูรายละเอียดประกาศ
+                                            </Link>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
                                     {hasAttachments && (
                                       <div className="flex flex-col gap-2">
                                         {attachments.map((attachment, index) => {

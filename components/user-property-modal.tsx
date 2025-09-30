@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dialog";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import {
   formatPropertyPrice,
   PROPERTY_TYPE_LABELS,
@@ -46,6 +48,7 @@ import {
 } from "@/lib/property";
 import { cn } from "@/lib/utils";
 import type { UserProperty } from "@/types/user-property";
+import type { ChatOpenEventDetail, PropertyPreviewPayload } from "@/types/chat";
 
 interface UserPropertyModalProps {
   open: boolean;
@@ -60,6 +63,9 @@ export function UserPropertyModal({
 }: UserPropertyModalProps) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [pointerStartX, setPointerStartX] = useState<number | null>(null);
+  const { user } = useAuthContext();
+  const { toast } = useToast();
+  const [hasSentInterest, setHasSentInterest] = useState(false);
 
   const userUid = property?.userUid?.trim() ? property.userUid : null;
   const {
@@ -75,6 +81,7 @@ export function UserPropertyModal({
 
   useEffect(() => {
     setActiveMediaIndex(0);
+    setHasSentInterest(false);
   }, [property?.id]);
 
   const mediaItems = useMemo(() => {
@@ -257,11 +264,78 @@ export function UserPropertyModal({
   const sellerDisplayName = sellerProfile?.name || property.sellerName;
   const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
   const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
+  const isOwnListing = Boolean(user?.uid && property.userUid && user.uid === property.userUid);
+  const interestButtonLabel = isOwnListing
+    ? "ประกาศของคุณ"
+    : hasSentInterest
+      ? "แจ้งผู้ขายอีกครั้ง"
+      : "ต้องการอสังหาริมทรัพย์นี้";
 
   const mapUrl =
     typeof property.lat === "number" && typeof property.lng === "number"
       ? `https://www.google.com/maps?q=${property.lat},${property.lng}&hl=th&z=16&output=embed`
       : null;
+
+  const handleExpressInterest = useCallback(() => {
+    if (!property?.userUid) {
+      toast({
+        variant: "destructive",
+        title: "ไม่พบข้อมูลผู้ขาย",
+        description: "ไม่สามารถส่งความสนใจได้ในขณะนี้",
+      });
+      return;
+    }
+
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "กรุณาเข้าสู่ระบบ",
+        description: "เข้าสู่ระบบเพื่อแจ้งความสนใจต่อผู้ขาย",
+      });
+      return;
+    }
+
+    if (user.uid === property.userUid) {
+      toast({
+        title: "นี่คือประกาศของคุณ",
+        description: "คุณไม่จำเป็นต้องแจ้งความสนใจประกาศของตัวเอง",
+      });
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const firstPhoto = property.photos.find(
+      (photo): photo is string => typeof photo === "string" && photo.trim().length > 0,
+    );
+
+    const preview: PropertyPreviewPayload = {
+      propertyId: property.id,
+      ownerUid: property.userUid,
+      title: property.title,
+      price: Number.isFinite(property.price) ? property.price : null,
+      transactionType: property.transactionType,
+      thumbnailUrl: firstPhoto ?? null,
+      address: property.address,
+      city: property.city,
+      province: property.province,
+    };
+
+    const detail: ChatOpenEventDetail = {
+      participantId: property.userUid,
+      propertyPreview: preview,
+    };
+
+    window.dispatchEvent(new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", { detail }));
+
+    setHasSentInterest(true);
+    toast({
+      title: "ส่งความสนใจให้ผู้ขายแล้ว",
+      description: "เราได้ส่งรายละเอียดประกาศนี้ให้ผู้ขายทราบผ่านระบบแชท",
+    });
+  }, [property, toast, user]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -544,6 +618,16 @@ export function UserPropertyModal({
                     </a>
                   )}
                 </div>
+
+                {property.userUid && (
+                  <Button
+                    className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700"
+                    onClick={handleExpressInterest}
+                    disabled={isOwnListing}
+                  >
+                    {interestButtonLabel}
+                  </Button>
+                )}
 
                 {sellerListingsError && (
                   <p className="text-sm text-red-600">{sellerListingsError}</p>

@@ -42,6 +42,7 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import ChatPanel from "./chat-panel"
+import type { ChatOpenEventDetail, PropertyPreviewPayload } from "@/types/chat"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -54,6 +55,8 @@ const Navigation: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [requestedParticipantId, setRequestedParticipantId] = useState<string | null>(null)
+  const [requestedPropertyPreview, setRequestedPropertyPreview] =
+    useState<PropertyPreviewPayload | null>(null)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -76,8 +79,11 @@ const Navigation: React.FC = () => {
 
   useEffect(() => {
     const handleOpenChat = (event: Event) => {
-      const detail = (event as CustomEvent<{ participantId?: string }>).detail
+      const detail = (event as CustomEvent<ChatOpenEventDetail>).detail
       setRequestedParticipantId(detail?.participantId ?? null)
+      if (detail?.propertyPreview) {
+        setRequestedPropertyPreview(detail.propertyPreview)
+      }
       setIsChatOpen(true)
     }
 
@@ -383,6 +389,8 @@ const Navigation: React.FC = () => {
         onClose={() => setIsChatOpen(false)}
         requestedParticipantId={requestedParticipantId}
         onRequestParticipantHandled={() => setRequestedParticipantId(null)}
+        requestedPropertyPreview={requestedPropertyPreview}
+        onRequestPropertyPreviewHandled={() => setRequestedPropertyPreview(null)}
       />
     </>
   )
