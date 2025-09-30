@@ -14,6 +14,7 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
+import type { PropertyPreviewOpenEventDetail } from "@/types/chat";
 
 interface UserProfilePageProps {
   uid: string;
@@ -35,14 +36,45 @@ export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
+  const [requestedPropertyId, setRequestedPropertyId] = useState<string | null>(
+    initialPropertyId ?? null,
+  );
 
   useEffect(() => {
-    if (!initialPropertyId || selectedProperty) return;
-    const found = properties.find((item) => item.id === initialPropertyId);
-    if (found) {
-      setSelectedProperty(found);
-    }
-  }, [initialPropertyId, properties, selectedProperty]);
+    if (!initialPropertyId) return;
+    setRequestedPropertyId(initialPropertyId);
+  }, [initialPropertyId]);
+
+  useEffect(() => {
+    if (!requestedPropertyId) return;
+    const found = properties.find((item) => item.id === requestedPropertyId);
+    if (!found) return;
+    setSelectedProperty(found);
+    setRequestedPropertyId(null);
+  }, [properties, requestedPropertyId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOpenPropertyPreview = (event: Event) => {
+      const detail = (event as CustomEvent<PropertyPreviewOpenEventDetail>).detail;
+      if (!detail?.propertyId) return;
+      if (detail.ownerUid && detail.ownerUid !== uid) return;
+      setRequestedPropertyId(detail.propertyId);
+    };
+
+    window.addEventListener(
+      "dreamhome:open-property-preview",
+      handleOpenPropertyPreview,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "dreamhome:open-property-preview",
+        handleOpenPropertyPreview,
+      );
+    };
+  }, [uid]);
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";

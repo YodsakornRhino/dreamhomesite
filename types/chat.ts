@@ -14,3 +14,9 @@ export interface ChatOpenEventDetail {
   participantId?: string;
   propertyPreview?: PropertyPreviewPayload;
 }
+
+export interface PropertyPreviewOpenEventDetail {
+  propertyId: string;
+  ownerUid?: string | null;
+  preview?: PropertyPreviewPayload;
+}

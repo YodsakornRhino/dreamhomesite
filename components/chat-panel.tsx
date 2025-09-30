@@ -1,6 +1,4 @@
 "use client"
-
-import Link from "next/link"
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
@@ -23,7 +21,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
-import type { PropertyPreviewPayload } from "@/types/chat"
+import type {
+  PropertyPreviewOpenEventDetail,
+  PropertyPreviewPayload,
+} from "@/types/chat"
 import {
   addDocument,
   setDocument,
@@ -318,6 +319,26 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [activeParticipantId, user?.uid])
 
   const activeProfile = activeParticipantId ? userMap[activeParticipantId] : undefined
+
+  const handleOpenPropertyPreview = useCallback(
+    (preview: ChatMessagePropertyPreview) => {
+      if (typeof window === "undefined") return
+      if (!preview.propertyId) return
+
+      const detail: PropertyPreviewOpenEventDetail = {
+        propertyId: preview.propertyId,
+        ownerUid: preview.ownerUid,
+        preview,
+      }
+
+      window.dispatchEvent(
+        new CustomEvent<PropertyPreviewOpenEventDetail>("dreamhome:open-property-preview", {
+          detail,
+        }),
+      )
+    },
+    [],
+  )
 
   useEffect(() => {
     if (isOpen) {
@@ -1554,11 +1575,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                             )
                                           })()}
                                           {propertyPreview.ownerUid && (
-                                            <Link
-                                              href={`/users/${propertyPreview.ownerUid}?propertyId=${encodeURIComponent(propertyPreview.propertyId)}`}
-                                              prefetch={false}
-                                              target="_blank"
-                                              rel="noreferrer"
+                                            <button
+                                              type="button"
+                                              onClick={() => handleOpenPropertyPreview(propertyPreview)}
                                               className={cn(
                                                 "mt-2 inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
                                                 isMine
@@ -1567,7 +1586,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                               )}
                                             >
                                               ดูรายละเอียดประกาศ
-                                            </Link>
+                                            </button>
                                           )}
                                         </div>
                                       </div>
