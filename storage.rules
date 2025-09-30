@@ -1,0 +1,40 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function chatIdIncludesSignedInUser(chatId) {
+      return isSignedIn() && (
+        chatId == request.auth.uid ||
+        chatId.matches('^' + request.auth.uid + '__[^/]+$') ||
+        chatId.matches('^[^/]+__' + request.auth.uid + '$')
+      );
+    }
+
+    function isChatParticipant(chatId) {
+      if (!isSignedIn()) {
+        return false;
+      }
+
+      let chat = get(/databases/(default)/documents/chats/$(chatId));
+      let isListedParticipant = chat != null &&
+        chat.data != null &&
+        chat.data.participants is list &&
+        chat.data.participants.hasAny([request.auth.uid]);
+
+      return isListedParticipant || chatIdIncludesSignedInUser(chatId);
+    }
+
+    match /propertyImages/{propertyId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    match /chat-attachments/{chatId}/{allPaths=**} {
+      allow read, write, delete: if isChatParticipant(chatId);
+    }
+  }
+}

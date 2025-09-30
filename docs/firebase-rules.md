@@ -61,14 +61,45 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function chatIdIncludesSignedInUser(chatId) {
+      return isSignedIn() && (
+        chatId == request.auth.uid ||
+        chatId.matches('^' + request.auth.uid + '__[^/]+$') ||
+        chatId.matches('^[^/]+__' + request.auth.uid + '$')
+      );
+    }
+
+    function isChatParticipant(chatId) {
+      if (!isSignedIn()) {
+        return false;
+      }
+
+      let chat = get(/databases/(default)/documents/chats/$(chatId));
+      let isListedParticipant = chat != null &&
+        chat.data != null &&
+        chat.data.participants is list &&
+        chat.data.participants.hasAny([request.auth.uid]);
+
+      return isListedParticipant || chatIdIncludesSignedInUser(chatId);
+    }
+
     match /propertyImages/{propertyId}/{allPaths=**} {
       allow read: if true;
       allow write: if isSignedIn();
       allow delete: if isSignedIn();
     }
+
+    match /chat-attachments/{chatId}/{allPaths=**} {
+      allow read, write, delete: if isChatParticipant(chatId);
+    }
   }
 }
 ```
+
+The helper now has two layers of protection:
+
+* When a chat document already exists, the signed-in user must be present in its `participants` array.
+* During the brief window where a brand-new chat is being created and the document has not been saved yet, uploads from either user that appears in the `uid1__uid2` chat identifier are still allowed so the initial message can include attachments.
 
 Replace the `allow delete` condition with whatever folder structure you actually use in Storage. The crucial part is verifying that the caller owns the listing—if you mirror Firestore ownership, fetch the property document with `get(/databases/(default)/documents/property/$(propertyId))` and check the same `userUid` / `userRef` combination before deleting files.
 
