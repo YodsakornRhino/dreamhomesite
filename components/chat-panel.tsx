@@ -1205,14 +1205,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                 key={`${attachment.messageId}-${attachment.storagePath}`}
                                 type="button"
                                 onClick={() => handleAttachmentClick(attachment)}
-                                className="group relative block overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                className="group relative block aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                                 aria-label={attachment.name || (attachment.type === "image" ? "ดูรูปภาพ" : "ดูวิดีโอ")}
                               >
                                 {attachment.type === "image" ? (
                                   <img
                                     src={attachment.url}
                                     alt={attachment.name || "ไฟล์รูปภาพ"}
-                                    className="h-32 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-36 md:h-44"
+                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                                   />
                                 ) : (
                                   <>
@@ -1221,9 +1221,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                       muted
                                       loop
                                       playsInline
-                                      className="h-32 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-36 md:h-44"
+                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                                     />
-                                    <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">
                                         <Play className="h-4 w-4" />
                                       </span>
