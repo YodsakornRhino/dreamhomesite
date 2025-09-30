@@ -184,6 +184,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const lastThreadTimestampsRef = useRef<Record<string, number>>({})
   const initialThreadSnapshotRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
+  const userMapRef = useRef(userMap)
+
+  useEffect(() => {
+    userMapRef.current = userMap
+  }, [userMap])
 
   useEffect(() => {
     if (!requestedParticipantId) {
@@ -482,6 +487,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   return Array.from(merged)
                 })
                 void playNotificationSound()
+
+                newThreadIds.forEach((threadId) => {
+                  const thread = mapped.find((item) => item.id === threadId)
+                  if (!thread) return
+
+                  const otherParticipantId = thread.participants.find((participantId) => participantId !== user?.uid)
+                  if (!otherParticipantId) return
+
+                  const profile = userMapRef.current?.[otherParticipantId]
+                  const displayName = getDisplayName(profile)
+                  const messagePreview = thread.lastMessage?.trim()
+
+                  toast({
+                    title: `มีการติดต่อจาก ${displayName}`,
+                    description: messagePreview && messagePreview.length > 0 ? messagePreview : "มีข้อความใหม่รอคุณอยู่",
+                  })
+                })
               }
             }
 
