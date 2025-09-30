@@ -1,0 +1,56 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    /* Helpers */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // กรณี chat แบบ 1:1 ใช้ id = "uidA__uidB"
+    function chatIdPairsWithMe(chatId) {
+      return isSignedIn()
+        && (
+          chatId == request.auth.uid
+          || chatId.matches('^' + request.auth.uid + '__[^/]+$')
+          || chatId.matches('^[^/]+__' + request.auth.uid + '$')
+        );
+    }
+
+    // อ่าน Firestore: chats/{chatId} แล้วเช็คว่ามีผมหรือยัง
+    function isInChatDoc(chatId) {
+      return isSignedIn()
+        && exists(/databases/(default)/documents/chats/$(chatId))
+        && let chat = get(/databases/(default)/documents/chats/$(chatId));
+           (
+             (
+               chat.data.participants is list
+               && chat.data.participants.hasAny([request.auth.uid])
+             ) || (
+               chat.data.participantIds is list
+               && chat.data.participantIds.hasAny([request.auth.uid])
+             )
+           );
+    }
+
+    // เป็นผู้เข้าร่วม ถ้าอยู่ใน doc หรือ chatId เป็นคู่กับเรา
+    function isChatParticipant(chatId) {
+      return isInChatDoc(chatId) || chatIdPairsWithMe(chatId);
+    }
+
+    /* ของคุณเดิม */
+    match /propertyImages/{propertyId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isSignedIn(); // write = create/update/delete
+    }
+
+    /* แนบไฟล์ในแชท: chat-attachments/{chatId}/{baseTs}-{index}-{safeName} */
+    match /chat-attachments/{chatId}/{allPaths=**} {
+      allow read, write: if isChatParticipant(chatId);
+
+      // ถ้าจะจำกัดชนิดไฟล์ ให้ใช้บรรทัดล่างแทน:
+      // allow write: if isChatParticipant(chatId)
+      //              && request.resource.contentType.matches('image/.*|application/pdf');
+    }
+  }
+}

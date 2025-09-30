@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 
 import ChatWidget from "@/components/chat-widget";
 import { UserPropertyCard } from "@/components/user-property-card";
@@ -10,6 +10,7 @@ import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuthContext } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
@@ -19,6 +20,7 @@ interface UserProfilePageProps {
 }
 
 export function UserProfilePage({ uid }: UserProfilePageProps) {
+  const { user } = useAuthContext();
   const {
     profile,
     loading: profileLoading,
@@ -54,6 +56,19 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
       setSelectedProperty(null);
     }
   };
+
+  const isViewingOwnProfile = Boolean(user?.uid && profile?.uid && user.uid === profile.uid);
+
+  const handleOpenChat = useCallback(() => {
+    if (!profile?.uid) return;
+    if (typeof window === "undefined") return;
+
+    window.dispatchEvent(
+      new CustomEvent("dreamhome:open-chat", {
+        detail: { participantId: profile.uid },
+      }),
+    );
+  }, [profile?.uid]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -118,6 +133,15 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
             </div>
 
             <div className="flex w-full flex-col gap-2 sm:w-auto">
+              {profile?.uid && !isViewingOwnProfile && (
+                <Button
+                  onClick={handleOpenChat}
+                  className="flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  แชทกับผู้ขาย
+                </Button>
+              )}
               {profile?.email && (
                 <Button asChild variant="outline">
                   <a href={`mailto:${profile.email}`}>ติดต่อผู้ขายผ่านอีเมล</a>
