@@ -177,9 +177,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (!isOpen) return
 
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node | null
-      if (!panelRef.current || (target && panelRef.current.contains(target))) {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!panelRef.current) {
+        return
+      }
+
+      const rawTarget = event.target
+      const targetElement =
+        rawTarget instanceof Element
+          ? rawTarget
+          : rawTarget instanceof Text
+            ? rawTarget.parentElement
+            : null
+
+      if (!targetElement) {
+        onClose()
+        return
+      }
+
+      if (panelRef.current.contains(targetElement)) {
+        return
+      }
+
+      if (targetElement.closest("[data-chat-panel-keep-open]")) {
         return
       }
 

@@ -29,7 +29,7 @@ export function Toaster() {
           </Toast>
         )
       })}
-      <ToastViewport />
+      <ToastViewport data-chat-panel-keep-open />
     </ToastProvider>
   )
 }
