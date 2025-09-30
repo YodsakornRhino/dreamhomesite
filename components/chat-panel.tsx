@@ -17,6 +17,7 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
@@ -172,6 +173,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     { id: string; url: string; kind: "image" | "video"; name: string }
   >([])
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
+  const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false)
+  const [selectedAttachment, setSelectedAttachment] = useState<ChatMessageAttachment | null>(null)
 
   const panelRef = useRef<HTMLDivElement>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
@@ -181,6 +184,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const lastThreadTimestampsRef = useRef<Record<string, number>>({})
   const initialThreadSnapshotRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
+  const userMapRef = useRef(userMap)
+
+  useEffect(() => {
+    userMapRef.current = userMap
+  }, [userMap])
+
+  useEffect(() => {
+    lastThreadTimestampsRef.current = {}
+    initialThreadSnapshotRef.current = true
+  }, [user?.uid])
 
   useEffect(() => {
     if (!requestedParticipantId) {
@@ -275,7 +288,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     if (!isOpen) return
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!panelRef.current) {
+      const panelElement = panelRef.current
+      if (!panelElement) {
         return
       }
 
@@ -292,11 +306,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         return
       }
 
-      if (panelRef.current.contains(targetElement)) {
+      if (panelElement.contains(targetElement)) {
         return
       }
 
       if (targetElement.closest("[data-chat-panel-keep-open]")) {
+        return
+      }
+
+      const composedPath = typeof event.composedPath === "function" ? event.composedPath() : []
+      if (composedPath.some((node) => node instanceof Element && node.hasAttribute("data-chat-panel-keep-open"))) {
         return
       }
 
@@ -313,20 +332,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setActiveParticipantId(null)
-      setThreads([])
       setMessages([])
       setSearchTerm("")
       setMessageDraft("")
-      setHighlightedThreadIds([])
       setHighlightedMessageId(null)
-      lastThreadTimestampsRef.current = {}
-      initialThreadSnapshotRef.current = true
+      setIsGalleryOpen(false)
+      setIsMediaViewerOpen(false)
+      setSelectedAttachment(null)
+      lastMessageIdRef.current = null
+      setPendingAttachments([])
+      setAttachmentPreviews([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
       return
     }
   }, [isOpen])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!user?.uid) return
 
     let unsubUsers: (() => void) | undefined
     let cancelled = false
@@ -362,7 +386,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       cancelled = true
       unsubUsers?.()
     }
-  }, [isOpen, toast])
+  }, [toast, user?.uid])
 
   const playNotificationSound = useCallback(async () => {
     try {
@@ -402,7 +426,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [])
 
   useEffect(() => {
-    if (!isOpen || !user?.uid) return
+    if (!user?.uid) return
 
     let unsubThreads: (() => void) | undefined
     let cancelled = false
@@ -470,6 +494,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   return Array.from(merged)
                 })
                 void playNotificationSound()
+
+                newThreadIds.forEach((threadId) => {
+                  const thread = mapped.find((item) => item.id === threadId)
+                  if (!thread) return
+
+                  const otherParticipantId = thread.participants.find((participantId) => participantId !== user?.uid)
+                  if (!otherParticipantId) return
+
+                  const profile = userMapRef.current?.[otherParticipantId]
+                  const displayName = getDisplayName(profile)
+                  const messagePreview = thread.lastMessage?.trim()
+
+                  toast({
+                    title: `มีการติดต่อจาก ${displayName}`,
+                    description: messagePreview && messagePreview.length > 0 ? messagePreview : "มีข้อความใหม่รอคุณอยู่",
+                  })
+                })
               }
             }
 
@@ -495,7 +536,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       cancelled = true
       unsubThreads?.()
     }
-  }, [isOpen, playNotificationSound, toast, user?.uid])
+  }, [playNotificationSound, toast, user?.uid])
 
   useEffect(() => {
     if (!isOpen || !activeChatId) {
@@ -693,22 +734,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     })
   }, [filteredThreads, user?.uid])
 
-  const suggestedUsers = useMemo(() => {
-    if (!user?.uid) return [] as UserProfileSummary[]
-
-    const threadIds = new Set(threadEntries.map((entry) => entry.otherId))
-
-    return Object.values(userMap)
-      .filter((profile) => profile.uid !== user.uid && !threadIds.has(profile.uid))
-      .filter((profile) => {
-        if (!normalizedSearch) return true
-        const name = (profile.name || "").toLowerCase()
-        const email = (profile.email || "").toLowerCase()
-        return name.includes(normalizedSearch) || email.includes(normalizedSearch)
-      })
-      .slice(0, 10)
-  }, [normalizedSearch, threadEntries, user?.uid, userMap])
-
   const handleSelectParticipant = (targetUid: string) => {
     if (!user?.uid) return
     setActiveParticipantId(targetUid)
@@ -796,6 +821,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleToggleGallery = () => {
     setIsGalleryOpen((prev) => !prev)
+  }
+
+  const handleAttachmentClick = (attachment: ChatMessageAttachment) => {
+    setSelectedAttachment(attachment)
+    setIsMediaViewerOpen(true)
+  }
+
+  const handleMediaViewerOpenChange = (open: boolean) => {
+    if (!open) {
+      setIsMediaViewerOpen(false)
+      setSelectedAttachment(null)
+    }
   }
 
   const handleSendMessage = async () => {
@@ -1090,34 +1127,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   )}
                 </div>
 
-                {suggestedUsers.length > 0 && (
-                  <div className="border-t border-slate-100 p-3 md:p-4">
-                    <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      เริ่มแชทใหม่
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {suggestedUsers.map((profile) => (
-                        <button
-                          key={profile.uid}
-                          type="button"
-                          onClick={() => handleSelectParticipant(profile.uid)}
-                          className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-slate-100/80"
-                        >
-                          <Avatar className="h-9 w-9 border border-slate-200">
-                            <AvatarImage src={profile.photoURL || ""} alt={getDisplayName(profile)} />
-                            <AvatarFallback className="bg-blue-100 text-xs font-semibold text-blue-600">
-                              {getAvatarFallback(profile)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-800">{getDisplayName(profile)}</span>
-                            {profile.email && <span className="text-xs text-gray-500">{profile.email}</span>}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div
@@ -1177,24 +1186,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
 
                     {isGalleryOpen && (
-                      <div className="max-h-52 overflow-y-auto border-b border-slate-200 bg-white/75 px-4 py-3 backdrop-blur md:px-6 md:py-4">
+                      <div className="max-h-80 overflow-y-auto border-b border-slate-200 bg-white/75 px-4 py-3 backdrop-blur md:px-6 md:py-4">
                         {mediaAttachments.length === 0 ? (
                           <p className="text-sm text-gray-500">ยังไม่มีไฟล์รูปภาพหรือวิดีโอในบทสนทนานี้</p>
                         ) : (
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:gap-3 lg:grid-cols-5">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                             {mediaAttachments.map((attachment) => (
-                              <a
+                              <button
                                 key={`${attachment.messageId}-${attachment.storagePath}`}
-                                href={attachment.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="group relative block overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                                type="button"
+                                onClick={() => handleAttachmentClick(attachment)}
+                                className="group relative block aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                aria-label={attachment.name || (attachment.type === "image" ? "ดูรูปภาพ" : "ดูวิดีโอ")}
                               >
                                 {attachment.type === "image" ? (
                                   <img
                                     src={attachment.url}
                                     alt={attachment.name || "ไฟล์รูปภาพ"}
-                                    className="h-24 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-28"
+                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                                   />
                                 ) : (
                                   <>
@@ -1203,16 +1212,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                       muted
                                       loop
                                       playsInline
-                                      className="h-24 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-28"
+                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                                     />
-                                    <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">
                                         <Play className="h-4 w-4" />
                                       </span>
                                     </div>
                                   </>
                                 )}
-                              </a>
+                              </button>
                             ))}
                           </div>
                         )}
@@ -1458,6 +1467,40 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
       </div>
       </div>
+      <Dialog open={isMediaViewerOpen && !!selectedAttachment} onOpenChange={handleMediaViewerOpenChange}>
+        <DialogContent className="w-[92vw] max-w-3xl bg-white/95 p-0 shadow-2xl backdrop-blur sm:w-[90vw] sm:max-w-4xl">
+          {selectedAttachment && (
+            <div className="flex flex-col gap-4 p-4 sm:p-6">
+              <DialogHeader className="space-y-1 text-left">
+                <DialogTitle className="text-base font-semibold text-gray-900 sm:text-lg">
+                  {selectedAttachment.name || (selectedAttachment.type === "image" ? "รูปภาพ" : "วิดีโอ")}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-gray-500 sm:text-sm">
+                  แสดงจากคลังสื่อของบทสนทนา
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center justify-center">
+                {selectedAttachment.type === "image" ? (
+                  <img
+                    src={selectedAttachment.url}
+                    alt={selectedAttachment.name || "ไฟล์รูปภาพ"}
+                    className="max-h-[70vh] w-full rounded-2xl bg-slate-100 object-contain"
+                  />
+                ) : (
+                  <video
+                    key={selectedAttachment.url}
+                    src={selectedAttachment.url}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="max-h-[70vh] w-full rounded-2xl bg-black object-contain"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
