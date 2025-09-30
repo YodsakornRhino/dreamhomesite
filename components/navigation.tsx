@@ -41,6 +41,7 @@ import SignUpModal from "./sign-up-modal"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
+import UserChatSidebar from "./user-chat-sidebar"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -51,6 +52,7 @@ const Navigation: React.FC = () => {
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -253,7 +255,7 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setIsChatOpen(true)}>
                         <Mail className="mr-2 h-4 w-4" />
                         <span>ข้อความ</span>
                       </DropdownMenuItem>
@@ -354,6 +356,7 @@ const Navigation: React.FC = () => {
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
       <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+      <UserChatSidebar isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </>
   )
 }
