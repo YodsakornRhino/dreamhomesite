@@ -442,7 +442,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   return (
     <div
       className={cn(
-        "fixed bottom-4 right-4 top-20 z-[60] w-[calc(100%-1.5rem)] max-w-3xl transition-all duration-300",
+        "fixed bottom-4 right-4 top-20 z-[60] w-[calc(100%-1.5rem)] max-w-2xl transition-all duration-300",
         isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none",
       )}
     >
@@ -480,12 +480,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             <div className="relative flex flex-1 overflow-hidden bg-white/50">
               <div
                 className={cn(
-                  "h-full overflow-y-auto border-r border-slate-100 bg-white/80 backdrop-blur transition-all duration-300 md:static md:w-72 md:translate-x-0 md:opacity-100",
+                  "h-full overflow-y-auto border-r border-slate-100 bg-white/80 backdrop-blur transition-all duration-300 md:static md:w-60 md:translate-x-0 md:opacity-100",
                   isMobile
                     ? activeParticipantId
                       ? "absolute inset-0 z-30 w-full -translate-x-full opacity-0"
                       : "absolute inset-0 z-30 w-full translate-x-0 opacity-100"
-                    : "w-72 md:w-80",
+                    : "w-60",
                 )}
               >
                 <div className="border-b border-slate-100 p-4">
@@ -592,7 +592,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
               <div
                 className={cn(
-                  "flex h-full flex-1 flex-col bg-slate-50/80 backdrop-blur transition-all duration-300 md:static md:flex-1 md:translate-x-0 md:opacity-100",
+                  "flex h-full flex-1 flex-col bg-slate-50/80 backdrop-blur transition-all duration-300 md:static md:flex-1 md:border-l md:border-slate-100",
                   isMobile
                     ? activeParticipantId
                       ? "absolute inset-0 z-20 w-full translate-x-0 opacity-100"
@@ -628,7 +628,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                    <div
+                      className={cn(
+                        "flex-1 overflow-y-auto px-4 py-4 transition-all duration-300",
+                        "animate-in fade-in-0 duration-300",
+                        "slide-in-from-right-8",
+                      )}
+                    >
                       {loadingMessages ? (
                         <div className="flex h-full items-center justify-center text-gray-400">
                           <Loader2 className="h-6 w-6 animate-spin" />
@@ -671,7 +677,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     </div>
                   </>
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center space-y-3 p-6 text-center text-sm text-gray-500">
+                  <div
+                    className={cn(
+                      "flex h-full flex-col items-center justify-center space-y-3 p-6 text-center text-sm text-gray-500",
+                      "animate-in fade-in-0 duration-300",
+                      "slide-in-from-right-4",
+                    )}
+                  >
                     <MessageSquareText className="h-12 w-12 text-blue-400" />
                     <p>เลือกชื่อผู้ใช้ทางด้านขวาเพื่อเปิดบทสนทนาเกี่ยวกับบ้านที่คุณสนใจ</p>
                   </div>
