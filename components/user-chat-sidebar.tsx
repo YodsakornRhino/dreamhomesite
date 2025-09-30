@@ -35,7 +35,7 @@ interface ParticipantProfile {
 
 interface ConversationSummary {
   id: string
-  participants: string[]
+  participantIds: string[]
   otherParticipantId: string
   profile: ParticipantProfile
   lastMessageText: string
@@ -261,7 +261,7 @@ const buildDemoConversations = (
     const profile = DEMO_PROFILES[item.otherParticipantId] ?? FALLBACK_PROFILE
     return {
       id: item.id,
-      participants: [currentUserId, item.otherParticipantId],
+      participantIds: [currentUserId, item.otherParticipantId],
       otherParticipantId: item.otherParticipantId,
       profile,
       lastMessageText: item.lastMessageText,
@@ -536,7 +536,7 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
         const { collection, onSnapshot, orderBy, query, where } = await import("firebase/firestore")
         const conversationsQuery = query(
           collection(db, "conversations"),
-          where("participants", "array-contains", user.uid),
+          where("participantIds", "array-contains", user.uid),
           orderBy("updatedAt", "desc"),
         )
 
@@ -548,16 +548,16 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
                 const mapped = await Promise.all(
                   snapshot.docs.map(async (docSnapshot) => {
                     const data = docSnapshot.data()
-                    const participants = Array.isArray(data.participants)
-                      ? (data.participants as string[])
+                    const participantIds = Array.isArray(data.participantIds)
+                      ? (data.participantIds as string[])
                       : []
 
-                    if (!participants.includes(user.uid)) {
+                    if (!participantIds.includes(user.uid)) {
                       return null
                     }
 
                     const otherParticipantId =
-                      participants.find((participantId) => participantId !== user.uid) ?? user.uid
+                      participantIds.find((participantId) => participantId !== user.uid) ?? user.uid
 
                     const profileFromDoc = (data.participantProfiles?.[otherParticipantId] ?? null) as
                       | ParticipantProfile
@@ -571,7 +571,7 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
 
                     const conversation: ConversationSummary = {
                       id: docSnapshot.id,
-                      participants,
+                      participantIds,
                       otherParticipantId,
                       profile,
                       lastMessageText: (data.lastMessageText as string | undefined)?.trim() ?? "",
@@ -933,7 +933,7 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
         [`unreadCounts.${user.uid}`]: 0,
       }
 
-      conversation.participants
+      conversation.participantIds
         .filter((participantId) => participantId !== user.uid)
         .forEach((participantId) => {
           updates[`unreadCounts.${participantId}`] = increment(1)
