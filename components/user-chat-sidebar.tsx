@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ChevronLeft,
+  Info,
   Loader2,
   MessageCircle,
   MoreHorizontal,
@@ -53,6 +54,13 @@ interface FirestoreErrorState {
   title: string
   description: string
 }
+
+type FirestoreErrorCode =
+  | "permission-denied"
+  | "unauthenticated"
+  | "unavailable"
+  | "not-found"
+  | "unknown"
 
 const FALLBACK_PROFILE: ParticipantProfile = {
   id: "",
@@ -147,6 +155,132 @@ const toDate = (value: unknown): Date | null => {
   return null
 }
 
+const DEMO_PROFILES: Record<string, ParticipantProfile> = {
+  "agent-ani": {
+    id: "agent-ani",
+    name: "แอนนี่ ตัวแทน",
+    email: "annie.agent@example.com",
+    photoURL: null,
+  },
+  "agent-narin": {
+    id: "agent-narin",
+    name: "นรินทร์",
+    email: "narin@example.com",
+    photoURL: null,
+  },
+}
+
+const DEMO_CONVERSATION_BLUEPRINT = [
+  {
+    id: "demo-convo-annie",
+    otherParticipantId: "agent-ani",
+    lastMessageText: "ขอบคุณค่ะ เดี๋ยวจัดส่งข้อมูลเพิ่มเติมให้นะคะ",
+    lastMessageAt: new Date(Date.now() - 1000 * 60 * 25),
+    unreadCount: 0,
+  },
+  {
+    id: "demo-convo-narin",
+    otherParticipantId: "agent-narin",
+    lastMessageText: "สะดวกเข้าไปดูบ้านวันเสาร์นี้ไหมครับ",
+    lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 3),
+    unreadCount: 1,
+  },
+]
+
+const DEMO_MESSAGES: Record<string, ChatMessage[]> = {
+  "demo-convo-annie": [
+    {
+      id: "demo-msg-1",
+      senderId: "agent-ani",
+      text: "สวัสดีค่ะ ขอบคุณที่สนใจโครงการ Dream Ville",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    },
+    {
+      id: "demo-msg-2",
+      senderId: "demo-user",
+      text: "สนใจแบบ 3 ห้องนอนค่ะ พอมีห้องว่างมั้ย",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4),
+    },
+    {
+      id: "demo-msg-3",
+      senderId: "agent-ani",
+      text: "มีค่ะ ราคาเริ่มต้นที่ 4.2 ล้าน รวมตกแต่งแล้วนะคะ",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3),
+    },
+    {
+      id: "demo-msg-4",
+      senderId: "demo-user",
+      text: "ขอบคุณค่ะ ขอรายละเอียดเพิ่มเติมทางอีเมลได้ไหม",
+      createdAt: new Date(Date.now() - 1000 * 60 * 40),
+    },
+    {
+      id: "demo-msg-5",
+      senderId: "agent-ani",
+      text: "ได้เลยค่ะ เดี๋ยวส่งข้อมูลให้อีกสักครู่นะคะ",
+      createdAt: new Date(Date.now() - 1000 * 60 * 25),
+    },
+  ],
+  "demo-convo-narin": [
+    {
+      id: "demo-msg-6",
+      senderId: "agent-narin",
+      text: "สวัสดีครับ บ้านโครงการ Lakefront ยังว่างอยู่ครับ",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6),
+    },
+    {
+      id: "demo-msg-7",
+      senderId: "demo-user",
+      text: "สนใจนัดดูบ้านครับ",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    },
+    {
+      id: "demo-msg-8",
+      senderId: "agent-narin",
+      text: "เสาร์นี้สะดวกไหมครับ มีรอบ 10 โมงกับบ่ายสอง",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4),
+    },
+    {
+      id: "demo-msg-9",
+      senderId: "demo-user",
+      text: "สะดวกบ่ายสองครับ",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3.5),
+    },
+    {
+      id: "demo-msg-10",
+      senderId: "agent-narin",
+      text: "รับทราบครับ ไว้เจอกันวันเสาร์ครับ",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3),
+    },
+  ],
+}
+
+const buildDemoConversations = (
+  currentUserId: string,
+): { conversations: ConversationSummary[]; messages: Record<string, ChatMessage[]> } => {
+  const conversations = DEMO_CONVERSATION_BLUEPRINT.map((item) => {
+    const profile = DEMO_PROFILES[item.otherParticipantId] ?? FALLBACK_PROFILE
+    return {
+      id: item.id,
+      participants: [currentUserId, item.otherParticipantId],
+      otherParticipantId: item.otherParticipantId,
+      profile,
+      lastMessageText: item.lastMessageText,
+      lastMessageAt: item.lastMessageAt,
+      unreadCount: item.unreadCount,
+    }
+  })
+
+  const messages: Record<string, ChatMessage[]> = {}
+  Object.entries(DEMO_MESSAGES).forEach(([conversationId, chatMessages]) => {
+    messages[conversationId] = chatMessages.map((message) => ({
+      ...message,
+      senderId: message.senderId === "demo-user" ? currentUserId : message.senderId,
+    }))
+  })
+
+  return { conversations, messages }
+}
+
 export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
   const { user } = useAuthContext()
   const { toast } = useToast()
@@ -161,6 +295,8 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
   const [isSending, setIsSending] = useState(false)
   const [conversationsError, setConversationsError] = useState<FirestoreErrorState | null>(null)
   const [messagesError, setMessagesError] = useState<FirestoreErrorState | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
+  const [demoNotice, setDemoNotice] = useState<string | null>(null)
 
   const profileCache = useRef<Map<string, ParticipantProfile>>(new Map())
   const conversationsRef = useRef<ConversationSummary[]>([])
@@ -169,32 +305,110 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
     conversationsRef.current = conversations
   }, [conversations])
 
+  const demoDataRef = useRef<{
+    conversations: ConversationSummary[]
+    messages: Record<string, ChatMessage[]>
+  } | null>(null)
+
+  const permissionToastShown = useRef(false)
+
   const resolveFirestoreError = useCallback(
     (
       error: unknown,
       fallback: FirestoreErrorState,
-    ): FirestoreErrorState => {
+    ): { state: FirestoreErrorState; code: FirestoreErrorCode } => {
       if (error instanceof FirebaseError) {
         if (error.code === "permission-denied") {
           return {
-            title: "ไม่มีสิทธิ์เข้าถึงข้อมูล",
-            description:
-              "บัญชีของคุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้ กรุณาตรวจสอบการกำหนดสิทธิ์หรือปรับ Firebase Security Rules",
+            code: "permission-denied",
+            state: {
+              title: "ไม่มีสิทธิ์เข้าถึงข้อมูล",
+              description:
+                "บัญชีของคุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้ DreamHome จึงแสดงตัวอย่างบทสนทนาแทน คุณสามารถปรับ Firebase Security Rules เพื่อเปิดใช้งานข้อมูลจริงได้",
+            },
           }
         }
 
         if (error.code === "unauthenticated") {
           return {
-            title: "กรุณาเข้าสู่ระบบ",
-            description: "คุณจำเป็นต้องเข้าสู่ระบบเพื่อดูข้อมูลนี้",
+            code: "unauthenticated",
+            state: {
+              title: "กรุณาเข้าสู่ระบบ",
+              description: "คุณจำเป็นต้องเข้าสู่ระบบเพื่อดูข้อมูลนี้",
+            },
+          }
+        }
+
+        if (error.code === "unavailable") {
+          return {
+            code: "unavailable",
+            state: {
+              title: "เซิร์ฟเวอร์ไม่พร้อมใช้งาน",
+              description: "โปรดลองใหม่อีกครั้งในภายหลัง",
+            },
           }
         }
       }
 
-      return fallback
+      return { code: "unknown", state: fallback }
     },
     [],
   )
+
+  const enableDemoMode = useCallback(
+    (reason: string) => {
+      if (!user) {
+        return
+      }
+
+      if (!demoDataRef.current) {
+        const { conversations: demoConversations, messages: demoMessages } = buildDemoConversations(
+          user.uid,
+        )
+
+        demoDataRef.current = {
+          conversations: demoConversations,
+          messages: demoMessages,
+        }
+      }
+
+      setIsDemoMode(true)
+      setConversations(demoDataRef.current.conversations)
+      setConversationsError(null)
+      setIsConversationsLoading(false)
+      setMessagesError(null)
+
+      const hasSelected = selectedConversationId
+        ? demoDataRef.current.conversations.some((item) => item.id === selectedConversationId)
+        : false
+
+      if (!hasSelected && demoDataRef.current.conversations.length > 0) {
+        const firstConversationId = demoDataRef.current.conversations[0].id
+        setSelectedConversationId(firstConversationId)
+        setMessages(demoDataRef.current.messages[firstConversationId] ?? [])
+      } else if (hasSelected && selectedConversationId) {
+        setMessages(demoDataRef.current.messages[selectedConversationId] ?? [])
+      }
+
+      setDemoNotice(reason)
+
+      if (!permissionToastShown.current) {
+        toast({
+          title: "กำลังแสดงข้อมูลตัวอย่าง",
+          description: reason,
+        })
+        permissionToastShown.current = true
+      }
+    },
+    [selectedConversationId, toast, user],
+  )
+
+  const disableDemoMode = useCallback(() => {
+    setIsDemoMode(false)
+    setDemoNotice(null)
+    demoDataRef.current = null
+    permissionToastShown.current = false
+  }, [])
 
   const fetchParticipantProfile = useCallback(
     async (participantId: string, existingProfile?: ParticipantProfile | null): Promise<ParticipantProfile> => {
@@ -241,6 +455,19 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
         return
       }
 
+      if (isDemoMode) {
+        const demoStore = demoDataRef.current
+        if (!demoStore) {
+          return
+        }
+
+        demoStore.conversations = demoStore.conversations.map((conversation) =>
+          conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation,
+        )
+        setConversations(demoStore.conversations)
+        return
+      }
+
       try {
         const conversation = conversationsRef.current.find((item) => item.id === conversationId)
         if (!conversation) {
@@ -269,7 +496,7 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
         console.error("Failed to mark conversation as read", error)
       }
     },
-    [user],
+    [isDemoMode, user],
   )
 
   useEffect(() => {
@@ -277,8 +504,26 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
       setConversations([])
       setSelectedConversationId(null)
       setConversationsError(null)
+      setMessages([])
+      setMessagesError(null)
+      setIsConversationsLoading(false)
+      setIsMessagesLoading(false)
+      disableDemoMode()
       return
     }
+
+    if (isDemoMode) {
+      const demoConversations = demoDataRef.current?.conversations ?? []
+      setConversations(demoConversations)
+      setConversationsError(null)
+      setIsConversationsLoading(false)
+      if (!selectedConversationId && demoConversations.length > 0) {
+        setSelectedConversationId(demoConversations[0].id)
+      }
+      return
+    }
+
+    disableDemoMode()
 
     let unsubscribe: (() => void) | undefined
     let cancelled = false
@@ -370,17 +615,25 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
             }
 
             console.error("Failed to subscribe to conversations", error)
-            const errorState = resolveFirestoreError(error, {
+            const { state, code } = resolveFirestoreError(error, {
               title: "ไม่สามารถโหลดรายการสนทนาได้",
               description: "โปรดลองใหม่อีกครั้ง",
             })
+
+            if (code === "permission-denied") {
+              setIsConversationsLoading(false)
+              enableDemoMode(state.description)
+              return
+            }
+
             setConversations([])
-            setConversationsError(errorState)
+            setConversationsError(state)
             setIsConversationsLoading(false)
+
             toast({
               variant: "destructive",
-              title: errorState.title,
-              description: errorState.description,
+              title: state.title,
+              description: state.description,
             })
           },
         )
@@ -391,16 +644,24 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
           return
         }
 
-        const errorState = resolveFirestoreError(error, {
+        const { state, code } = resolveFirestoreError(error, {
           title: "ไม่สามารถโหลดรายการสนทนาได้",
           description: "โปรดลองใหม่อีกครั้ง",
         })
+
+        if (code === "permission-denied") {
+          setIsConversationsLoading(false)
+          enableDemoMode(state.description)
+          return
+        }
+
         setConversations([])
-        setConversationsError(errorState)
+        setConversationsError(state)
+
         toast({
           variant: "destructive",
-          title: errorState.title,
-          description: errorState.description,
+          title: state.title,
+          description: state.description,
         })
       }
     }
@@ -411,13 +672,39 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
       cancelled = true
       unsubscribe?.()
     }
-  }, [fetchParticipantProfile, isOpen, resolveFirestoreError, selectedConversationId, toast, user])
+  }, [
+    disableDemoMode,
+    enableDemoMode,
+    fetchParticipantProfile,
+    isDemoMode,
+    isOpen,
+    resolveFirestoreError,
+    selectedConversationId,
+    toast,
+    user,
+  ])
 
   useEffect(() => {
-    if (!user || !isOpen || !selectedConversationId) {
+    if (!user || !isOpen) {
       setMessages([])
       setIsMessagesLoading(false)
       setMessagesError(null)
+      return
+    }
+
+    if (!selectedConversationId) {
+      setMessages([])
+      setIsMessagesLoading(false)
+      setMessagesError(null)
+      return
+    }
+
+    if (isDemoMode) {
+      const demoMessages = demoDataRef.current?.messages[selectedConversationId] ?? []
+      setMessages(demoMessages)
+      setMessagesError(null)
+      setIsMessagesLoading(false)
+      void markConversationAsRead(selectedConversationId)
       return
     }
 
@@ -467,17 +754,24 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
             }
 
             console.error("Failed to subscribe to messages", error)
-            const errorState = resolveFirestoreError(error, {
+            const { state, code } = resolveFirestoreError(error, {
               title: "ไม่สามารถโหลดข้อความได้",
               description: "โปรดลองใหม่อีกครั้ง",
             })
+
+            if (code === "permission-denied") {
+              setIsMessagesLoading(false)
+              enableDemoMode(state.description)
+              return
+            }
+
             setMessages([])
-            setMessagesError(errorState)
+            setMessagesError(state)
             setIsMessagesLoading(false)
             toast({
               variant: "destructive",
-              title: errorState.title,
-              description: errorState.description,
+              title: state.title,
+              description: state.description,
             })
           },
         )
@@ -490,16 +784,23 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
           return
         }
 
-        const errorState = resolveFirestoreError(error, {
+        const { state, code } = resolveFirestoreError(error, {
           title: "ไม่สามารถโหลดข้อความได้",
           description: "โปรดลองใหม่อีกครั้ง",
         })
+
+        if (code === "permission-denied") {
+          setIsMessagesLoading(false)
+          enableDemoMode(state.description)
+          return
+        }
+
         setMessages([])
-        setMessagesError(errorState)
+        setMessagesError(state)
         toast({
           variant: "destructive",
-          title: errorState.title,
-          description: errorState.description,
+          title: state.title,
+          description: state.description,
         })
       }
     }
@@ -510,7 +811,16 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
       cancelled = true
       unsubscribe?.()
     }
-  }, [isOpen, markConversationAsRead, resolveFirestoreError, selectedConversationId, toast, user])
+  }, [
+    enableDemoMode,
+    isDemoMode,
+    isOpen,
+    markConversationAsRead,
+    resolveFirestoreError,
+    selectedConversationId,
+    toast,
+    user,
+  ])
 
   useEffect(() => {
     setMessageInput("")
@@ -550,6 +860,49 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
 
     setIsSending(true)
     setMessageInput("")
+
+    if (isDemoMode) {
+      const demoStore = demoDataRef.current
+      if (!demoStore) {
+        setIsSending(false)
+        return
+      }
+
+      const now = new Date()
+      const newMessage: ChatMessage = {
+        id: `demo-local-${now.getTime()}`,
+        senderId: user.uid,
+        text: trimmed,
+        createdAt: now,
+      }
+
+      const existingMessages = demoStore.messages[selectedConversationId] ?? []
+      const updatedMessages = [...existingMessages, newMessage]
+      demoStore.messages[selectedConversationId] = updatedMessages
+
+      demoStore.conversations = demoStore.conversations
+        .map((item) =>
+          item.id === selectedConversationId
+            ? {
+                ...item,
+                lastMessageText: trimmed,
+                lastMessageAt: now,
+                unreadCount: 0,
+              }
+            : item,
+        )
+        .sort((a, b) => {
+          const aTime = a.lastMessageAt?.getTime() ?? 0
+          const bTime = b.lastMessageAt?.getTime() ?? 0
+          return bTime - aTime
+        })
+
+      setMessages(updatedMessages)
+      setMessagesError(null)
+      setConversations(demoStore.conversations)
+      setIsSending(false)
+      return
+    }
 
     try {
       const db = await getFirestoreInstance()
@@ -690,6 +1043,17 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-2 pb-6">
+                  {demoNotice && !conversationsError ? (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                      <div className="flex items-start space-x-2">
+                        <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-amber-800">โหมดตัวอย่าง</p>
+                          <p className="mt-1 text-[11px] leading-4 text-amber-700">{demoNotice}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                   {conversationsError ? (
                     <div className="flex h-full flex-col items-center justify-center space-y-2 px-6 text-center text-red-500">
                       <MessageCircle className="h-10 w-10 text-red-300" />
@@ -805,6 +1169,16 @@ export function UserChatSidebar({ isOpen, onClose }: UserChatSidebarProps) {
                     </div>
 
                     <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6">
+                      {isDemoMode && !messagesError ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                          <div className="flex items-start space-x-2">
+                            <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                            <p className="text-[11px] leading-4 text-amber-700">
+                              ข้อความในบทสนทนานี้เป็นตัวอย่างเพื่อช่วยทดสอบส่วนติดต่อผู้ใช้ เมื่อเปิดสิทธิ์ Firebase แล้ว คุณจะเห็นข้อมูลจริงของลูกค้า
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
                       {messagesError ? (
                         <div className="flex h-full flex-col items-center justify-center space-y-3 text-center text-red-500">
                           <MessageCircle className="h-12 w-12 text-red-300" />
