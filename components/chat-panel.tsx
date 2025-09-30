@@ -101,6 +101,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   const { user } = useAuthContext()
   const { toast } = useToast()
 
+  const [shouldRender, setShouldRender] = useState(isOpen)
   const [isMobile, setIsMobile] = useState(false)
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -114,6 +115,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   const [highlightedThreadIds, setHighlightedThreadIds] = useState<string[]>([])
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
 
+  const panelRef = useRef<HTMLDivElement>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -127,6 +129,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   }, [activeParticipantId, user?.uid])
 
   const activeProfile = activeParticipantId ? userMap[activeParticipantId] : undefined
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => setShouldRender(false), 300)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
@@ -156,6 +171,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null
+      if (!panelRef.current || (target && panelRef.current.contains(target))) {
+        return
+      }
+
+      onClose()
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
     }
   }, [isOpen, onClose])
 
@@ -606,17 +640,27 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     }
   }
 
-  if (!isOpen) {
+  if (!shouldRender) {
     return null
   }
 
   return (
-    <div
-      className={cn(
-        "fixed bottom-4 left-3 right-3 top-20 z-[60] mx-auto max-w-full transition-all duration-300 sm:left-6 sm:right-6 sm:top-24 sm:max-w-3xl md:left-auto md:right-8 md:mx-0 md:w-[min(90vw,60rem)] lg:w-[min(85vw,72rem)]",
-        isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none",
-      )}
-    >
+    <div className="fixed inset-0 z-[60]">
+      <div
+        role="presentation"
+        onClick={onClose}
+        className={cn(
+          "absolute inset-0 z-0 bg-slate-900/20 transition-opacity duration-300",
+          isOpen ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      />
+      <div
+        ref={panelRef}
+        className={cn(
+          "absolute bottom-4 left-3 right-3 top-20 z-10 mx-auto max-w-full pointer-events-auto transition-all duration-300 sm:left-6 sm:right-6 sm:top-24 sm:max-w-3xl md:left-auto md:right-8 md:mx-0 md:w-[min(90vw,60rem)] lg:w-[min(85vw,72rem)]",
+          isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none",
+        )}
+      >
       <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white/90 px-5 py-4">
           <div className="flex items-center gap-3">
@@ -939,6 +983,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   )
