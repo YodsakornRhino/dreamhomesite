@@ -28,6 +28,8 @@ import { cn } from "@/lib/utils"
 interface ChatPanelProps {
   isOpen: boolean
   onClose: () => void
+  requestedParticipantId?: string | null
+  onRequestParticipantHandled?: () => void
 }
 
 interface ChatThread {
@@ -97,7 +99,12 @@ const formatMessageTime = (date?: Date | null) => {
   }).format(date)
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({
+  isOpen,
+  onClose,
+  requestedParticipantId,
+  onRequestParticipantHandled,
+}) => {
   const { user } = useAuthContext()
   const { toast } = useToast()
 
@@ -122,6 +129,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   const lastThreadTimestampsRef = useRef<Record<string, number>>({})
   const initialThreadSnapshotRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!requestedParticipantId) {
+      return
+    }
+
+    if (!user?.uid || requestedParticipantId === user.uid) {
+      onRequestParticipantHandled?.()
+      return
+    }
+
+    setActiveParticipantId(requestedParticipantId)
+    setHighlightedThreadIds((current) => {
+      const chatId = createChatId(user.uid, requestedParticipantId)
+      return current.filter((id) => id !== chatId)
+    })
+    onRequestParticipantHandled?.()
+  }, [requestedParticipantId, onRequestParticipantHandled, user?.uid])
 
   const activeChatId = useMemo(() => {
     if (!user?.uid || !activeParticipantId) return null
