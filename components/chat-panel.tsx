@@ -191,6 +191,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [userMap])
 
   useEffect(() => {
+    lastThreadTimestampsRef.current = {}
+    initialThreadSnapshotRef.current = true
+  }, [user?.uid])
+
+  useEffect(() => {
     if (!requestedParticipantId) {
       return
     }
@@ -327,23 +332,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setActiveParticipantId(null)
-      setThreads([])
       setMessages([])
       setSearchTerm("")
       setMessageDraft("")
-      setHighlightedThreadIds([])
       setHighlightedMessageId(null)
       setIsGalleryOpen(false)
       setIsMediaViewerOpen(false)
       setSelectedAttachment(null)
-      lastThreadTimestampsRef.current = {}
-      initialThreadSnapshotRef.current = true
+      lastMessageIdRef.current = null
+      setPendingAttachments([])
+      setAttachmentPreviews([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
       return
     }
   }, [isOpen])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!user?.uid) return
 
     let unsubUsers: (() => void) | undefined
     let cancelled = false
@@ -379,7 +386,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       cancelled = true
       unsubUsers?.()
     }
-  }, [isOpen, toast])
+  }, [toast, user?.uid])
 
   const playNotificationSound = useCallback(async () => {
     try {
@@ -419,7 +426,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [])
 
   useEffect(() => {
-    if (!isOpen || !user?.uid) return
+    if (!user?.uid) return
 
     let unsubThreads: (() => void) | undefined
     let cancelled = false
@@ -529,7 +536,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       cancelled = true
       unsubThreads?.()
     }
-  }, [isOpen, playNotificationSound, toast, user?.uid])
+  }, [playNotificationSound, toast, user?.uid])
 
   useEffect(() => {
     if (!isOpen || !activeChatId) {
