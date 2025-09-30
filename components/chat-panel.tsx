@@ -213,6 +213,43 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen, toast])
 
+  const playNotificationSound = useCallback(async () => {
+    try {
+      if (typeof window === "undefined") return
+
+      const AudioContextConstructor =
+        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioContextConstructor) return
+
+      const audioContext = audioContextRef.current ?? new AudioContextConstructor()
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume()
+      }
+
+      const now = audioContext.currentTime
+      const oscillator = audioContext.createOscillator()
+      const gain = audioContext.createGain()
+
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(880, now)
+
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5)
+
+      oscillator.connect(gain)
+      gain.connect(audioContext.destination)
+
+      oscillator.start(now)
+      oscillator.stop(now + 0.5)
+
+      audioContextRef.current = audioContext
+    } catch (error) {
+      console.error("Failed to play notification sound", error)
+    }
+  }, [])
+
   useEffect(() => {
     if (!isOpen || !user?.uid) return
 
@@ -409,43 +446,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
       window.clearTimeout(timeoutId)
     }
   }, [highlightedMessageId])
-
-  const playNotificationSound = useCallback(async () => {
-    try {
-      if (typeof window === "undefined") return
-
-      const AudioContextConstructor =
-        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!AudioContextConstructor) return
-
-      const audioContext = audioContextRef.current ?? new AudioContextConstructor()
-
-      if (audioContext.state === "suspended") {
-        await audioContext.resume()
-      }
-
-      const now = audioContext.currentTime
-      const oscillator = audioContext.createOscillator()
-      const gain = audioContext.createGain()
-
-      oscillator.type = "sine"
-      oscillator.frequency.setValueAtTime(880, now)
-
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5)
-
-      oscillator.connect(gain)
-      gain.connect(audioContext.destination)
-
-      oscillator.start(now)
-      oscillator.stop(now + 0.5)
-
-      audioContextRef.current = audioContext
-    } catch (error) {
-      console.error("Failed to play notification sound", error)
-    }
-  }, [])
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
 
