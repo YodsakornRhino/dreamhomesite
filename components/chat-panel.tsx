@@ -613,7 +613,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
   return (
     <div
       className={cn(
-        "fixed bottom-4 right-4 top-20 z-[60] w-[calc(100%-1.5rem)] max-w-2xl transition-all duration-300",
+        "fixed bottom-4 left-3 right-3 top-20 z-[60] mx-auto max-w-full transition-all duration-300 sm:left-6 sm:right-6 sm:top-24 sm:max-w-3xl md:left-auto md:right-8 md:mx-0 md:w-[min(90vw,60rem)] lg:w-[min(85vw,72rem)]",
         isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none",
       )}
     >
@@ -651,7 +651,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             <div className="relative flex flex-1 overflow-hidden bg-white/50">
               <div
                 className={cn(
-                  "h-full overflow-y-auto border-r border-slate-100 bg-white/80 backdrop-blur transition-all duration-300 md:static md:w-60 md:translate-x-0 md:opacity-100",
+                  "h-full overflow-y-auto border-r border-slate-100 bg-white/80 backdrop-blur transition-all duration-300 md:static md:w-72 md:translate-x-0 md:opacity-100 lg:w-80 xl:w-96",
                   isMobile
                     ? activeParticipantId
                       ? "absolute inset-0 z-30 w-full -translate-x-full opacity-0"
@@ -659,19 +659,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     : "w-60",
                 )}
               >
-                <div className="border-b border-slate-100 p-4">
+                <div className="border-b border-slate-100 p-4 md:p-5">
                   <div className="relative flex items-center">
                     <Search className="absolute left-3 h-4 w-4 text-gray-400" />
                     <Input
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
                       placeholder="ค้นหาชื่อหรืออีเมล"
-                      className="h-9 rounded-full bg-slate-100 pl-9 pr-3 text-sm"
+                      className="h-9 rounded-full bg-slate-100 pl-9 pr-3 text-sm md:h-10 md:text-base"
                     />
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2 p-3">
+                <div className="flex flex-col gap-2 p-3 md:p-4">
                   {loadingThreads ? (
                     <div className="flex flex-col gap-2">
                       {Array.from({ length: 4 }).map((_, index) => (
@@ -773,7 +773,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 {suggestedUsers.length > 0 && (
-                  <div className="border-t border-slate-100 p-3">
+                  <div className="border-t border-slate-100 p-3 md:p-4">
                     <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       เริ่มแชทใหม่
                     </p>
@@ -814,7 +814,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
               >
                 {activeParticipantId ? (
                   <>
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3">
+                    <div className="flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 md:px-6 md:py-4">
                       <div className="flex items-center gap-3">
                         {isMobile && (
                           <Button
@@ -842,7 +842,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
                     <div
                       className={cn(
-                        "flex-1 overflow-y-auto px-4 py-4 transition-all duration-300",
+                        "flex-1 overflow-y-auto px-4 py-4 transition-all duration-300 md:px-6 md:py-6",
                         "animate-in fade-in-0 duration-300",
                         "slide-in-from-right-8",
                       )}
@@ -865,7 +865,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                               <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
                                 <div
                                   className={cn(
-                                    "max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm transition",
+                                    "max-w-[82%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm transition md:max-w-[75%] md:px-4 md:py-3 md:text-base lg:max-w-[70%]",
                                     isMine
                                       ? "bg-blue-600 text-white"
                                       : "bg-white text-gray-900",
@@ -875,7 +875,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                                   <p>{message.text}</p>
                                   <span
                                     className={cn(
-                                      "mt-1 block text-[11px]",
+                                      "mt-1 block text-[11px] md:text-xs",
                                       isMine ? "text-blue-100/80" : "text-gray-400",
                                     )}
                                   >
@@ -893,7 +893,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                 ) : (
                   <div
                     className={cn(
-                      "flex h-full flex-col items-center justify-center space-y-3 p-6 text-center text-sm text-gray-500",
+                      "flex h-full flex-col items-center justify-center space-y-3 p-6 text-center text-sm text-gray-500 md:p-8 md:text-base",
                       "animate-in fade-in-0 duration-300",
                       "slide-in-from-right-4",
                     )}
@@ -905,15 +905,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            <div className="border-t border-slate-200 bg-white/90 px-4 py-3">
+            <div className="border-t border-slate-200 bg-white/90 px-4 py-3 md:px-6 md:py-4">
               {activeParticipantId ? (
-                <form onSubmit={handleSubmit} className="flex items-center gap-2">
+                <form onSubmit={handleSubmit} className="flex items-center gap-2 md:gap-3">
                   <Input
                     ref={inputRef}
                     value={messageDraft}
                     onChange={(event) => setMessageDraft(event.target.value)}
                     placeholder="พิมพ์ข้อความของคุณ..."
-                    className="h-10 flex-1 rounded-full bg-slate-100 px-4 text-sm"
+                    className="h-10 flex-1 rounded-full bg-slate-100 px-4 text-sm md:h-11 md:px-5 md:text-base"
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && !event.shiftKey) {
                         event.preventDefault()
@@ -926,9 +926,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                   <Button
                     type="submit"
                     disabled={sending || !messageDraft.trim()}
-                    className="h-10 w-10 rounded-full bg-blue-600 p-0 hover:bg-blue-700"
+                    className="h-10 w-10 rounded-full bg-blue-600 p-0 hover:bg-blue-700 md:h-11 md:w-11"
                   >
-                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 md:h-5 md:w-5" />}
                   </Button>
                 </form>
               ) : (
