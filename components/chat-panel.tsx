@@ -872,14 +872,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const oscillator = audioContext.createOscillator()
       const gain = audioContext.createGain()
 
+      const peakGain = 0.7
+      const fadeOutTime = 0.6
+
       oscillator.type = "sine"
       oscillator.frequency.setValueAtTime(880, now)
+
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(peakGain, now + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOutTime)
 
       oscillator.connect(gain)
       gain.connect(audioContext.destination)
 
       oscillator.start(now)
-      oscillator.stop(now + 0.5)
+      oscillator.stop(now + fadeOutTime)
 
       audioContextRef.current = audioContext
     } catch (error) {
