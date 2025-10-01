@@ -2251,16 +2251,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         <DialogContent className="max-w-md space-y-4">
           <DialogHeader>
             <DialogTitle>ผู้ขายยืนยันการซื้อแล้ว</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-words text-pretty">
               {buyerConfirmationPreview
                 ? `ผู้ขายได้ยืนยันประกาศ ${buyerConfirmationPreview.title}`
                 : "ผู้ขายได้ยืนยันประกาศแล้ว"}
             </DialogDescription>
           </DialogHeader>
           {buyerConfirmationPreview && (
-            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-pretty text-sm text-amber-800">
               {buyerConfirmationPreview.price && Number.isFinite(buyerConfirmationPreview.price) && (
-                <p className="font-semibold">
+                <p className="break-words font-semibold">
                   ราคา {formatPropertyPrice(
                     buyerConfirmationPreview.price,
                     buyerConfirmationPreview.transactionType ?? "sale",
@@ -2268,13 +2268,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </p>
               )}
               {(buyerConfirmationPreview.address || buyerConfirmationPreview.city || buyerConfirmationPreview.province) && (
-                <p>
+                <p className="break-words">
                   {[buyerConfirmationPreview.address, buyerConfirmationPreview.city, buyerConfirmationPreview.province]
                     .filter((value): value is string => Boolean(value && value.trim()))
                     .join(" ")}
                 </p>
               )}
-              <p>โปรดเตรียมเอกสารที่จำเป็นและติดตามการติดต่อจากผู้ขายเพื่อดำเนินการขั้นตอนถัดไป</p>
+              <p className="break-words">
+                โปรดเตรียมเอกสารที่จำเป็นและติดตามการติดต่อจากผู้ขายเพื่อดำเนินการขั้นตอนถัดไป
+              </p>
             </div>
           )}
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
