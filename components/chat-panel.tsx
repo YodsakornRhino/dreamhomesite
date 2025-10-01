@@ -95,6 +95,7 @@ interface PropertyPurchaseStatus {
   isUnderPurchase: boolean
   confirmedBuyerId: string | null
   buyerConfirmed: boolean
+  sellerDocumentsConfirmed: boolean
 }
 
 const createChatId = (first: string, second: string) => {
@@ -430,6 +431,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 ? record.confirmedBuyerId
                 : null
             const buyerConfirmed = Boolean(record.buyerConfirmed)
+            const sellerDocumentsConfirmed = Boolean(record.sellerDocumentsConfirmed)
 
             setPropertyStatusMap((current) => ({
               ...current,
@@ -437,6 +439,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 isUnderPurchase,
                 confirmedBuyerId,
                 buyerConfirmed,
+                sellerDocumentsConfirmed,
               },
             }))
           })
@@ -581,6 +584,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             isUnderPurchase: true,
             confirmedBuyerId: activeParticipantId,
             buyerConfirmed: false,
+            sellerDocumentsConfirmed: false,
           }),
           updateDocument(
             `users/${preview.ownerUid}/user_property`,
@@ -589,6 +593,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               isUnderPurchase: true,
               confirmedBuyerId: activeParticipantId,
               buyerConfirmed: false,
+              sellerDocumentsConfirmed: false,
             },
           ),
         ])

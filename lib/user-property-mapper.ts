@@ -104,5 +104,6 @@ export const mapDocumentToUserProperty = (
         ? data.confirmedBuyerId
         : null,
     buyerConfirmed: Boolean(data.buyerConfirmed),
+    sellerDocumentsConfirmed: Boolean(data.sellerDocumentsConfirmed),
   };
 };

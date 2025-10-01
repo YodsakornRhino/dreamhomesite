@@ -556,6 +556,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
             isUnderPurchase: false,
             confirmedBuyerId: null as string | null,
             buyerConfirmed: false,
+            sellerDocumentsConfirmed: false,
             createdAt,
           },
         )
@@ -590,6 +591,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           isUnderPurchase: false,
           confirmedBuyerId: null,
           buyerConfirmed: false,
+          sellerDocumentsConfirmed: false,
           createdAt,
         })
 
