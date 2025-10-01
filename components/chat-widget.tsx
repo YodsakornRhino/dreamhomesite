@@ -7,20 +7,15 @@ import { cn } from "@/lib/utils"
 import type { ChatOpenEventDetail } from "@/types/chat"
 
 const SHRINK_DURATION_MS = 220
-const OPEN_DELAY_MS = 140
 
 export default function ChatWidget() {
   const [isButtonShrinking, setIsButtonShrinking] = useState(false)
   const shrinkTimeoutRef = useRef<number | null>(null)
-  const openTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     return () => {
       if (shrinkTimeoutRef.current !== null) {
         window.clearTimeout(shrinkTimeoutRef.current)
-      }
-      if (openTimeoutRef.current !== null) {
-        window.clearTimeout(openTimeoutRef.current)
       }
     }
   }, [])
@@ -35,16 +30,13 @@ export default function ChatWidget() {
       return
     }
 
-    if (openTimeoutRef.current !== null) {
-      window.clearTimeout(openTimeoutRef.current)
-    }
     if (shrinkTimeoutRef.current !== null) {
       window.clearTimeout(shrinkTimeoutRef.current)
     }
 
-    openTimeoutRef.current = window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat"))
-    }, OPEN_DELAY_MS)
+    window.dispatchEvent(
+      new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat"),
+    )
 
     shrinkTimeoutRef.current = window.setTimeout(() => {
       setIsButtonShrinking(false)
@@ -58,8 +50,10 @@ export default function ChatWidget() {
         onClick={handleOpenChat}
         aria-label="เปิดแชทสด"
         className={cn(
-          "flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-transform duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
-          isButtonShrinking ? "scale-90" : "scale-100 hover:bg-blue-700",
+          "flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-transform duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+          isButtonShrinking
+            ? "scale-75"
+            : "scale-100 hover:scale-[1.02] hover:bg-blue-700",
           !isButtonShrinking && "animate-bounce",
         )}
       >
