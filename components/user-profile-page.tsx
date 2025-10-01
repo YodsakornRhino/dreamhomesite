@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 
 import ChatWidget from "@/components/chat-widget";
@@ -14,12 +14,14 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
 import type { UserProperty } from "@/types/user-property";
+import type { PropertyPreviewOpenEventDetail } from "@/types/chat";
 
 interface UserProfilePageProps {
   uid: string;
+  initialPropertyId?: string;
 }
 
-export function UserProfilePage({ uid }: UserProfilePageProps) {
+export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps) {
   const { user } = useAuthContext();
   const {
     profile,
@@ -34,6 +36,45 @@ export function UserProfilePage({ uid }: UserProfilePageProps) {
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(
     null,
   );
+  const [requestedPropertyId, setRequestedPropertyId] = useState<string | null>(
+    initialPropertyId ?? null,
+  );
+
+  useEffect(() => {
+    if (!initialPropertyId) return;
+    setRequestedPropertyId(initialPropertyId);
+  }, [initialPropertyId]);
+
+  useEffect(() => {
+    if (!requestedPropertyId) return;
+    const found = properties.find((item) => item.id === requestedPropertyId);
+    if (!found) return;
+    setSelectedProperty(found);
+    setRequestedPropertyId(null);
+  }, [properties, requestedPropertyId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOpenPropertyPreview = (event: Event) => {
+      const detail = (event as CustomEvent<PropertyPreviewOpenEventDetail>).detail;
+      if (!detail?.propertyId) return;
+      if (detail.ownerUid && detail.ownerUid !== uid) return;
+      setRequestedPropertyId(detail.propertyId);
+    };
+
+    window.addEventListener(
+      "dreamhome:open-property-preview",
+      handleOpenPropertyPreview,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "dreamhome:open-property-preview",
+        handleOpenPropertyPreview,
+      );
+    };
+  }, [uid]);
 
   const profileInitials = useMemo(() => {
     const name = profile?.name || "ผู้ขาย";

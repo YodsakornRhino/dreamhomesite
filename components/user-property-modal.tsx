@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ImageIcon,
+  Loader2,
   MapPin,
   Phone,
   Mail,
@@ -38,6 +39,8 @@ import {
 } from "@/components/ui/dialog";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import {
   formatPropertyPrice,
   PROPERTY_TYPE_LABELS,
@@ -46,22 +49,30 @@ import {
 } from "@/lib/property";
 import { cn } from "@/lib/utils";
 import type { UserProperty } from "@/types/user-property";
+import type { ChatOpenEventDetail, PropertyPreviewPayload } from "@/types/chat";
 
 interface UserPropertyModalProps {
   open: boolean;
   property: UserProperty | null;
   onOpenChange: (open: boolean) => void;
+  loading?: boolean;
 }
 
 export function UserPropertyModal({
   open,
   property,
   onOpenChange,
+  loading = false,
 }: UserPropertyModalProps) {
+  const router = useRouter();
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [pointerStartX, setPointerStartX] = useState<number | null>(null);
+  const { user } = useAuthContext();
+  const { toast } = useToast();
+  const [hasSentInterest, setHasSentInterest] = useState(false);
 
   const userUid = property?.userUid?.trim() ? property.userUid : null;
+  const sellerProfileHref = userUid ? `/users/${userUid}` : null;
   const {
     profile: sellerProfile,
     loading: sellerProfileLoading,
@@ -75,6 +86,7 @@ export function UserPropertyModal({
 
   useEffect(() => {
     setActiveMediaIndex(0);
+    setHasSentInterest(false);
   }, [property?.id]);
 
   const mediaItems = useMemo(() => {
@@ -168,6 +180,15 @@ export function UserPropertyModal({
     setPointerStartX(null);
   }, []);
 
+  const handleViewSellerListings = useCallback(() => {
+    if (!sellerProfileHref) {
+      return;
+    }
+
+    onOpenChange(false);
+    router.push(sellerProfileHref);
+  }, [onOpenChange, router, sellerProfileHref]);
+
   const safeIndex =
     mediaItems.length > 0
       ? Math.min(activeMediaIndex, mediaItems.length - 1)
@@ -246,7 +267,97 @@ export function UserPropertyModal({
   }, [property?.sellerName, sellerProfile?.name]);
   const sellerListingsCount = sellerListings.length;
 
-  if (!property) return null;
+  const handleExpressInterest = useCallback(() => {
+    if (!property) {
+      toast({
+        variant: "destructive",
+        title: "ไม่พบรายละเอียดประกาศ",
+        description: "ไม่สามารถส่งความสนใจได้ในขณะนี้",
+      });
+      return;
+    }
+
+    if (!property.userUid) {
+      toast({
+        variant: "destructive",
+        title: "ไม่พบข้อมูลผู้ขาย",
+        description: "ไม่สามารถส่งความสนใจได้ในขณะนี้",
+      });
+      return;
+    }
+
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "กรุณาเข้าสู่ระบบ",
+        description: "เข้าสู่ระบบเพื่อแจ้งความสนใจต่อผู้ขาย",
+      });
+      return;
+    }
+
+    if (user.uid === property.userUid) {
+      toast({
+        title: "นี่คือประกาศของคุณ",
+        description: "คุณไม่จำเป็นต้องแจ้งความสนใจประกาศของตัวเอง",
+      });
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const photos = Array.isArray(property.photos) ? property.photos : [];
+    const firstPhoto = photos.find(
+      (photo): photo is string => typeof photo === "string" && photo.trim().length > 0,
+    );
+
+    const preview: PropertyPreviewPayload = {
+      propertyId: property.id,
+      ownerUid: property.userUid,
+      title: property.title,
+      price: Number.isFinite(property.price) ? property.price : null,
+      transactionType: property.transactionType,
+      thumbnailUrl: firstPhoto ?? null,
+      address: property.address,
+      city: property.city,
+      province: property.province,
+    };
+
+    const detail: ChatOpenEventDetail = {
+      participantId: property.userUid,
+      propertyPreview: preview,
+    };
+
+    window.dispatchEvent(
+      new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", { detail }),
+    );
+
+    setHasSentInterest(true);
+
+    onOpenChange(false);
+    toast({
+      title: "ส่งความสนใจให้ผู้ขายแล้ว",
+      description: "เราได้ส่งรายละเอียดประกาศนี้ให้ผู้ขายทราบผ่านระบบแชท",
+    });
+  }, [onOpenChange, property, toast, user]);
+
+  if (!property && !loading) return null;
+
+  if (!property && loading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex w-full max-w-[calc(100vw-2rem)] flex-col items-center justify-center gap-4 py-12 text-center sm:max-w-3xl">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+          <p className="text-sm text-muted-foreground">กำลังโหลดรายละเอียดประกาศ...</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!property) {
+    return null;
+  }
 
   const sellerRoleLabel =
     SELLER_ROLE_LABELS[property.sellerRole] ?? property.sellerRole;
@@ -257,6 +368,14 @@ export function UserPropertyModal({
   const sellerDisplayName = sellerProfile?.name || property.sellerName;
   const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
   const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
+  const isOwnListing = Boolean(
+    user?.uid && property.userUid && user.uid === property.userUid,
+  );
+  const interestButtonLabel = isOwnListing
+    ? "ประกาศของคุณ"
+    : hasSentInterest
+      ? "แจ้งผู้ขายอีกครั้ง"
+      : "ต้องการอสังหาริมทรัพย์นี้";
 
   const mapUrl =
     typeof property.lat === "number" && typeof property.lng === "number"
@@ -545,18 +664,30 @@ export function UserPropertyModal({
                   )}
                 </div>
 
+                {property.userUid && (
+                  <Button
+                    className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700"
+                    onClick={handleExpressInterest}
+                    disabled={isOwnListing}
+                  >
+                    {interestButtonLabel}
+                  </Button>
+                )}
+
                 {sellerListingsError && (
                   <p className="text-sm text-red-600">{sellerListingsError}</p>
                 )}
 
-                {property.userUid && (
-                  <Link href={`/users/${property.userUid}`} className="block">
-                    <Button variant="outline" className="w-full justify-center">
-                      {sellerListingsLoading
-                        ? "กำลังโหลดประกาศจากผู้ขาย..."
-                        : `ดูประกาศทั้งหมดจากผู้ขายรายนี้ (${sellerListingsCount})`}
-                    </Button>
-                  </Link>
+                {sellerProfileHref && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center"
+                    onClick={handleViewSellerListings}
+                  >
+                    {sellerListingsLoading
+                      ? "กำลังโหลดประกาศจากผู้ขาย..."
+                      : `ดูประกาศทั้งหมดจากผู้ขายรายนี้ (${sellerListingsCount})`}
+                  </Button>
                 )}
               </div>
             </section>
@@ -574,6 +705,12 @@ export function UserPropertyModal({
             </section>
           </aside>
         </div>
+        {loading && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/70 backdrop-blur-sm">
+            <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
+            <p className="text-sm text-muted-foreground">กำลังโหลดรายละเอียดล่าสุด...</p>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
