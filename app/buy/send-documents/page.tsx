@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircle, CheckCircle2, ClipboardList, FileText, NotebookPen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useAuthContext } from "@/contexts/AuthContext"
 import { subscribeToDocument } from "@/lib/firestore"
 
 interface DocumentItem {
@@ -62,6 +63,8 @@ const OPTIONAL_DOCUMENTS: DocumentItem[] = [
 export default function BuyerSendDocumentsPage() {
   const searchParams = useSearchParams()
   const propertyId = searchParams.get("propertyId")
+  const router = useRouter()
+  const { user, loading } = useAuthContext()
 
   const [sellerConfirmed, setSellerConfirmed] = useState(false)
   const [modalDismissed, setModalDismissed] = useState(false)
@@ -111,6 +114,12 @@ export default function BuyerSendDocumentsPage() {
       setModalDismissed(true)
     }
   }
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/")
+    }
+  }, [loading, router, user])
 
   return (
     <>

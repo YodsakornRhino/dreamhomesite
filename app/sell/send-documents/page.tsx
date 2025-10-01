@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle2, ClipboardList, FileText, NotebookPen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -59,7 +59,8 @@ const allDocuments = [...REQUIRED_DOCUMENTS, ...OPTIONAL_DOCUMENTS]
 export default function SellerSendDocumentsPage() {
   const searchParams = useSearchParams()
   const propertyId = searchParams.get("propertyId")
-  const { user } = useAuthContext()
+  const router = useRouter()
+  const { user, loading } = useAuthContext()
   const { toast } = useToast()
 
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>(() => {
@@ -202,6 +203,12 @@ export default function SellerSendDocumentsPage() {
       setIsSubmitting(false)
     }
   }
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/")
+    }
+  }, [loading, router, user])
 
   return (
     <div className="min-h-[70vh] bg-gray-50 py-10">
