@@ -2283,8 +2283,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <Button
               type="button"
               variant="outline"
+              size="lg"
               onClick={() => setBuyerConfirmationPreview(null)}
-              className="w-full break-words whitespace-normal text-center sm:w-auto"
+              className="w-full break-words whitespace-normal text-center text-base sm:w-auto"
             >
               ภายหลัง
             </Button>
@@ -2292,10 +2293,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               <Button
                 type="button"
                 variant="secondary"
+                size="lg"
                 onClick={() => {
                   handleOpenPropertyPreview(buyerConfirmationPreview)
                 }}
-                className="w-full break-words whitespace-normal text-center sm:w-auto"
+                className="w-full break-words whitespace-normal text-center text-base sm:w-auto"
               >
                 ดูรายละเอียดประกาศ
               </Button>
@@ -2303,9 +2305,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             {buyerConfirmationPreview && (
               <Button
                 type="button"
+                size="lg"
                 onClick={() => handleBuyerConfirmProperty(buyerConfirmationPreview)}
                 disabled={buyerConfirmationCompleted || buyerConfirmationLoading}
-                className="w-full break-words whitespace-normal text-center sm:w-auto"
+                className="w-full break-words whitespace-normal text-center text-base sm:w-auto"
               >
                 {buyerConfirmationLoading
                   ? "กำลังยืนยัน..."
