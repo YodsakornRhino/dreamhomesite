@@ -365,7 +365,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     Object.values(subscriptions).forEach((unsubscribe) => unsubscribe())
     propertySubscriptionsRef.current = {}
     setPropertyStatusMap({})
-    shownBuyerConfirmationRef.current.clear()
     setBuyerConfirmationPreview(null)
   }, [isOpen])
 
