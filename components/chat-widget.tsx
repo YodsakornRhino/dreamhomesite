@@ -2,15 +2,33 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { MessageCircle, X, Send, Bot } from "lucide-react"
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState("")
+  const [isButtonShrinking, setIsButtonShrinking] = useState(false)
 
-  const toggleChat = () => {
-    setIsOpen(!isOpen)
+  useEffect(() => {
+    if (!isButtonShrinking) return
+
+    const timer = window.setTimeout(() => {
+      setIsButtonShrinking(false)
+    }, 200)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [isButtonShrinking])
+
+  const openChat = () => {
+    setIsButtonShrinking(true)
+    setIsOpen(true)
+  }
+
+  const closeChat = () => {
+    setIsOpen(false)
   }
 
   const handleSendMessage = () => {
@@ -31,8 +49,12 @@ export default function ChatWidget() {
       {/* Chat Button */}
       <div className="fixed bottom-6 right-6 z-40">
         <button
-          onClick={toggleChat}
-          className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 animate-bounce"
+          onClick={isOpen ? closeChat : openChat}
+          className={`bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 ${
+            isOpen ? "opacity-0 scale-90 pointer-events-none" : ""
+          } ${isButtonShrinking ? "scale-75" : "scale-100"} ${
+            !isOpen && !isButtonShrinking ? "animate-bounce" : ""
+          }`}
         >
           <MessageCircle size={24} />
         </button>
@@ -40,11 +62,11 @@ export default function ChatWidget() {
 
       {/* Chat Widget */}
       {isOpen && (
-        <div className="fixed bottom-20 sm:bottom-24 right-2 sm:right-6 w-72 sm:w-80 bg-white rounded-lg shadow-2xl z-50 max-h-96 sm:max-h-none">
+        <div className="fixed bottom-20 sm:bottom-24 right-2 sm:right-6 w-72 sm:w-80 bg-white rounded-lg shadow-2xl z-50 max-h-96 sm:max-h-none animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="bg-blue-600 text-white p-3 sm:p-4 rounded-t-lg">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-sm sm:text-base">แชทสดช่วยเหลือ</h3>
-              <button onClick={toggleChat} className="text-white hover:text-gray-200 transition-colors">
+              <button onClick={closeChat} className="text-white hover:text-gray-200 transition-colors">
                 <X size={18} />
               </button>
             </div>
