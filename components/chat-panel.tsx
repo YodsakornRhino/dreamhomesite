@@ -875,9 +875,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       oscillator.type = "sine"
       oscillator.frequency.setValueAtTime(880, now)
 
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5)
+      gain.gain.value = 0.3
 
       oscillator.connect(gain)
       gain.connect(audioContext.destination)
