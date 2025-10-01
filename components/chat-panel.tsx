@@ -573,6 +573,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           title: "ประกาศถูกยืนยันแล้ว",
           description: "ประกาศนี้มีผู้กำลังดำเนินการซื้ออยู่",
         })
+
+        if (preview.propertyId) {
+          router.push(`/sell/send-documents?propertyId=${preview.propertyId}`)
+        }
+
         return
       }
 
@@ -653,6 +658,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           title: "ยืนยันแล้ว",
           description: "คุณได้ยืนยันประกาศนี้ไปก่อนหน้านี้แล้ว",
         })
+
+        if (preview.propertyId) {
+          router.push(`/buy/send-documents?propertyId=${preview.propertyId}`)
+        }
+
         return
       }
 
@@ -1969,12 +1979,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                               {isPreviewOwner && (
                                                 <button
                                                   type="button"
-                                                  onClick={() => handleConfirmProperty(propertyPreview)}
-                                                  disabled={isPreviewUnderPurchase || isPreviewConfirming}
+                                                  onClick={() => {
+                                                    if (
+                                                      isPreviewUnderPurchase &&
+                                                      propertyPreview.propertyId
+                                                    ) {
+                                                      router.push(
+                                                        `/sell/send-documents?propertyId=${propertyPreview.propertyId}`,
+                                                      )
+                                                      return
+                                                    }
+
+                                                    handleConfirmProperty(propertyPreview)
+                                                  }}
+                                                  disabled={isPreviewConfirming}
                                                   className={cn(
                                                     "inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
                                                     isPreviewUnderPurchase
-                                                      ? "bg-amber-100 text-amber-700"
+                                                      ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
                                                       : "bg-emerald-500 text-white hover:bg-emerald-600",
                                                     isPreviewConfirming && "cursor-wait opacity-75",
                                                   )}
@@ -1989,12 +2011,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                               {isPreviewConfirmedBuyer && (
                                                 <button
                                                   type="button"
-                                                  onClick={() => handleBuyerConfirmProperty(propertyPreview)}
-                                                  disabled={isPreviewBuyerConfirmed || isPreviewBuyerConfirming}
+                                                  onClick={() => {
+                                                    if (
+                                                      isPreviewBuyerConfirmed &&
+                                                      propertyPreview.propertyId
+                                                    ) {
+                                                      router.push(
+                                                        `/buy/send-documents?propertyId=${propertyPreview.propertyId}`,
+                                                      )
+                                                      return
+                                                    }
+
+                                                    handleBuyerConfirmProperty(propertyPreview)
+                                                  }}
+                                                  disabled={isPreviewBuyerConfirming}
                                                   className={cn(
                                                     "inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
                                                     isPreviewBuyerConfirmed
-                                                      ? "bg-emerald-100 text-emerald-700"
+                                                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
                                                       : "bg-emerald-500 text-white hover:bg-emerald-600",
                                                     isPreviewBuyerConfirming && "cursor-wait opacity-75",
                                                   )}
@@ -2014,9 +2048,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                                   </div>
                                               )}
                                               {isPreviewConfirmedBuyer && isPreviewBuyerConfirmed && (
-                                                <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    if (!propertyPreview.propertyId) return
+                                                    router.push(
+                                                      `/buy/send-documents?propertyId=${propertyPreview.propertyId}`,
+                                                    )
+                                                  }}
+                                                  className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                                                >
                                                   คุณยืนยันประกาศนี้แล้ว
-                                                </div>
+                                                </button>
                                               )}
                                             </div>
                                           )}

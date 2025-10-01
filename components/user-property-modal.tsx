@@ -382,6 +382,9 @@ export function UserPropertyModal({
   const isOwnListing = Boolean(
     user?.uid && property.userUid && user.uid === property.userUid,
   );
+  const isConfirmedBuyer = Boolean(
+    user?.uid && property.confirmedBuyerId && property.confirmedBuyerId === user.uid,
+  );
   const interestButtonLabel = isOwnListing
     ? "ประกาศของคุณ"
     : isUnderPurchase
@@ -389,6 +392,20 @@ export function UserPropertyModal({
       : hasSentInterest
         ? "แจ้งผู้ขายอีกครั้ง"
         : "ต้องการอสังหาริมทรัพย์นี้";
+
+  const sendDocumentsHref = property.id
+    ? isOwnListing
+      ? `/sell/send-documents?propertyId=${property.id}`
+      : isConfirmedBuyer
+        ? `/buy/send-documents?propertyId=${property.id}`
+        : null
+    : null;
+
+  const handleSendDocumentsNavigation = () => {
+    if (!sendDocumentsHref) return;
+    onOpenChange(false);
+    router.push(sendDocumentsHref);
+  };
 
   const mapUrl =
     typeof property.lat === "number" && typeof property.lng === "number"
@@ -429,6 +446,18 @@ export function UserPropertyModal({
                   </p>
                 )}
               </AlertDescription>
+              {sendDocumentsHref && (
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-blue-600 text-white hover:bg-blue-700"
+                    onClick={handleSendDocumentsNavigation}
+                  >
+                    ไปยังหน้าส่งเอกสาร
+                  </Button>
+                </div>
+              )}
             </Alert>
           )}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">

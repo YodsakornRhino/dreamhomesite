@@ -3,12 +3,14 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Bath, Bed, Heart, MapPin, Square, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { formatPropertyPrice, PROPERTY_TYPE_LABELS, TRANSACTION_LABELS } from "@/lib/property"
 import { cn } from "@/lib/utils"
 import type { UserProperty } from "@/types/user-property"
+import { useAuthContext } from "@/contexts/AuthContext"
 
 interface UserPropertyCardProps {
   property: UserProperty
@@ -36,6 +38,8 @@ export function UserPropertyCard({
   className,
 }: UserPropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
+  const router = useRouter()
+  const { user } = useAuthContext()
 
   const mainPhoto = property.photos?.[0]
   const transactionLabel = TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
@@ -71,6 +75,24 @@ export function UserPropertyCard({
   }, [property.bathrooms])
 
   const gradient = placeholderGradients[property.propertyType] ?? placeholderGradients.house
+
+  const isPropertyOwner = Boolean(user?.uid && property.userUid === user.uid)
+  const isConfirmedBuyer = Boolean(
+    user?.uid && property.confirmedBuyerId && property.confirmedBuyerId === user.uid,
+  )
+
+  const sendDocumentsHref = property.id
+    ? isPropertyOwner
+      ? `/sell/send-documents?propertyId=${property.id}`
+      : isConfirmedBuyer
+        ? `/buy/send-documents?propertyId=${property.id}`
+        : null
+    : null
+
+  const handleSendDocumentsNavigation = () => {
+    if (!sendDocumentsHref) return
+    router.push(sendDocumentsHref)
+  }
 
   return (
     <div
@@ -112,9 +134,19 @@ export function UserPropertyCard({
         </span>
 
         {isUnderPurchase && (
-          <span className="absolute left-4 bottom-4 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white shadow">
+          <button
+            type="button"
+            onClick={handleSendDocumentsNavigation}
+            disabled={!sendDocumentsHref}
+            className={cn(
+              "absolute left-4 bottom-4 rounded-full px-3 py-1 text-xs font-semibold text-white shadow transition",
+              sendDocumentsHref
+                ? "bg-amber-500 hover:bg-amber-600"
+                : "cursor-not-allowed bg-amber-400/70",
+            )}
+          >
             มีคนกำลังซื้อแล้ว
-          </span>
+          </button>
         )}
 
         {showInteractiveElements && (
@@ -142,13 +174,33 @@ export function UserPropertyCard({
 
           {isUnderPurchase && (
             <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              <button
+                type="button"
+                onClick={handleSendDocumentsNavigation}
+                disabled={!sendDocumentsHref}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition",
+                  sendDocumentsHref
+                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                    : "cursor-not-allowed bg-amber-50 text-amber-400",
+                )}
+              >
                 มีคนกำลังซื้อแล้ว
-              </div>
+              </button>
               {buyerConfirmed && (
-                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                <button
+                  type="button"
+                  onClick={handleSendDocumentsNavigation}
+                  disabled={!sendDocumentsHref}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition",
+                    sendDocumentsHref
+                      ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      : "cursor-not-allowed bg-emerald-50 text-emerald-400",
+                  )}
+                >
                   ผู้ซื้อยืนยันเอกสารแล้ว
-                </div>
+                </button>
               )}
             </div>
           )}
