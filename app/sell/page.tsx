@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
-import ChatWidget from "@/components/chat-widget"
 import { UserPropertyCard } from "@/components/user-property-card"
 import { UserPropertyModal } from "@/components/user-property-modal"
 import SellAuthPrompt from "@/components/sell-auth-prompt"
@@ -202,7 +201,6 @@ export default function SellDashboardPage() {
         </CardContent>
       </Card>
 
-      <ChatWidget />
 
       <UserPropertyModal
         open={Boolean(selectedProperty)}

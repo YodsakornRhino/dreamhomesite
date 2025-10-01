@@ -1,5 +1,4 @@
 import { Inter } from "next/font/google"
-import ChatWidget from "@/components/chat-widget"
 import { Calendar, User, ArrowRight, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -221,7 +220,6 @@ export default function BlogPage() {
         </div>
       </section>
 
-      <ChatWidget />
     </div>
   )
 }
