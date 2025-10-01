@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useMemo, useState, type KeyboardEvent, type MouseEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Bath, Bed, Heart, MapPin, Square, Trash2 } from "lucide-react"
 
@@ -94,10 +94,30 @@ export function UserPropertyCard({
     router.push(sendDocumentsHref)
   }
 
+  const handleCardInteraction = (event: MouseEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    onViewDetails(property)
+  }
+
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      onViewDetails(property)
+    }
+  }
+
+  const stopPropagation = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation()
+  }
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={handleCardInteraction}
+      onKeyDown={handleCardKeyDown}
       className={cn(
-        "group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg",
+        "group flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500",
         className,
       )}
     >
@@ -136,7 +156,10 @@ export function UserPropertyCard({
         {isUnderPurchase && (
           <button
             type="button"
-            onClick={handleSendDocumentsNavigation}
+            onClick={(event) => {
+              stopPropagation(event)
+              handleSendDocumentsNavigation()
+            }}
             disabled={!sendDocumentsHref}
             className={cn(
               "absolute left-4 bottom-4 rounded-full px-3 py-1 text-xs font-semibold text-white shadow transition",
@@ -152,7 +175,10 @@ export function UserPropertyCard({
         {showInteractiveElements && (
           <button
             type="button"
-            onClick={() => setIsFavorited((prev) => !prev)}
+            onClick={(event) => {
+              stopPropagation(event)
+              setIsFavorited((prev) => !prev)
+            }}
             className="absolute right-4 top-4 rounded-full bg-white p-2 text-gray-500 shadow transition hover:bg-gray-100"
             aria-label={isFavorited ? "นำออกจากรายการโปรด" : "เพิ่มในรายการโปรด"}
           >
@@ -176,7 +202,10 @@ export function UserPropertyCard({
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={handleSendDocumentsNavigation}
+                onClick={(event) => {
+                  stopPropagation(event)
+                  handleSendDocumentsNavigation()
+                }}
                 disabled={!sendDocumentsHref}
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition",
@@ -190,7 +219,10 @@ export function UserPropertyCard({
               {buyerConfirmed && (
                 <button
                   type="button"
-                  onClick={handleSendDocumentsNavigation}
+                  onClick={(event) => {
+                    stopPropagation(event)
+                    handleSendDocumentsNavigation()
+                  }}
                   disabled={!sendDocumentsHref}
                   className={cn(
                     "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition",
@@ -246,13 +278,21 @@ export function UserPropertyCard({
                     isDeleting && "pointer-events-none opacity-50",
                   )}
                 >
-                  <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
+                  <Link
+                    href={`/sell/edit/${property.id}`}
+                    onClick={stopPropagation}
+                  >
+                    แก้ไขประกาศ
+                  </Link>
                 </Button>
                 <Button
                   type="button"
                   variant="destructive"
                   className="col-start-2 row-span-2 flex h-full w-full flex-col items-center justify-center gap-2 text-base font-semibold"
-                  onClick={() => onDelete(property)}
+                  onClick={(event) => {
+                    stopPropagation(event)
+                    onDelete(property)
+                  }}
                   disabled={isDeleting}
                 >
                   {isDeleting ? (
@@ -283,7 +323,12 @@ export function UserPropertyCard({
                       isDeleting && "pointer-events-none opacity-50",
                     )}
                   >
-                    <Link href={`/sell/edit/${property.id}`}>แก้ไขประกาศ</Link>
+                    <Link
+                      href={`/sell/edit/${property.id}`}
+                      onClick={stopPropagation}
+                    >
+                      แก้ไขประกาศ
+                    </Link>
                   </Button>
                 )}
               </div>
