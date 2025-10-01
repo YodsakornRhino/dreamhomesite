@@ -71,6 +71,8 @@ export const mapDocumentToUserProperty = (
     userUid:
       toStringValue(data.userUid) ||
       (doc.ref.parent.parent ? toStringValue(doc.ref.parent.parent.id) : ""),
+    hasPendingBuyer: Boolean(data.hasPendingBuyer),
+    pendingBuyerUid: toOptionalString(data.pendingBuyerUid),
     sellerName: toStringValue(data.sellerName),
     sellerPhone: toStringValue(data.sellerPhone),
     sellerEmail: toStringValue(data.sellerEmail),

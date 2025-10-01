@@ -132,6 +132,12 @@ export function UserPropertyCard({
           </span>
         </div>
 
+        {property.hasPendingBuyer && (
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm">
+            มีคนกำลังซื้อแล้ว
+          </div>
+        )}
+
         <p className="flex items-center text-sm text-gray-600">
           <MapPin className="mr-2 h-4 w-4 text-blue-500" />
           <span className="truncate" title={locationText}>

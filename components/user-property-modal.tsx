@@ -322,6 +322,8 @@ export function UserPropertyModal({
       address: property.address,
       city: property.city,
       province: property.province,
+      hasPendingBuyer: property.hasPendingBuyer,
+      pendingBuyerUid: property.pendingBuyerUid,
     };
 
     const detail: ChatOpenEventDetail = {
@@ -368,6 +370,7 @@ export function UserPropertyModal({
   const sellerDisplayName = sellerProfile?.name || property.sellerName;
   const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
   const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
+  const hasPendingBuyer = Boolean(property.hasPendingBuyer);
   const isOwnListing = Boolean(
     user?.uid && property.userUid && user.uid === property.userUid,
   );
@@ -408,6 +411,11 @@ export function UserPropertyModal({
               {transactionLabel}
             </Badge>
             <Badge variant="outline">{typeLabel}</Badge>
+            {hasPendingBuyer && (
+              <Badge className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">
+                มีคนกำลังซื้อแล้ว
+              </Badge>
+            )}
             <DialogDescription className="text-2xl font-bold text-blue-600 sm:text-3xl">
               {formatPropertyPrice(property.price, property.transactionType)}
             </DialogDescription>

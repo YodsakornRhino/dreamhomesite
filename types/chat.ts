@@ -8,6 +8,8 @@ export interface PropertyPreviewPayload {
   address?: string | null;
   city?: string | null;
   province?: string | null;
+  hasPendingBuyer?: boolean | null;
+  pendingBuyerUid?: string | null;
 }
 
 export interface ChatOpenEventDetail {

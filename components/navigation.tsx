@@ -98,6 +98,12 @@ const Navigation: React.FC = () => {
       return {
         id: preview.propertyId,
         userUid: safeOwner,
+        hasPendingBuyer: Boolean(preview.hasPendingBuyer),
+        pendingBuyerUid:
+          typeof preview.pendingBuyerUid === "string" &&
+          preview.pendingBuyerUid.trim().length > 0
+            ? preview.pendingBuyerUid
+            : null,
         sellerName: "",
         sellerPhone: "",
         sellerEmail: "",

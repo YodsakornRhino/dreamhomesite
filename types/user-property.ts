@@ -1,6 +1,8 @@
 export interface UserProperty {
   id: string;
   userUid: string;
+  hasPendingBuyer: boolean;
+  pendingBuyerUid: string | null;
   sellerName: string;
   sellerPhone: string;
   sellerEmail: string;
