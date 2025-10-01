@@ -94,6 +94,7 @@ interface UserProfileSummary {
 interface PropertyPurchaseStatus {
   isUnderPurchase: boolean
   confirmedBuyerId: string | null
+  buyerConfirmed: boolean
 }
 
 const createChatId = (first: string, second: string) => {
@@ -243,13 +244,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false)
   const [selectedAttachment, setSelectedAttachment] = useState<ChatMessageAttachment | null>(null)
   const [confirmingPropertyId, setConfirmingPropertyId] = useState<string | null>(null)
+  const [buyerConfirmingPropertyId, setBuyerConfirmingPropertyId] =
+    useState<string | null>(null)
   const [propertyStatusMap, setPropertyStatusMap] = useState<
     Record<string, PropertyPurchaseStatus>
   >({})
   const propertySubscriptionsRef = useRef<Record<string, () => void>>({})
-  const shownBuyerConfirmationRef = useRef<Set<string>>(new Set())
   const [buyerConfirmationPreview, setBuyerConfirmationPreview] =
     useState<ChatMessagePropertyPreview | null>(null)
+  const buyerConfirmationDismissedRef = useRef<Set<string>>(new Set())
+  const lastBuyerConfirmationPropertyIdRef = useRef<string | null>(null)
 
   const panelRef = useRef<HTMLDivElement>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
@@ -260,6 +264,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const initialThreadSnapshotRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
   const userMapRef = useRef(userMap)
+
+  const activeBuyerConfirmationStatus =
+    buyerConfirmationPreview?.propertyId
+      ? propertyStatusMap[buyerConfirmationPreview.propertyId]
+      : undefined
+  const buyerConfirmationCompleted = Boolean(activeBuyerConfirmationStatus?.buyerConfirmed)
+  const buyerConfirmationLoading =
+    buyerConfirmationPreview?.propertyId
+      ? buyerConfirmingPropertyId === buyerConfirmationPreview.propertyId
+      : false
 
   useEffect(() => {
     return () => {
@@ -416,12 +430,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               typeof record.confirmedBuyerId === "string" && record.confirmedBuyerId.trim().length > 0
                 ? record.confirmedBuyerId
                 : null
+            const buyerConfirmed = Boolean(record.buyerConfirmed)
 
             setPropertyStatusMap((current) => ({
               ...current,
               [propertyId]: {
                 isUnderPurchase,
                 confirmedBuyerId,
+                buyerConfirmed,
               },
             }))
           })
@@ -446,22 +462,55 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     if (!user?.uid) return
 
-    for (const [propertyId, status] of Object.entries(propertyStatusMap)) {
-      if (!status?.isUnderPurchase) continue
-      if (status.confirmedBuyerId !== user.uid) continue
-      if (shownBuyerConfirmationRef.current.has(propertyId)) continue
+    if (buyerConfirmationPreview?.propertyId) {
+      const status = propertyStatusMap[buyerConfirmationPreview.propertyId]
+      if (!status) {
+        return
+      }
 
-      const preview = messages.find(
-        (message): message is ChatMessage & { propertyPreview: ChatMessagePropertyPreview } =>
-          Boolean(message.propertyPreview && message.propertyPreview.propertyId === propertyId),
-      )?.propertyPreview
+      if (!status.isUnderPurchase || status.confirmedBuyerId !== user.uid || status.buyerConfirmed) {
+        buyerConfirmationDismissedRef.current.delete(buyerConfirmationPreview.propertyId)
+        setBuyerConfirmationPreview(null)
+      }
 
-      if (!preview) continue
+      return
+    }
 
-      shownBuyerConfirmationRef.current.add(propertyId)
+    const nextPropertyId = Object.entries(propertyStatusMap).find(([propertyId, status]) => {
+      if (!status?.isUnderPurchase) return false
+      if (status.confirmedBuyerId !== user.uid) return false
+      if (status.buyerConfirmed) return false
+      if (buyerConfirmationDismissedRef.current.has(propertyId)) return false
+      return true
+    })?.[0]
+
+    if (!nextPropertyId) {
+      return
+    }
+
+    const preview = messages.find(
+      (message): message is ChatMessage & { propertyPreview: ChatMessagePropertyPreview } =>
+        Boolean(message.propertyPreview && message.propertyPreview.propertyId === nextPropertyId),
+    )?.propertyPreview
+
+    if (preview) {
+      lastBuyerConfirmationPropertyIdRef.current = preview.propertyId ?? nextPropertyId
       setBuyerConfirmationPreview(preview)
     }
-  }, [messages, propertyStatusMap, user?.uid])
+  }, [
+    buyerConfirmationPreview?.propertyId,
+    messages,
+    propertyStatusMap,
+    user?.uid,
+  ])
+
+  useEffect(() => {
+    for (const [propertyId, status] of Object.entries(propertyStatusMap)) {
+      if (!status?.isUnderPurchase || status.buyerConfirmed) {
+        buyerConfirmationDismissedRef.current.delete(propertyId)
+      }
+    }
+  }, [propertyStatusMap])
 
   const handleOpenPropertyPreview = useCallback(
     (preview: ChatMessagePropertyPreview) => {
@@ -532,6 +581,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           updateDocument("property", preview.propertyId, {
             isUnderPurchase: true,
             confirmedBuyerId: activeParticipantId,
+            buyerConfirmed: false,
           }),
           updateDocument(
             `users/${preview.ownerUid}/user_property`,
@@ -539,6 +589,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             {
               isUnderPurchase: true,
               confirmedBuyerId: activeParticipantId,
+              buyerConfirmed: false,
             },
           ),
         ])
@@ -561,6 +612,83 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       }
     },
     [activeParticipantId, propertyStatusMap, router, toast, user?.uid],
+  )
+
+  const handleBuyerConfirmProperty = useCallback(
+    async (preview: ChatMessagePropertyPreview) => {
+      if (!user?.uid) {
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถยืนยันได้",
+          description: "กรุณาเข้าสู่ระบบเพื่อดำเนินการยืนยัน",
+        })
+        return
+      }
+
+      if (!preview.propertyId) {
+        toast({
+          variant: "destructive",
+          title: "ไม่พบประกาศ",
+          description: "ไม่พบรหัสประกาศสำหรับการยืนยัน",
+        })
+        return
+      }
+
+      const status = propertyStatusMap[preview.propertyId]
+      if (!status?.isUnderPurchase || status.confirmedBuyerId !== user.uid) {
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถยืนยันประกาศนี้ได้",
+          description: "สถานะประกาศไม่รองรับการยืนยันโดยผู้ใช้คนนี้",
+        })
+        return
+      }
+
+      if (status.buyerConfirmed) {
+        toast({
+          title: "ยืนยันแล้ว",
+          description: "คุณได้ยืนยันประกาศนี้ไปก่อนหน้านี้แล้ว",
+        })
+        return
+      }
+
+      setBuyerConfirmingPropertyId(preview.propertyId)
+
+      try {
+        await Promise.all([
+          updateDocument("property", preview.propertyId, {
+            buyerConfirmed: true,
+          }),
+          updateDocument(
+            `users/${preview.ownerUid}/user_property`,
+            preview.propertyId,
+            {
+              buyerConfirmed: true,
+            },
+          ),
+        ])
+
+        toast({
+          title: "ยืนยันการซื้อเรียบร้อย",
+          description: "ตรวจสอบรายการเอกสารที่ต้องเตรียมในขั้นตอนถัดไป",
+        })
+
+        buyerConfirmationDismissedRef.current.delete(preview.propertyId)
+        lastBuyerConfirmationPropertyIdRef.current = preview.propertyId
+        setBuyerConfirmationPreview(null)
+        router.push(`/buy/send-documents?propertyId=${preview.propertyId}`)
+      } catch (error) {
+        console.error("Failed to confirm buyer acknowledgment", error)
+        toast({
+          variant: "destructive",
+          title: "ยืนยันไม่สำเร็จ",
+          description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+        })
+      } finally {
+        setBuyerConfirmingPropertyId(null)
+      }
+    },
+    [propertyStatusMap, router, toast, user?.uid],
   )
 
   useEffect(() => {
@@ -1723,6 +1851,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                               propertyPreview?.propertyId
                                 ? confirmingPropertyId === propertyPreview.propertyId
                                 : false
+                            const isPreviewConfirmedBuyer =
+                              Boolean(
+                                propertyPreview?.propertyId &&
+                                  !isPreviewOwner &&
+                                  previewStatus?.confirmedBuyerId === user.uid,
+                              )
+                            const isPreviewBuyerConfirmed = Boolean(previewStatus?.buyerConfirmed)
+                            const isPreviewBuyerConfirming =
+                              propertyPreview?.propertyId
+                                ? buyerConfirmingPropertyId === propertyPreview.propertyId
+                                : false
 
                             return (
                               <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
@@ -1843,9 +1982,36 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                                       : "ยืนยันอสังหาริมทรัพย์นี้"}
                                                 </button>
                                               )}
-                                              {!isPreviewOwner && isPreviewUnderPurchase && (
-                                                <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-700">
-                                                  มีคนกำลังซื้อแล้ว
+                                              {isPreviewConfirmedBuyer && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleBuyerConfirmProperty(propertyPreview)}
+                                                  disabled={isPreviewBuyerConfirmed || isPreviewBuyerConfirming}
+                                                  className={cn(
+                                                    "inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
+                                                    isPreviewBuyerConfirmed
+                                                      ? "bg-emerald-100 text-emerald-700"
+                                                      : "bg-emerald-500 text-white hover:bg-emerald-600",
+                                                    isPreviewBuyerConfirming && "cursor-wait opacity-75",
+                                                  )}
+                                                >
+                                                  {isPreviewBuyerConfirming
+                                                    ? "กำลังยืนยัน..."
+                                                    : isPreviewBuyerConfirmed
+                                                      ? "ยืนยันแล้ว"
+                                                      : "ยืนยันเพื่อดำเนินการต่อ"}
+                                                </button>
+                                              )}
+                                              {!isPreviewOwner &&
+                                                isPreviewUnderPurchase &&
+                                                !isPreviewConfirmedBuyer && (
+                                                  <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-700">
+                                                    มีคนกำลังซื้อแล้ว
+                                                  </div>
+                                              )}
+                                              {isPreviewConfirmedBuyer && isPreviewBuyerConfirmed && (
+                                                <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                                                  คุณยืนยันประกาศนี้แล้ว
                                                 </div>
                                               )}
                                             </div>
@@ -2064,6 +2230,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         open={Boolean(buyerConfirmationPreview)}
         onOpenChange={(open) => {
           if (!open) {
+            const propertyId =
+              buyerConfirmationPreview?.propertyId ?? lastBuyerConfirmationPropertyIdRef.current
+            if (propertyId) {
+              const status = propertyStatusMap[propertyId]
+              if (
+                status?.isUnderPurchase &&
+                status.confirmedBuyerId === user?.uid &&
+                !status.buyerConfirmed
+              ) {
+                buyerConfirmationDismissedRef.current.add(propertyId)
+              } else {
+                buyerConfirmationDismissedRef.current.delete(propertyId)
+              }
+              lastBuyerConfirmationPropertyIdRef.current = propertyId
+            }
             setBuyerConfirmationPreview(null)
           }
         }}
@@ -2097,25 +2278,39 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               <p>โปรดเตรียมเอกสารที่จำเป็นและติดตามการติดต่อจากผู้ขายเพื่อดำเนินการขั้นตอนถัดไป</p>
             </div>
           )}
-          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => setBuyerConfirmationPreview(null)}
               className="sm:w-auto"
             >
-              ปิด
+              ภายหลัง
             </Button>
             {buyerConfirmationPreview && (
               <Button
                 type="button"
+                variant="secondary"
                 onClick={() => {
                   handleOpenPropertyPreview(buyerConfirmationPreview)
-                  setBuyerConfirmationPreview(null)
                 }}
                 className="sm:w-auto"
               >
                 ดูรายละเอียดประกาศ
+              </Button>
+            )}
+            {buyerConfirmationPreview && (
+              <Button
+                type="button"
+                onClick={() => handleBuyerConfirmProperty(buyerConfirmationPreview)}
+                disabled={buyerConfirmationCompleted || buyerConfirmationLoading}
+                className="sm:w-auto"
+              >
+                {buyerConfirmationLoading
+                  ? "กำลังยืนยัน..."
+                  : buyerConfirmationCompleted
+                    ? "ยืนยันแล้ว"
+                    : "ยืนยันเพื่อไปขั้นตอนถัดไป"}
               </Button>
             )}
           </DialogFooter>

@@ -103,5 +103,6 @@ export const mapDocumentToUserProperty = (
       typeof data.confirmedBuyerId === "string" && data.confirmedBuyerId.trim().length > 0
         ? data.confirmedBuyerId
         : null,
+    buyerConfirmed: Boolean(data.buyerConfirmed),
   };
 };

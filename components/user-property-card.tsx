@@ -41,6 +41,7 @@ export function UserPropertyCard({
   const transactionLabel = TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
   const typeLabel = PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType
   const isUnderPurchase = property.isUnderPurchase
+  const buyerConfirmed = property.buyerConfirmed
 
   const locationText = useMemo(() => {
     const segments = [property.address, property.city, property.province]
@@ -140,8 +141,15 @@ export function UserPropertyCard({
           </div>
 
           {isUnderPurchase && (
-            <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-              มีคนกำลังซื้อแล้ว
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                มีคนกำลังซื้อแล้ว
+              </div>
+              {buyerConfirmed && (
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                  ผู้ซื้อยืนยันเอกสารแล้ว
+                </div>
+              )}
             </div>
           )}
 

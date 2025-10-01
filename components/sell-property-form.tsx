@@ -555,6 +555,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
             video: null as string | null,
             isUnderPurchase: false,
             confirmedBuyerId: null as string | null,
+            buyerConfirmed: false,
             createdAt,
           },
         )
@@ -588,6 +589,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           video: videoUrl,
           isUnderPurchase: false,
           confirmedBuyerId: null,
+          buyerConfirmed: false,
           createdAt,
         })
 

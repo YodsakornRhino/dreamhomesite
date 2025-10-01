@@ -27,4 +27,5 @@ export interface UserProperty {
   createdAt: string;
   isUnderPurchase: boolean;
   confirmedBuyerId: string | null;
+  buyerConfirmed: boolean;
 }

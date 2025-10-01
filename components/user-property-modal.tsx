@@ -378,6 +378,7 @@ export function UserPropertyModal({
   const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
   const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
   const isUnderPurchase = property.isUnderPurchase;
+  const buyerConfirmed = property.buyerConfirmed;
   const isOwnListing = Boolean(
     user?.uid && property.userUid && user.uid === property.userUid,
   );
@@ -418,8 +419,15 @@ export function UserPropertyModal({
           {isUnderPurchase && (
             <Alert className="border-amber-200 bg-amber-50 text-amber-800">
               <AlertTitle>มีคนกำลังซื้อแล้ว</AlertTitle>
-              <AlertDescription>
-                ประกาศนี้มีผู้กำลังดำเนินการซื้ออยู่ หากคุณสนใจกรุณาติดตามความคืบหน้าหรือเลือกประกาศอื่น
+              <AlertDescription className="space-y-2">
+                <p>
+                  ประกาศนี้มีผู้กำลังดำเนินการซื้ออยู่ หากคุณสนใจกรุณาติดตามความคืบหน้าหรือเลือกประกาศอื่น
+                </p>
+                {buyerConfirmed && (
+                  <p className="font-semibold text-amber-900">
+                    ผู้ซื้อได้ยืนยันการเตรียมเอกสารแล้ว กำลังรอขั้นตอนจากผู้ขาย
+                  </p>
+                )}
               </AlertDescription>
             </Alert>
           )}
