@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Check } from "lucide-react"
-import ChatWidget from "@/components/chat-widget"
 import { Button } from "@/components/ui/button"
 import SignInModal from "@/components/sign-in-modal"
 import SignUpModal from "@/components/sign-up-modal"
@@ -49,7 +48,6 @@ export default function SellAuthPrompt() {
           สมัครสมาชิก
         </Button>
       </div>
-      <ChatWidget />
       <SignInModal
         isOpen={isSignInOpen}
         onClose={() => setIsSignInOpen(false)}

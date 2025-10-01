@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 
-import ChatWidget from "@/components/chat-widget";
 import { UserPropertyCard } from "@/components/user-property-card";
 import { UserPropertyModal } from "@/components/user-property-modal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -245,7 +244,6 @@ export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps
         onOpenChange={handleModalChange}
       />
 
-      <ChatWidget />
     </div>
   );
 }

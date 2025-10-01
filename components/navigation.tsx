@@ -6,7 +6,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import {
   Tooltip,
   TooltipTrigger,
@@ -229,11 +228,6 @@ const Navigation: React.FC = () => {
     }
   }, [handleOpenPropertyPreview])
 
-  const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + "..."
-  }
-
   const getInitials = (email: string) => {
     return email.substring(0, 2).toUpperCase()
   }
@@ -363,39 +357,27 @@ const Navigation: React.FC = () => {
                 </div>
               ) : user ? (
                 <div className="flex items-center space-x-2 sm:space-x-3">
+                  <Button
+                    variant="ghost"
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0"
+                    onClick={() => setIsChatOpen(true)}
+                  >
+                    <Mail className="h-4 w-4" />
+                    <span className="sr-only">เปิดข้อความ</span>
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
-                        className="relative h-8 w-8 sm:h-9 sm:w-auto sm:px-3 rounded-full sm:rounded-md"
+                        className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0"
                       >
-                        <div className="flex items-center space-x-2">
-                          <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
-                            <AvatarImage src={user.photoURL || ""} alt={user.email || ""} />
-                            <AvatarFallback className="text-xs sm:text-sm bg-blue-100 text-blue-700">
-                              {getInitials(user.email || "U")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] lg:max-w-[200px]">
-                            <div className="flex items-center space-x-1">
-                              <span className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                                {truncateText(
-                                  user.displayName || user.email?.split("@")[0] || "ผู้ใช้",
-                                  15
-                                )}
-                              </span>
-                              {!user.emailVerified && (
-                                <Badge variant="destructive" className="text-xs px-1 py-0 h-4 lg:px-2 lg:h-5">
-                                  <span className="lg:hidden">!</span>
-                                  <span className="hidden lg:inline">ยังไม่ยืนยัน</span>
-                                </Badge>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500 truncate max-w-full">
-                              {truncateText(user.email || "", 20)}
-                            </span>
-                          </div>
-                        </div>
+                        <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                          <AvatarImage src={user.photoURL || ""} alt={user.email || ""} />
+                          <AvatarFallback className="text-xs sm:text-sm bg-blue-100 text-blue-700">
+                            {getInitials(user.email || "U")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="sr-only">เมนูโปรไฟล์</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56" align="end" forceMount>

@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import type {
+  ChatOpenEventDetail,
   PropertyPreviewOpenEventDetail,
   PropertyPreviewPayload,
 } from "@/types/chat"
@@ -871,18 +872,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const oscillator = audioContext.createOscillator()
       const gain = audioContext.createGain()
 
+      const peakGain = 0.7
+      const fadeOutTime = 0.6
+
       oscillator.type = "sine"
       oscillator.frequency.setValueAtTime(880, now)
 
       gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5)
+      gain.gain.exponentialRampToValueAtTime(peakGain, now + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOutTime)
 
       oscillator.connect(gain)
       gain.connect(audioContext.destination)
 
       oscillator.start(now)
-      oscillator.stop(now + 0.5)
+      oscillator.stop(now + fadeOutTime)
 
       audioContextRef.current = audioContext
     } catch (error) {
@@ -971,9 +975,39 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   const displayName = getDisplayName(profile)
                   const messagePreview = thread.lastMessage?.trim()
 
-                  toast({
+                  const detail: ChatOpenEventDetail = { participantId: otherParticipantId }
+                  const openChatFromToast = () => {
+                    window.dispatchEvent(
+                      new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", {
+                        detail,
+                      }),
+                    )
+                    setHighlightedThreadIds((current) => current.filter((id) => id !== threadId))
+                  }
+
+                  const { dismiss } = toast({
                     title: `มีการติดต่อจาก ${displayName}`,
                     description: messagePreview && messagePreview.length > 0 ? messagePreview : "มีข้อความใหม่รอคุณอยู่",
+                    className: "cursor-pointer transition hover:bg-muted",
+                    tabIndex: 0,
+                    onClick: (event) => {
+                      if ((event.target as HTMLElement | null)?.closest("[toast-close]")) {
+                        return
+                      }
+
+                      event.preventDefault()
+                      openChatFromToast()
+                      dismiss()
+                    },
+                    onKeyDown: (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") {
+                        return
+                      }
+
+                      event.preventDefault()
+                      openChatFromToast()
+                      dismiss()
+                    },
                   })
                 })
               }

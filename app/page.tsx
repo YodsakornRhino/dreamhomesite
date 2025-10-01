@@ -1,5 +1,4 @@
 import { Inter } from "next/font/google"
-import ChatWidget from "@/components/chat-widget"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -355,7 +354,6 @@ export default function Home() {
         </div>
       </section>
 
-      <ChatWidget />
     </div>
   )
 }
