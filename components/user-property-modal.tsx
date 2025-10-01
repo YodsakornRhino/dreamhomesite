@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -64,6 +64,7 @@ export function UserPropertyModal({
   onOpenChange,
   loading = false,
 }: UserPropertyModalProps) {
+  const router = useRouter();
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [pointerStartX, setPointerStartX] = useState<number | null>(null);
   const { user } = useAuthContext();
@@ -71,6 +72,7 @@ export function UserPropertyModal({
   const [hasSentInterest, setHasSentInterest] = useState(false);
 
   const userUid = property?.userUid?.trim() ? property.userUid : null;
+  const sellerProfileHref = userUid ? `/users/${userUid}` : null;
   const {
     profile: sellerProfile,
     loading: sellerProfileLoading,
@@ -177,6 +179,15 @@ export function UserPropertyModal({
   const resetPointer = useCallback(() => {
     setPointerStartX(null);
   }, []);
+
+  const handleViewSellerListings = useCallback(() => {
+    if (!sellerProfileHref) {
+      return;
+    }
+
+    onOpenChange(false);
+    router.push(sellerProfileHref);
+  }, [onOpenChange, router, sellerProfileHref]);
 
   const safeIndex =
     mediaItems.length > 0
@@ -667,14 +678,16 @@ export function UserPropertyModal({
                   <p className="text-sm text-red-600">{sellerListingsError}</p>
                 )}
 
-                {property.userUid && (
-                  <Link href={`/users/${property.userUid}`} className="block">
-                    <Button variant="outline" className="w-full justify-center">
-                      {sellerListingsLoading
-                        ? "กำลังโหลดประกาศจากผู้ขาย..."
-                        : `ดูประกาศทั้งหมดจากผู้ขายรายนี้ (${sellerListingsCount})`}
-                    </Button>
-                  </Link>
+                {sellerProfileHref && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center"
+                    onClick={handleViewSellerListings}
+                  >
+                    {sellerListingsLoading
+                      ? "กำลังโหลดประกาศจากผู้ขาย..."
+                      : `ดูประกาศทั้งหมดจากผู้ขายรายนี้ (${sellerListingsCount})`}
+                  </Button>
                 )}
               </div>
             </section>
