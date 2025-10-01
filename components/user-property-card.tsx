@@ -40,6 +40,7 @@ export function UserPropertyCard({
   const mainPhoto = property.photos?.[0]
   const transactionLabel = TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
   const typeLabel = PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType
+  const isUnderPurchase = property.isUnderPurchase
 
   const locationText = useMemo(() => {
     const segments = [property.address, property.city, property.province]
@@ -102,12 +103,18 @@ export function UserPropertyCard({
 
         <span
           className={cn(
-            "absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold text-white shadow", 
+            "absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold text-white shadow",
             property.transactionType === "rent" ? "bg-orange-500" : "bg-emerald-500",
           )}
         >
           {transactionLabel}
         </span>
+
+        {isUnderPurchase && (
+          <span className="absolute left-4 bottom-4 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white shadow">
+            มีคนกำลังซื้อแล้ว
+          </span>
+        )}
 
         {showInteractiveElements && (
           <button
@@ -121,16 +128,22 @@ export function UserPropertyCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-blue-600">{typeLabel}</p>
-            <h3 className="text-xl font-semibold text-gray-900">{property.title}</h3>
+        <div className="flex flex-1 flex-col gap-4 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-600">{typeLabel}</p>
+              <h3 className="text-xl font-semibold text-gray-900">{property.title}</h3>
+            </div>
+            <span className="shrink-0 text-lg font-bold text-blue-600">
+              {formatPropertyPrice(property.price, property.transactionType)}
+            </span>
           </div>
-          <span className="shrink-0 text-lg font-bold text-blue-600">
-            {formatPropertyPrice(property.price, property.transactionType)}
-          </span>
-        </div>
+
+          {isUnderPurchase && (
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              มีคนกำลังซื้อแล้ว
+            </div>
+          )}
 
         <p className="flex items-center text-sm text-gray-600">
           <MapPin className="mr-2 h-4 w-4 text-blue-500" />

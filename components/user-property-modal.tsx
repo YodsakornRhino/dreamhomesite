@@ -30,6 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -307,6 +308,14 @@ export function UserPropertyModal({
       return;
     }
 
+    if (property.isUnderPurchase) {
+      toast({
+        title: "มีคนกำลังซื้อแล้ว",
+        description: "ประกาศนี้มีผู้กำลังดำเนินการซื้ออยู่ กรุณาติดตามสถานะหรือดูประกาศอื่น",
+      });
+      return;
+    }
+
     const photos = Array.isArray(property.photos) ? property.photos : [];
     const firstPhoto = photos.find(
       (photo): photo is string => typeof photo === "string" && photo.trim().length > 0,
@@ -368,14 +377,17 @@ export function UserPropertyModal({
   const sellerDisplayName = sellerProfile?.name || property.sellerName;
   const sellerPhone = property.sellerPhone || sellerProfile?.phoneNumber || "";
   const sellerEmail = property.sellerEmail || sellerProfile?.email || "";
+  const isUnderPurchase = property.isUnderPurchase;
   const isOwnListing = Boolean(
     user?.uid && property.userUid && user.uid === property.userUid,
   );
   const interestButtonLabel = isOwnListing
     ? "ประกาศของคุณ"
-    : hasSentInterest
-      ? "แจ้งผู้ขายอีกครั้ง"
-      : "ต้องการอสังหาริมทรัพย์นี้";
+    : isUnderPurchase
+      ? "มีคนกำลังซื้อแล้ว"
+      : hasSentInterest
+        ? "แจ้งผู้ขายอีกครั้ง"
+        : "ต้องการอสังหาริมทรัพย์นี้";
 
   const mapUrl =
     typeof property.lat === "number" && typeof property.lng === "number"
@@ -403,6 +415,14 @@ export function UserPropertyModal({
               )}
             </div>
           </div>
+          {isUnderPurchase && (
+            <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+              <AlertTitle>มีคนกำลังซื้อแล้ว</AlertTitle>
+              <AlertDescription>
+                ประกาศนี้มีผู้กำลังดำเนินการซื้ออยู่ หากคุณสนใจกรุณาติดตามความคืบหน้าหรือเลือกประกาศอื่น
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Badge className="bg-blue-600 text-white hover:bg-blue-600">
               {transactionLabel}
@@ -668,7 +688,7 @@ export function UserPropertyModal({
                   <Button
                     className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700"
                     onClick={handleExpressInterest}
-                    disabled={isOwnListing}
+                    disabled={isOwnListing || isUnderPurchase}
                   >
                     {interestButtonLabel}
                   </Button>

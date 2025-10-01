@@ -1,5 +1,6 @@
 "use client"
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   Images,
@@ -17,7 +18,14 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
@@ -29,6 +37,7 @@ import {
   addDocument,
   setDocument,
   subscribeToCollection,
+  subscribeToDocument,
   updateDocument,
 } from "@/lib/firestore"
 import { getDownloadURL, uploadFile } from "@/lib/storage"
@@ -80,6 +89,11 @@ interface UserProfileSummary {
   name?: string
   email?: string
   photoURL?: string
+}
+
+interface PropertyPurchaseStatus {
+  isUnderPurchase: boolean
+  confirmedBuyerId: string | null
 }
 
 const createChatId = (first: string, second: string) => {
@@ -202,6 +216,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 }) => {
   const { user } = useAuthContext()
   const { toast } = useToast()
+  const router = useRouter()
 
   const MAX_PENDING_ATTACHMENTS = 6
 
@@ -227,6 +242,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false)
   const [selectedAttachment, setSelectedAttachment] = useState<ChatMessageAttachment | null>(null)
+  const [confirmingPropertyId, setConfirmingPropertyId] = useState<string | null>(null)
+  const [propertyStatusMap, setPropertyStatusMap] = useState<
+    Record<string, PropertyPurchaseStatus>
+  >({})
+  const propertySubscriptionsRef = useRef<Record<string, () => void>>({})
+  const shownBuyerConfirmationRef = useRef<Set<string>>(new Set())
+  const [buyerConfirmationPreview, setBuyerConfirmationPreview] =
+    useState<ChatMessagePropertyPreview | null>(null)
 
   const panelRef = useRef<HTMLDivElement>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
@@ -237,6 +260,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const initialThreadSnapshotRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
   const userMapRef = useRef(userMap)
+
+  useEffect(() => {
+    return () => {
+      const subscriptions = propertySubscriptionsRef.current
+      Object.values(subscriptions).forEach((unsubscribe) => unsubscribe())
+      propertySubscriptionsRef.current = {}
+    }
+  }, [])
 
   useEffect(() => {
     userMapRef.current = userMap
@@ -313,12 +344,124 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [pendingAttachments])
 
+  useEffect(() => {
+    if (isOpen) return
+
+    const subscriptions = propertySubscriptionsRef.current
+    Object.values(subscriptions).forEach((unsubscribe) => unsubscribe())
+    propertySubscriptionsRef.current = {}
+    setPropertyStatusMap({})
+    shownBuyerConfirmationRef.current.clear()
+    setBuyerConfirmationPreview(null)
+  }, [isOpen])
+
   const activeChatId = useMemo(() => {
     if (!user?.uid || !activeParticipantId) return null
     return createChatId(user.uid, activeParticipantId)
   }, [activeParticipantId, user?.uid])
 
   const activeProfile = activeParticipantId ? userMap[activeParticipantId] : undefined
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const propertyIds = new Set<string>()
+    messages.forEach((message) => {
+      const propertyId = message.propertyPreview?.propertyId
+      if (propertyId) {
+        propertyIds.add(propertyId)
+      }
+    })
+
+    const subscriptions = propertySubscriptionsRef.current
+
+    for (const [propertyId, unsubscribe] of Object.entries(subscriptions)) {
+      if (!propertyIds.has(propertyId)) {
+        unsubscribe()
+        delete subscriptions[propertyId]
+        setPropertyStatusMap((current) => {
+          const next = { ...current }
+          delete next[propertyId]
+          return next
+        })
+      }
+    }
+
+    const newIds = Array.from(propertyIds).filter((propertyId) => !subscriptions[propertyId])
+    if (newIds.length === 0) {
+      return
+    }
+
+    let cancelled = false
+
+    void Promise.all(
+      newIds.map(async (propertyId) => {
+        try {
+          const unsubscribe = await subscribeToDocument("property", propertyId, (doc) => {
+            if (cancelled) return
+
+            const record = doc?.data() as Record<string, unknown> | null
+
+            if (!record) {
+              setPropertyStatusMap((current) => {
+                const next = { ...current }
+                delete next[propertyId]
+                return next
+              })
+              return
+            }
+
+            const isUnderPurchase = Boolean(record.isUnderPurchase)
+            const confirmedBuyerId =
+              typeof record.confirmedBuyerId === "string" && record.confirmedBuyerId.trim().length > 0
+                ? record.confirmedBuyerId
+                : null
+
+            setPropertyStatusMap((current) => ({
+              ...current,
+              [propertyId]: {
+                isUnderPurchase,
+                confirmedBuyerId,
+              },
+            }))
+          })
+
+          if (cancelled) {
+            unsubscribe()
+            return
+          }
+
+          subscriptions[propertyId] = unsubscribe
+        } catch (error) {
+          console.error("Failed to subscribe property status", error)
+        }
+      }),
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, messages])
+
+  useEffect(() => {
+    if (!user?.uid) return
+
+    for (const [propertyId, status] of Object.entries(propertyStatusMap)) {
+      if (!status?.isUnderPurchase) continue
+      if (status.confirmedBuyerId !== user.uid) continue
+      if (shownBuyerConfirmationRef.current.has(propertyId)) continue
+
+      const preview = messages.find(
+        (message): message is ChatMessage & { propertyPreview: ChatMessagePropertyPreview } =>
+          Boolean(message.propertyPreview && message.propertyPreview.propertyId === propertyId),
+      )?.propertyPreview
+
+      if (!preview) continue
+
+      shownBuyerConfirmationRef.current.add(propertyId)
+      setBuyerConfirmationPreview(preview)
+    }
+  }, [messages, propertyStatusMap, user?.uid])
 
   const handleOpenPropertyPreview = useCallback(
     (preview: ChatMessagePropertyPreview) => {
@@ -338,6 +481,76 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       )
     },
     [],
+  )
+
+  const handleConfirmProperty = useCallback(
+    async (preview: ChatMessagePropertyPreview) => {
+      if (!user?.uid) {
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถยืนยันได้",
+          description: "กรุณาเข้าสู่ระบบเพื่อดำเนินการยืนยันประกาศ",
+        })
+        return
+      }
+
+      if (preview.ownerUid !== user.uid) {
+        return
+      }
+
+      if (!preview.propertyId) {
+        toast({
+          variant: "destructive",
+          title: "ไม่พบประกาศ",
+          description: "ไม่พบรหัสประกาศสำหรับการยืนยัน",
+        })
+        return
+      }
+
+      if (!activeParticipantId) {
+        toast({
+          variant: "destructive",
+          title: "ไม่พบผู้ซื้อ",
+          description: "กรุณาเลือกบทสนทนากับผู้ซื้อก่อนยืนยัน",
+        })
+        return
+      }
+
+      const status = propertyStatusMap[preview.propertyId]
+      if (status?.isUnderPurchase) {
+        toast({
+          title: "ประกาศถูกยืนยันแล้ว",
+          description: "ประกาศนี้มีผู้กำลังดำเนินการซื้ออยู่",
+        })
+        return
+      }
+
+      setConfirmingPropertyId(preview.propertyId)
+
+      try {
+        await updateDocument("property", preview.propertyId, {
+          isUnderPurchase: true,
+          confirmedBuyerId: activeParticipantId,
+        })
+
+        toast({
+          title: "ยืนยันประกาศสำเร็จ",
+          description: "ระบบได้แจ้งเตือนผู้ซื้อเรียบร้อยแล้ว",
+        })
+
+        router.push(`/sell/send-documents?propertyId=${preview.propertyId}`)
+      } catch (error) {
+        console.error("Failed to confirm property purchase", error)
+        toast({
+          variant: "destructive",
+          title: "ยืนยันไม่สำเร็จ",
+          description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+        })
+      } finally {
+        setConfirmingPropertyId(null)
+      }
+    },
+    [activeParticipantId, propertyStatusMap, router, toast, user?.uid],
   )
 
   useEffect(() => {
@@ -1488,6 +1701,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             const textContent = message.text ?? ""
                             const showText = textContent.trim().length > 0
                             const propertyPreview = message.propertyPreview
+                            const previewStatus =
+                              propertyPreview?.propertyId
+                                ? propertyStatusMap[propertyPreview.propertyId]
+                                : undefined
+                            const isPreviewUnderPurchase = Boolean(previewStatus?.isUnderPurchase)
+                            const isPreviewOwner = propertyPreview?.ownerUid
+                              ? propertyPreview.ownerUid === user.uid
+                              : false
+                            const isPreviewConfirming =
+                              propertyPreview?.propertyId
+                                ? confirmingPropertyId === propertyPreview.propertyId
+                                : false
 
                             return (
                               <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
@@ -1575,18 +1800,45 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                             )
                                           })()}
                                           {propertyPreview.ownerUid && (
-                                            <button
-                                              type="button"
-                                              onClick={() => handleOpenPropertyPreview(propertyPreview)}
-                                              className={cn(
-                                                "mt-2 inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
-                                                isMine
-                                                  ? "bg-white text-blue-600 hover:bg-blue-50"
-                                                  : "bg-blue-600 text-white hover:bg-blue-700",
+                                            <div className="mt-2 flex flex-col gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleOpenPropertyPreview(propertyPreview)}
+                                                className={cn(
+                                                  "inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
+                                                  isMine
+                                                    ? "bg-white text-blue-600 hover:bg-blue-50"
+                                                    : "bg-blue-600 text-white hover:bg-blue-700",
+                                                )}
+                                              >
+                                                ดูรายละเอียดประกาศ
+                                              </button>
+                                              {isPreviewOwner && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleConfirmProperty(propertyPreview)}
+                                                  disabled={isPreviewUnderPurchase || isPreviewConfirming}
+                                                  className={cn(
+                                                    "inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition",
+                                                    isPreviewUnderPurchase
+                                                      ? "bg-amber-100 text-amber-700"
+                                                      : "bg-emerald-500 text-white hover:bg-emerald-600",
+                                                    isPreviewConfirming && "cursor-wait opacity-75",
+                                                  )}
+                                                >
+                                                  {isPreviewConfirming
+                                                    ? "กำลังยืนยัน..."
+                                                    : isPreviewUnderPurchase
+                                                      ? "มีคนกำลังซื้อแล้ว"
+                                                      : "ยืนยันอสังหาริมทรัพย์นี้"}
+                                                </button>
                                               )}
-                                            >
-                                              ดูรายละเอียดประกาศ
-                                            </button>
+                                              {!isPreviewOwner && isPreviewUnderPurchase && (
+                                                <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-700">
+                                                  มีคนกำลังซื้อแล้ว
+                                                </div>
+                                              )}
+                                            </div>
                                           )}
                                         </div>
                                       </div>
@@ -1798,6 +2050,67 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
       </div>
       </div>
+      <Dialog
+        open={Boolean(buyerConfirmationPreview)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBuyerConfirmationPreview(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-md space-y-4">
+          <DialogHeader>
+            <DialogTitle>ผู้ขายยืนยันการซื้อแล้ว</DialogTitle>
+            <DialogDescription>
+              {buyerConfirmationPreview
+                ? `ผู้ขายได้ยืนยันประกาศ ${buyerConfirmationPreview.title}`
+                : "ผู้ขายได้ยืนยันประกาศแล้ว"}
+            </DialogDescription>
+          </DialogHeader>
+          {buyerConfirmationPreview && (
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {buyerConfirmationPreview.price && Number.isFinite(buyerConfirmationPreview.price) && (
+                <p className="font-semibold">
+                  ราคา {formatPropertyPrice(
+                    buyerConfirmationPreview.price,
+                    buyerConfirmationPreview.transactionType ?? "sale",
+                  )}
+                </p>
+              )}
+              {(buyerConfirmationPreview.address || buyerConfirmationPreview.city || buyerConfirmationPreview.province) && (
+                <p>
+                  {[buyerConfirmationPreview.address, buyerConfirmationPreview.city, buyerConfirmationPreview.province]
+                    .filter((value): value is string => Boolean(value && value.trim()))
+                    .join(" ")}
+                </p>
+              )}
+              <p>โปรดเตรียมเอกสารที่จำเป็นและติดตามการติดต่อจากผู้ขายเพื่อดำเนินการขั้นตอนถัดไป</p>
+            </div>
+          )}
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBuyerConfirmationPreview(null)}
+              className="sm:w-auto"
+            >
+              ปิด
+            </Button>
+            {buyerConfirmationPreview && (
+              <Button
+                type="button"
+                onClick={() => {
+                  handleOpenPropertyPreview(buyerConfirmationPreview)
+                  setBuyerConfirmationPreview(null)
+                }}
+                className="sm:w-auto"
+              >
+                ดูรายละเอียดประกาศ
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isMediaViewerOpen && !!selectedAttachment} onOpenChange={handleMediaViewerOpenChange}>
         <DialogContent className="w-[92vw] max-w-3xl bg-white/95 p-0 shadow-2xl backdrop-blur sm:w-[90vw] sm:max-w-4xl">
           {selectedAttachment && (
