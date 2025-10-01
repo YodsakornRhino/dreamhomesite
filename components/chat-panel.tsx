@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import type {
+  ChatOpenEventDetail,
   PropertyPreviewOpenEventDetail,
   PropertyPreviewPayload,
 } from "@/types/chat"
@@ -971,9 +972,39 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   const displayName = getDisplayName(profile)
                   const messagePreview = thread.lastMessage?.trim()
 
-                  toast({
+                  const detail: ChatOpenEventDetail = { participantId: otherParticipantId }
+                  const openChatFromToast = () => {
+                    window.dispatchEvent(
+                      new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", {
+                        detail,
+                      }),
+                    )
+                    setHighlightedThreadIds((current) => current.filter((id) => id !== threadId))
+                  }
+
+                  const { dismiss } = toast({
                     title: `มีการติดต่อจาก ${displayName}`,
                     description: messagePreview && messagePreview.length > 0 ? messagePreview : "มีข้อความใหม่รอคุณอยู่",
+                    className: "cursor-pointer transition hover:bg-muted",
+                    tabIndex: 0,
+                    onClick: (event) => {
+                      if ((event.target as HTMLElement | null)?.closest("[toast-close]")) {
+                        return
+                      }
+
+                      event.preventDefault()
+                      openChatFromToast()
+                      dismiss()
+                    },
+                    onKeyDown: (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") {
+                        return
+                      }
+
+                      event.preventDefault()
+                      openChatFromToast()
+                      dismiss()
+                    },
                   })
                 })
               }
