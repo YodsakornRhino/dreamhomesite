@@ -2248,17 +2248,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           }
         }}
       >
-        <DialogContent className="max-w-md space-y-4 break-words text-pretty">
+        <DialogContent className="max-w-lg space-y-6 break-words text-pretty sm:max-w-xl md:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>ผู้ขายยืนยันการซื้อแล้ว</DialogTitle>
-            <DialogDescription className="break-words text-pretty">
+            <DialogTitle className="text-lg font-semibold sm:text-xl">ผู้ขายยืนยันการซื้อแล้ว</DialogTitle>
+            <DialogDescription className="break-words text-pretty text-sm sm:text-base">
               {buyerConfirmationPreview
                 ? `ผู้ขายได้ยืนยันประกาศ ${buyerConfirmationPreview.title}`
                 : "ผู้ขายได้ยืนยันประกาศแล้ว"}
             </DialogDescription>
           </DialogHeader>
           {buyerConfirmationPreview && (
-            <div className="space-y-2 break-words rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-pretty text-sm text-amber-800">
+            <div className="space-y-3 break-words rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-pretty text-sm text-amber-800 sm:text-base">
               {buyerConfirmationPreview.price && Number.isFinite(buyerConfirmationPreview.price) && (
                 <p className="break-words font-semibold">
                   ราคา {formatPropertyPrice(
@@ -2279,13 +2279,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               </p>
             </div>
           )}
-          <DialogFooter className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+          <DialogFooter className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
               size="lg"
               onClick={() => setBuyerConfirmationPreview(null)}
-              className="w-full break-words whitespace-normal text-center text-base sm:w-auto"
+              className="h-auto min-h-[3.25rem] w-full break-words whitespace-normal px-6 py-3 text-center text-base sm:w-auto sm:px-8 sm:text-lg"
             >
               ภายหลัง
             </Button>
@@ -2297,7 +2297,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 onClick={() => {
                   handleOpenPropertyPreview(buyerConfirmationPreview)
                 }}
-                className="w-full break-words whitespace-normal text-center text-base sm:w-auto"
+                className="h-auto min-h-[3.25rem] w-full break-words whitespace-normal px-6 py-3 text-center text-base sm:w-auto sm:px-8 sm:text-lg"
               >
                 ดูรายละเอียดประกาศ
               </Button>
@@ -2308,7 +2308,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 size="lg"
                 onClick={() => handleBuyerConfirmProperty(buyerConfirmationPreview)}
                 disabled={buyerConfirmationCompleted || buyerConfirmationLoading}
-                className="w-full break-words whitespace-normal text-center text-base sm:w-auto"
+                className="h-auto min-h-[3.25rem] w-full break-words whitespace-normal px-6 py-3 text-center text-base sm:w-auto sm:px-8 sm:text-lg"
               >
                 {buyerConfirmationLoading
                   ? "กำลังยืนยัน..."
