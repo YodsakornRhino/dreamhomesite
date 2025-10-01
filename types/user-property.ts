@@ -25,4 +25,8 @@ export interface UserProperty {
   photos: string[];
   video: string | null;
   createdAt: string;
+  isUnderPurchase: boolean;
+  confirmedBuyerId: string | null;
+  buyerConfirmed: boolean;
+  sellerDocumentsConfirmed: boolean;
 }

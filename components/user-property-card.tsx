@@ -3,12 +3,14 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Bath, Bed, Heart, MapPin, Square, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { formatPropertyPrice, PROPERTY_TYPE_LABELS, TRANSACTION_LABELS } from "@/lib/property"
 import { cn } from "@/lib/utils"
 import type { UserProperty } from "@/types/user-property"
+import { useAuthContext } from "@/contexts/AuthContext"
 
 interface UserPropertyCardProps {
   property: UserProperty
@@ -36,10 +38,14 @@ export function UserPropertyCard({
   className,
 }: UserPropertyCardProps) {
   const [isFavorited, setIsFavorited] = useState(false)
+  const router = useRouter()
+  const { user } = useAuthContext()
 
   const mainPhoto = property.photos?.[0]
   const transactionLabel = TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
   const typeLabel = PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType
+  const isUnderPurchase = property.isUnderPurchase
+  const buyerConfirmed = property.buyerConfirmed
 
   const locationText = useMemo(() => {
     const segments = [property.address, property.city, property.province]
@@ -69,6 +75,24 @@ export function UserPropertyCard({
   }, [property.bathrooms])
 
   const gradient = placeholderGradients[property.propertyType] ?? placeholderGradients.house
+
+  const isPropertyOwner = Boolean(user?.uid && property.userUid === user.uid)
+  const isConfirmedBuyer = Boolean(
+    user?.uid && property.confirmedBuyerId && property.confirmedBuyerId === user.uid,
+  )
+
+  const sendDocumentsHref = property.id
+    ? isPropertyOwner
+      ? `/sell/send-documents?propertyId=${property.id}`
+      : isConfirmedBuyer
+        ? `/buy/send-documents?propertyId=${property.id}`
+        : null
+    : null
+
+  const handleSendDocumentsNavigation = () => {
+    if (!sendDocumentsHref) return
+    router.push(sendDocumentsHref)
+  }
 
   return (
     <div
@@ -102,12 +126,28 @@ export function UserPropertyCard({
 
         <span
           className={cn(
-            "absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold text-white shadow", 
+            "absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold text-white shadow",
             property.transactionType === "rent" ? "bg-orange-500" : "bg-emerald-500",
           )}
         >
           {transactionLabel}
         </span>
+
+        {isUnderPurchase && (
+          <button
+            type="button"
+            onClick={handleSendDocumentsNavigation}
+            disabled={!sendDocumentsHref}
+            className={cn(
+              "absolute left-4 bottom-4 rounded-full px-3 py-1 text-xs font-semibold text-white shadow transition",
+              sendDocumentsHref
+                ? "bg-amber-500 hover:bg-amber-600"
+                : "cursor-not-allowed bg-amber-400/70",
+            )}
+          >
+            มีคนกำลังซื้อแล้ว
+          </button>
+        )}
 
         {showInteractiveElements && (
           <button
@@ -121,16 +161,49 @@ export function UserPropertyCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-blue-600">{typeLabel}</p>
-            <h3 className="text-xl font-semibold text-gray-900">{property.title}</h3>
+        <div className="flex flex-1 flex-col gap-4 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-600">{typeLabel}</p>
+              <h3 className="text-xl font-semibold text-gray-900">{property.title}</h3>
+            </div>
+            <span className="shrink-0 text-lg font-bold text-blue-600">
+              {formatPropertyPrice(property.price, property.transactionType)}
+            </span>
           </div>
-          <span className="shrink-0 text-lg font-bold text-blue-600">
-            {formatPropertyPrice(property.price, property.transactionType)}
-          </span>
-        </div>
+
+          {isUnderPurchase && (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleSendDocumentsNavigation}
+                disabled={!sendDocumentsHref}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition",
+                  sendDocumentsHref
+                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                    : "cursor-not-allowed bg-amber-50 text-amber-400",
+                )}
+              >
+                มีคนกำลังซื้อแล้ว
+              </button>
+              {buyerConfirmed && (
+                <button
+                  type="button"
+                  onClick={handleSendDocumentsNavigation}
+                  disabled={!sendDocumentsHref}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition",
+                    sendDocumentsHref
+                      ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      : "cursor-not-allowed bg-emerald-50 text-emerald-400",
+                  )}
+                >
+                  ผู้ซื้อยืนยันเอกสารแล้ว
+                </button>
+              )}
+            </div>
+          )}
 
         <p className="flex items-center text-sm text-gray-600">
           <MapPin className="mr-2 h-4 w-4 text-blue-500" />

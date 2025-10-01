@@ -98,5 +98,12 @@ export const mapDocumentToUserProperty = (
         ? data.video
         : null,
     createdAt: toIsoString(data.createdAt),
+    isUnderPurchase: Boolean(data.isUnderPurchase),
+    confirmedBuyerId:
+      typeof data.confirmedBuyerId === "string" && data.confirmedBuyerId.trim().length > 0
+        ? data.confirmedBuyerId
+        : null,
+    buyerConfirmed: Boolean(data.buyerConfirmed),
+    sellerDocumentsConfirmed: Boolean(data.sellerDocumentsConfirmed),
   };
 };

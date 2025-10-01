@@ -553,6 +553,10 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
             ...propertyBase,
             photos: [] as string[],
             video: null as string | null,
+            isUnderPurchase: false,
+            confirmedBuyerId: null as string | null,
+            buyerConfirmed: false,
+            sellerDocumentsConfirmed: false,
             createdAt,
           },
         )
@@ -584,6 +588,10 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           userUid: user.uid,
           photos: photoUrls,
           video: videoUrl,
+          isUnderPurchase: false,
+          confirmedBuyerId: null,
+          buyerConfirmed: false,
+          sellerDocumentsConfirmed: false,
           createdAt,
         })
 
