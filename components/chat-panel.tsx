@@ -528,10 +528,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       setConfirmingPropertyId(preview.propertyId)
 
       try {
-        await updateDocument("property", preview.propertyId, {
-          isUnderPurchase: true,
-          confirmedBuyerId: activeParticipantId,
-        })
+        await Promise.all([
+          updateDocument("property", preview.propertyId, {
+            isUnderPurchase: true,
+            confirmedBuyerId: activeParticipantId,
+          }),
+          updateDocument(
+            `users/${preview.ownerUid}/user_property`,
+            preview.propertyId,
+            {
+              isUnderPurchase: true,
+              confirmedBuyerId: activeParticipantId,
+            },
+          ),
+        ])
 
         toast({
           title: "ยืนยันประกาศสำเร็จ",
