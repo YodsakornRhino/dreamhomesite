@@ -2248,7 +2248,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           }
         }}
       >
-        <DialogContent className="max-w-md space-y-4">
+        <DialogContent className="max-w-md space-y-4 break-words text-pretty">
           <DialogHeader>
             <DialogTitle>ผู้ขายยืนยันการซื้อแล้ว</DialogTitle>
             <DialogDescription className="break-words text-pretty">
@@ -2258,7 +2258,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             </DialogDescription>
           </DialogHeader>
           {buyerConfirmationPreview && (
-            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-pretty text-sm text-amber-800">
+            <div className="space-y-2 break-words rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-pretty text-sm text-amber-800">
               {buyerConfirmationPreview.price && Number.isFinite(buyerConfirmationPreview.price) && (
                 <p className="break-words font-semibold">
                   ราคา {formatPropertyPrice(
@@ -2279,12 +2279,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               </p>
             </div>
           )}
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+          <DialogFooter className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => setBuyerConfirmationPreview(null)}
-              className="sm:w-auto"
+              className="w-full break-words whitespace-normal text-center sm:w-auto"
             >
               ภายหลัง
             </Button>
@@ -2295,7 +2295,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 onClick={() => {
                   handleOpenPropertyPreview(buyerConfirmationPreview)
                 }}
-                className="sm:w-auto"
+                className="w-full break-words whitespace-normal text-center sm:w-auto"
               >
                 ดูรายละเอียดประกาศ
               </Button>
@@ -2305,7 +2305,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 type="button"
                 onClick={() => handleBuyerConfirmProperty(buyerConfirmationPreview)}
                 disabled={buyerConfirmationCompleted || buyerConfirmationLoading}
-                className="sm:w-auto"
+                className="w-full break-words whitespace-normal text-center sm:w-auto"
               >
                 {buyerConfirmationLoading
                   ? "กำลังยืนยัน..."
