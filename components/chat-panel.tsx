@@ -1595,45 +1595,51 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                       <div className="flex flex-col gap-2">
                                         {attachments.map((attachment, index) => {
                                           const key = `${attachment.storagePath || message.id}-${index}`
+
                                           if (attachment.type === "image") {
                                             return (
-                                              <a
+                                              <button
                                                 key={key}
-                                                href={attachment.url}
-                                                target="_blank"
-                                                rel="noreferrer"
+                                                type="button"
+                                                onClick={() => handleAttachmentClick(attachment)}
                                                 className={cn(
-                                                  "block overflow-hidden rounded-xl border",
+                                                  "group block overflow-hidden rounded-xl border text-left",
                                                   isMine ? "border-white/30" : "border-slate-200",
                                                 )}
                                               >
                                                 <img
                                                   src={attachment.url}
                                                   alt={attachment.name || "ไฟล์รูปภาพ"}
-                                                  className="max-h-64 w-full object-cover"
+                                                  className="max-h-64 w-full object-cover transition duration-300 group-hover:scale-[1.02]"
                                                 />
-                                              </a>
+                                              </button>
                                             )
                                           }
 
                                           if (attachment.type === "video") {
                                             return (
-                                              <div
+                                              <button
                                                 key={key}
+                                                type="button"
+                                                onClick={() => handleAttachmentClick(attachment)}
                                                 className={cn(
-                                                  "overflow-hidden rounded-xl border",
+                                                  "group relative overflow-hidden rounded-xl border",
                                                   isMine ? "border-white/30" : "border-slate-200",
                                                 )}
                                               >
                                                 <video
-                                                  controls
+                                                  src={attachment.url}
+                                                  muted
+                                                  loop
                                                   playsInline
-                                                  preload="metadata"
-                                                  className="max-h-64 w-full bg-black object-cover"
-                                                >
-                                                  <source src={attachment.url} type={attachment.contentType} />
-                                                </video>
-                                              </div>
+                                                  className="max-h-64 w-full bg-black object-cover transition duration-300 group-hover:scale-[1.02]"
+                                                />
+                                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white">
+                                                    <Play className="h-5 w-5" />
+                                                  </span>
+                                                </div>
+                                              </button>
                                             )
                                           }
 
