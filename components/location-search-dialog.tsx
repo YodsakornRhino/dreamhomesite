@@ -69,6 +69,7 @@ export default function LocationSearchDialog({
     [],
   )
 
+  const [mapResetCounter, setMapResetCounter] = useState(0)
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
   const markerRef = useRef<google.maps.Marker | null>(null)
@@ -76,6 +77,12 @@ export default function LocationSearchDialog({
   const geocoderRef = useRef<google.maps.Geocoder | null>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
   const autocompleteInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    setMapResetCounter((counter) => counter + 1)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -239,7 +246,7 @@ export default function LocationSearchDialog({
       circleRef.current = null
       mapInstanceRef.current = null
     }
-  }, [open, mapsReady, initialValue, updateSelectedLocation])
+  }, [open, mapsReady, initialValue, updateSelectedLocation, mapResetCounter])
 
   useEffect(() => {
     if (!open) return
@@ -388,7 +395,7 @@ export default function LocationSearchDialog({
             </div>
           ) : (
             <>
-              <div className="relative">
+              <div key={mapResetCounter} className="relative">
                 <input
                   ref={autocompleteInputRef}
                   type="text"
@@ -416,6 +423,7 @@ export default function LocationSearchDialog({
               </div>
 
               <div
+                key={`map-${mapResetCounter}`}
                 ref={mapContainerRef}
                 className="h-[260px] w-full overflow-hidden rounded-xl border border-gray-200 sm:h-[320px] md:h-[360px] lg:h-[420px]"
               />
