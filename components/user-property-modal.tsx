@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
+import { usePresenceStatus } from "@/hooks/use-presence-status";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -49,7 +50,6 @@ import {
   TRANSACTION_LABELS,
 } from "@/lib/property";
 import { cn } from "@/lib/utils";
-import { getPresenceLabel, isPresenceOnline } from "@/lib/presence";
 import type { UserProperty } from "@/types/user-property";
 import type { ChatOpenEventDetail, PropertyPreviewPayload } from "@/types/chat";
 
@@ -267,14 +267,8 @@ export function UserPropertyModal({
       .slice(0, 2)
       .toUpperCase();
   }, [property?.sellerName, sellerProfile?.name]);
-  const sellerPresenceLabel = useMemo(
-    () => getPresenceLabel(sellerProfile?.status),
-    [sellerProfile?.status],
-  );
-  const isSellerOnline = useMemo(
-    () => isPresenceOnline(sellerProfile?.status),
-    [sellerProfile?.status],
-  );
+  const { label: sellerPresenceLabel, isOnline: isSellerOnline } =
+    usePresenceStatus(sellerProfile?.status);
   const sellerListingsCount = sellerListings.length;
 
   const handleExpressInterest = useCallback(() => {

@@ -12,9 +12,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
+import { usePresenceStatus } from "@/hooks/use-presence-status";
 import type { UserProperty } from "@/types/user-property";
 import type { PropertyPreviewOpenEventDetail } from "@/types/chat";
-import { getPresenceLabel, isPresenceOnline } from "@/lib/presence";
 
 interface UserProfilePageProps {
   uid: string;
@@ -88,14 +88,8 @@ export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps
 
   const totalListings = properties.length;
 
-  const profilePresenceLabel = useMemo(
-    () => getPresenceLabel(profile?.status),
-    [profile?.status],
-  );
-  const isProfileOnline = useMemo(
-    () => isPresenceOnline(profile?.status),
-    [profile?.status],
-  );
+  const { label: profilePresenceLabel, isOnline: isProfileOnline } =
+    usePresenceStatus(profile?.status);
 
   const handleViewDetails = (property: UserProperty) => {
     setSelectedProperty(property);
