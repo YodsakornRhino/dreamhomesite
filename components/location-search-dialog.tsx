@@ -50,6 +50,11 @@ export default function LocationSearchDialog({
 
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
   const [radiusKm, setRadiusKm] = useState<number>(DEFAULT_LOCATION_RADIUS_KM)
+  const latestRadiusRef = useRef(radiusKm)
+
+  useEffect(() => {
+    latestRadiusRef.current = radiusKm
+  }, [radiusKm])
 
   const updateSelectedLocation = useCallback(
     (
@@ -137,114 +142,135 @@ export default function LocationSearchDialog({
   }, [open, initialValue])
 
   useEffect(() => {
-    if (!open || !mapsReady || !mapContainerRef.current) return
+    if (!open || !mapsReady) return
 
-    const center: google.maps.LatLngLiteral = initialValue
-      ? { lat: initialValue.lat, lng: initialValue.lng }
-      : DEFAULT_CENTER
+    let cancelAnimation = 0
+    let cleanup: (() => void) | undefined
 
-    // Clear any previous Google Map instance markup before creating a new map.
-    mapContainerRef.current.innerHTML = ""
+    cancelAnimation = window.requestAnimationFrame(() => {
+      const container = mapContainerRef.current
+      if (!container) return
 
-    const map = new google.maps.Map(mapContainerRef.current, {
-      center,
-      zoom: initialValue ? 14 : 11,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: true,
-    })
-    mapInstanceRef.current = map
+      const center: google.maps.LatLngLiteral = initialValue
+        ? { lat: initialValue.lat, lng: initialValue.lng }
+        : DEFAULT_CENTER
 
-    const marker = new google.maps.Marker({
-      map,
-      position: initialValue ?? undefined,
-      draggable: true,
-    })
-    markerRef.current = marker
+      // Clear any previous Google Map instance markup before creating a new map.
+      container.innerHTML = ""
 
-    const circle = new google.maps.Circle({
-      map,
-      center: initialValue ?? undefined,
-      radius: (initialValue?.radiusKm ?? radiusKm) * 1000,
-      fillColor: "#2563EB",
-      fillOpacity: 0.15,
-      strokeColor: "#2563EB",
-      strokeOpacity: 0.5,
-      strokeWeight: 1,
-    })
-    circleRef.current = circle
+      const map = new google.maps.Map(container, {
+        center,
+        zoom: initialValue ? 14 : 11,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+      })
+      mapInstanceRef.current = map
 
-    geocoderRef.current = new google.maps.Geocoder()
+      const marker = new google.maps.Marker({
+        map,
+        position: initialValue ?? undefined,
+        draggable: true,
+      })
+      markerRef.current = marker
 
-    const updateFromLatLng = (latLng: google.maps.LatLng) => {
-      const position = latLng.toJSON()
-      marker.setPosition(position)
-      circle.setCenter(position)
-      updateSelectedLocation(position, { source: "pin" })
+      const circle = new google.maps.Circle({
+        map,
+        center: initialValue ?? undefined,
+        radius: (initialValue?.radiusKm ?? latestRadiusRef.current) * 1000,
+        fillColor: "#2563EB",
+        fillOpacity: 0.15,
+        strokeColor: "#2563EB",
+        strokeOpacity: 0.5,
+        strokeWeight: 1,
+      })
+      circleRef.current = circle
 
-      geocoderRef.current?.geocode({ location: position }, (results, status) => {
-        if (status === "OK" && results && results[0]) {
-          updateSelectedLocation(position, {
-            formattedAddress: results[0].formatted_address ?? undefined,
-            source: "pin",
-          })
+      geocoderRef.current = new google.maps.Geocoder()
+
+      const updateFromLatLng = (latLng: google.maps.LatLng) => {
+        const position = latLng.toJSON()
+        marker.setPosition(position)
+        circle.setCenter(position)
+        updateSelectedLocation(position, { source: "pin" })
+
+        geocoderRef.current?.geocode({ location: position }, (results, status) => {
+          if (status === "OK" && results && results[0]) {
+            updateSelectedLocation(position, {
+              formattedAddress: results[0].formatted_address ?? undefined,
+              source: "pin",
+            })
+          }
+        })
+      }
+
+      const mapClickListener = map.addListener("click", (event: google.maps.MapMouseEvent) => {
+        if (event.latLng) {
+          updateFromLatLng(event.latLng)
         }
       })
-    }
 
-    const mapClickListener = map.addListener("click", (event: google.maps.MapMouseEvent) => {
-      if (event.latLng) {
-        updateFromLatLng(event.latLng)
-      }
-    })
-
-    const markerDragListener = marker.addListener("dragend", () => {
-      const position = marker.getPosition()
-      if (position) {
-        updateFromLatLng(position)
-      }
-    })
-
-    if (autocompleteInputRef.current) {
-      autocompleteRef.current = new google.maps.places.Autocomplete(autocompleteInputRef.current, {
-        fields: ["geometry", "formatted_address"],
-        types: ["geocode"],
+      const markerDragListener = marker.addListener("dragend", () => {
+        const position = marker.getPosition()
+        if (position) {
+          updateFromLatLng(position)
+        }
       })
-      autocompleteRef.current.bindTo("bounds", map)
-      autocompleteRef.current.addListener("place_changed", () => {
-        const place = autocompleteRef.current?.getPlace()
-        if (!place?.geometry?.location) return
 
-        const loc = place.geometry.location
-        map.panTo(loc)
+      if (autocompleteInputRef.current) {
+        autocompleteRef.current = new google.maps.places.Autocomplete(autocompleteInputRef.current, {
+          fields: ["geometry", "formatted_address"],
+          types: ["geocode"],
+        })
+        autocompleteRef.current.bindTo("bounds", map)
+        autocompleteRef.current.addListener("place_changed", () => {
+          const place = autocompleteRef.current?.getPlace()
+          if (!place?.geometry?.location) return
+
+          const loc = place.geometry.location
+          map.panTo(loc)
+          map.setZoom(15)
+          marker.setPosition(loc)
+          circle.setCenter(loc)
+          updateSelectedLocation(
+            { lat: loc.lat(), lng: loc.lng() },
+            { formattedAddress: place.formatted_address ?? undefined, source: "search" },
+          )
+        })
+      }
+
+      if (initialValue) {
+        const position = new google.maps.LatLng(initialValue.lat, initialValue.lng)
+        map.panTo(position)
         map.setZoom(15)
-        marker.setPosition(loc)
-        circle.setCenter(loc)
-        updateSelectedLocation(
-          { lat: loc.lat(), lng: loc.lng() },
-          { formattedAddress: place.formatted_address ?? undefined, source: "search" },
-        )
-      })
-    }
+        marker.setPosition(position)
+        circle.setCenter(position)
+      }
 
-    if (initialValue) {
-      const position = new google.maps.LatLng(initialValue.lat, initialValue.lng)
-      map.panTo(position)
-      map.setZoom(15)
-      marker.setPosition(position)
-      circle.setCenter(position)
-    }
+      const idleListener = google.maps.event.addListenerOnce(map, "idle", () => {
+        google.maps.event.trigger(map, "resize")
+      })
+
+      cleanup = () => {
+        google.maps.event.removeListener(mapClickListener)
+        google.maps.event.removeListener(markerDragListener)
+        google.maps.event.removeListener(idleListener)
+        marker.setMap(null)
+        circle.setMap(null)
+        autocompleteRef.current?.unbindAll()
+        autocompleteRef.current = null
+        geocoderRef.current = null
+        markerRef.current = null
+        circleRef.current = null
+        mapInstanceRef.current = null
+      }
+    })
 
     return () => {
-      google.maps.event.removeListener(mapClickListener)
-      google.maps.event.removeListener(markerDragListener)
-      marker.setMap(null)
-      circle.setMap(null)
-      autocompleteRef.current?.unbindAll()
-      autocompleteRef.current = null
-      markerRef.current = null
-      circleRef.current = null
-      mapInstanceRef.current = null
+      if (cancelAnimation) {
+        window.cancelAnimationFrame(cancelAnimation)
+      }
+      cleanup?.()
     }
   }, [open, mapsReady, initialValue, updateSelectedLocation, mapResetCounter])
 
