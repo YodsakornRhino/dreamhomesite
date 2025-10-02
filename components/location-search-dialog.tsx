@@ -136,6 +136,9 @@ export default function LocationSearchDialog({
       ? { lat: initialValue.lat, lng: initialValue.lng }
       : DEFAULT_CENTER
 
+    // Clear any previous Google Map instance markup before creating a new map.
+    mapContainerRef.current.innerHTML = ""
+
     const map = new google.maps.Map(mapContainerRef.current, {
       center,
       zoom: initialValue ? 14 : 11,
