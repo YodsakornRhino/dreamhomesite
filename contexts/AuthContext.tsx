@@ -95,7 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignIn = async (email: string, password: string) => {
     try {
       setError(null)
-      await signInWithEmailAndPassword(email, password)
+      const credential = await signInWithEmailAndPassword(email, password)
+
+      const signedInUser = credential.user
+      if (signedInUser?.uid) {
+        await updateUserStatus(signedInUser.uid, "online")
+      }
     } catch (error) {
       console.error("Error signing in:", error)
       throw error
@@ -263,9 +268,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             window.location.reload()
           })
       }, INACTIVITY_LIMIT)
-      if (user?.uid) {
-        void updateUserStatus(user.uid, "online")
-      }
     }
 
     const events = [
@@ -288,38 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.removeEventListener(event, resetTimer),
       )
     }
-  }, [handleSignOut, toast, updateUserStatus, user])
-
-  useEffect(() => {
-    const currentUid = user?.uid
-    if (!currentUid) return
-    if (typeof window === "undefined") return
-
-    let interval: ReturnType<typeof setInterval> | undefined
-
-    const markOnline = () => updateUserStatus(currentUid, "online")
-    const markOffline = () => updateUserStatus(currentUid, "offline")
-
-    void markOnline()
-
-    interval = setInterval(() => {
-      void markOnline()
-    }, 60_000)
-
-    const handleBeforeUnload = () => {
-      void markOffline()
-    }
-
-    window.addEventListener("beforeunload", handleBeforeUnload)
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload)
-      if (interval) {
-        clearInterval(interval)
-      }
-      void markOffline()
-    }
-  }, [updateUserStatus, user?.uid])
+  }, [handleSignOut, toast, user])
 
   // Refresh the page in all tabs when session timeout occurs
   useEffect(() => {
