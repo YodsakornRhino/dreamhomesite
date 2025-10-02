@@ -27,8 +27,18 @@ export const isPresenceOnline = (
 ): boolean => {
   if (!presence) return false
 
-  const state = presence.state === "online" ? "online" : presence.state === "offline" ? "offline" : null
-  if (state !== "online") {
+  const state =
+    presence.state === "online"
+      ? "online"
+      : presence.state === "offline"
+        ? "offline"
+        : null
+
+  if (state === "online") {
+    return true
+  }
+
+  if (state === "offline") {
     return false
   }
 
