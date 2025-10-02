@@ -337,23 +337,50 @@ export default function LocationSearchDialog({
     )
   }
 
+  useEffect(() => {
+    if (!open || !mapsReady) return
+
+    const map = mapInstanceRef.current
+    if (!map || typeof google === "undefined") return
+
+    const resizeTimer = window.setTimeout(() => {
+      google.maps.event.trigger(map, "resize")
+
+      if (selectedLocation) {
+        map.setCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng })
+        return
+      }
+
+      if (initialValue) {
+        map.setCenter({ lat: initialValue.lat, lng: initialValue.lng })
+        return
+      }
+
+      map.setCenter(DEFAULT_CENTER)
+    }, 150)
+
+    return () => {
+      window.clearTimeout(resizeTimer)
+    }
+  }, [open, mapsReady, selectedLocation, initialValue])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-3xl overflow-hidden p-0 sm:w-[90vw]">
-        <DialogHeader className="space-y-1 border-b border-gray-200 bg-white px-6 py-5">
+      <DialogContent className="flex w-[95vw] max-w-3xl flex-col overflow-hidden p-0 sm:w-[90vw] max-h-[90vh]">
+        <DialogHeader className="shrink-0 space-y-1 border-b border-gray-200 bg-white px-6 py-5">
           <DialogTitle className="text-lg font-semibold text-gray-900 sm:text-xl">เลือกพื้นที่การค้นหา</DialogTitle>
           <DialogDescription className="text-sm text-gray-500">
             ปักหมุดตำแหน่งบนแผนที่ แล้วเลือกระยะรอบๆ เพื่อค้นหาอสังหาริมทรัพย์ใกล้เคียง
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 p-6">
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {mapsError ? (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">
               {mapsError}
             </div>
           ) : !mapsReady ? (
-            <div className="flex h-[420px] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500">
+            <div className="flex h-[260px] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500 sm:h-[320px] md:h-[360px] lg:h-[420px]">
               {isLoadingMaps ? "กำลังโหลดแผนที่..." : "กำลังเตรียมแผนที่"}
             </div>
           ) : (
@@ -385,7 +412,10 @@ export default function LocationSearchDialog({
                 </div>
               </div>
 
-              <div ref={mapContainerRef} className="h-[420px] w-full overflow-hidden rounded-xl border border-gray-200" />
+              <div
+                ref={mapContainerRef}
+                className="h-[260px] w-full overflow-hidden rounded-xl border border-gray-200 sm:h-[320px] md:h-[360px] lg:h-[420px]"
+              />
 
               <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -428,7 +458,7 @@ export default function LocationSearchDialog({
           )}
         </div>
 
-        <DialogFooter className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 sm:flex-row sm:justify-between">
+        <DialogFooter className="shrink-0 flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 sm:flex-row sm:justify-between">
           <button
             type="button"
             onClick={handleClearLocation}
