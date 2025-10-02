@@ -8,8 +8,12 @@ import HeroSection from "@/components/hero-section"
 import FeaturedProperties from "@/components/featured-properties"
 import CallToAction from "@/components/call-to-action"
 import LocationSearchDialog from "@/components/location-search-dialog"
-import type { LocationFilterValue } from "@/types/location-filter"
-import { DEFAULT_LOCATION_RADIUS_KM } from "@/types/location-filter"
+import type { LocationFilterValue, LocationFilterSource } from "@/types/location-filter"
+import {
+  CURRENT_LOCATION_LABEL,
+  DEFAULT_LOCATION_RADIUS_KM,
+  MAP_LOCATION_FALLBACK_LABEL,
+} from "@/types/location-filter"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -31,12 +35,16 @@ const parseNumericInput = (value: string | null): number | null => {
   return Number.isFinite(numericValue) ? numericValue : null
 }
 
+const isValidLocationSource = (value: string | null): value is LocationFilterSource =>
+  value === "current" || value === "pin" || value === "search"
+
 const parseLocationFromParams = (
   params: ReadonlyURLSearchParams,
 ): LocationFilterValue | null => {
   const latParam = params.get("lat")
   const lngParam = params.get("lng")
   const radiusParam = params.get("radius")
+  const sourceParam = params.get("source")
 
   if (!latParam || !lngParam || !radiusParam) return null
 
@@ -48,13 +56,18 @@ const parseLocationFromParams = (
     return null
   }
 
-  const label = params.get("label") ?? `${lat.toFixed(3)}, ${lng.toFixed(3)}`
+  const source = isValidLocationSource(sourceParam) ? sourceParam : undefined
+
+  const label =
+    params.get("label") ??
+    (source === "current" ? CURRENT_LOCATION_LABEL : MAP_LOCATION_FALLBACK_LABEL)
 
   return {
     lat,
     lng,
     radiusKm: Math.max(0.1, radius),
     label,
+    source,
   }
 }
 
@@ -96,6 +109,9 @@ const buildQueryString = (values: HeroFilters) => {
     params.set("radius", values.location.radiusKm.toString())
     if (values.location.label) {
       params.set("label", values.location.label)
+    }
+    if (values.location.source) {
+      params.set("source", values.location.source)
     }
   }
 
@@ -145,9 +161,15 @@ export default function BuyPage() {
   )
 
   const handleLocationApplied = useCallback((value: LocationFilterValue | null) => {
+    const normalizedValue = value
+      ? {
+          ...value,
+          source: isValidLocationSource(value.source ?? null) ? value.source : "pin",
+        }
+      : null
     setLocationFilter((previous) => {
       setSearchTerm((current) => {
-        if (value) {
+        if (normalizedValue) {
           if (previous && current === previous.label) {
             return ""
           }
@@ -160,7 +182,7 @@ export default function BuyPage() {
 
         return current
       })
-      return value
+      return normalizedValue
     })
     setLocationError(null)
   }, [])
@@ -199,14 +221,13 @@ export default function BuyPage() {
           lng: position.coords.longitude,
         }
 
-        const label = `ตำแหน่งปัจจุบัน (${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)})`
-
         setSearchTerm("")
         setLocationFilter((previous) => ({
           lat: coords.lat,
           lng: coords.lng,
           radiusKm: previous?.radiusKm ?? DEFAULT_LOCATION_RADIUS_KM,
-          label,
+          label: CURRENT_LOCATION_LABEL,
+          source: "current",
         }))
       },
       (error) => {

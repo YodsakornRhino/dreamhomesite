@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react"
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react"
 import { LocateFixed } from "lucide-react"
 
 import {
@@ -11,7 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DEFAULT_LOCATION_RADIUS_KM, type LocationFilterValue } from "@/types/location-filter"
+import {
+  CURRENT_LOCATION_LABEL,
+  DEFAULT_LOCATION_RADIUS_KM,
+  MAP_LOCATION_FALLBACK_LABEL,
+  type LocationFilterValue,
+  type LocationFilterSource,
+} from "@/types/location-filter"
 
 interface LocationSearchDialogProps {
   open: boolean
@@ -27,6 +33,7 @@ interface SelectedLocation {
   lat: number
   lng: number
   label: string
+  source: LocationFilterSource
 }
 
 export default function LocationSearchDialog({
@@ -43,6 +50,24 @@ export default function LocationSearchDialog({
 
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
   const [radiusKm, setRadiusKm] = useState<number>(DEFAULT_LOCATION_RADIUS_KM)
+
+  const updateSelectedLocation = useCallback(
+    (
+      position: google.maps.LatLngLiteral,
+      options?: { formattedAddress?: string; source?: LocationFilterSource },
+    ) => {
+      const fallbackLabel =
+        options?.source === "current" ? CURRENT_LOCATION_LABEL : MAP_LOCATION_FALLBACK_LABEL
+
+      setSelectedLocation({
+        lat: position.lat,
+        lng: position.lng,
+        label: options?.formattedAddress ?? fallbackLabel,
+        source: options?.source ?? "pin",
+      })
+    },
+    [],
+  )
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
@@ -93,6 +118,7 @@ export default function LocationSearchDialog({
         lat: initialValue.lat,
         lng: initialValue.lng,
         label: initialValue.label,
+        source: initialValue.source ?? "pin",
       })
       setRadiusKm(initialValue.radiusKm)
     } else {
@@ -140,26 +166,18 @@ export default function LocationSearchDialog({
 
     geocoderRef.current = new google.maps.Geocoder()
 
-    const setLocationFromPosition = (
-      position: google.maps.LatLngLiteral,
-      formattedAddress?: string,
-    ) => {
-      setSelectedLocation({
-        lat: position.lat,
-        lng: position.lng,
-        label: formattedAddress ?? `${position.lat.toFixed(3)}, ${position.lng.toFixed(3)}`,
-      })
-    }
-
     const updateFromLatLng = (latLng: google.maps.LatLng) => {
       const position = latLng.toJSON()
       marker.setPosition(position)
       circle.setCenter(position)
-      setLocationFromPosition(position)
+      updateSelectedLocation(position, { source: "pin" })
 
       geocoderRef.current?.geocode({ location: position }, (results, status) => {
         if (status === "OK" && results && results[0]) {
-          setLocationFromPosition(position, results[0].formatted_address ?? undefined)
+          updateSelectedLocation(position, {
+            formattedAddress: results[0].formatted_address ?? undefined,
+            source: "pin",
+          })
         }
       })
     }
@@ -192,9 +210,9 @@ export default function LocationSearchDialog({
         map.setZoom(15)
         marker.setPosition(loc)
         circle.setCenter(loc)
-        setLocationFromPosition(
+        updateSelectedLocation(
           { lat: loc.lat(), lng: loc.lng() },
-          place.formatted_address ?? undefined,
+          { formattedAddress: place.formatted_address ?? undefined, source: "search" },
         )
       })
     }
@@ -218,7 +236,7 @@ export default function LocationSearchDialog({
       circleRef.current = null
       mapInstanceRef.current = null
     }
-  }, [open, mapsReady, initialValue])
+  }, [open, mapsReady, initialValue, updateSelectedLocation])
 
   useEffect(() => {
     if (!open) return
@@ -245,13 +263,17 @@ export default function LocationSearchDialog({
       return
     }
 
+    const fallbackLabel =
+      selectedLocation.source === "current"
+        ? CURRENT_LOCATION_LABEL
+        : MAP_LOCATION_FALLBACK_LABEL
+
     onApply({
       lat: selectedLocation.lat,
       lng: selectedLocation.lng,
       radiusKm,
-      label:
-        selectedLocation.label ||
-        `${selectedLocation.lat.toFixed(3)}, ${selectedLocation.lng.toFixed(3)}`,
+      label: selectedLocation.label || fallbackLabel,
+      source: selectedLocation.source,
     })
     onOpenChange(false)
   }
@@ -291,12 +313,7 @@ export default function LocationSearchDialog({
           lng: position.coords.longitude,
         }
 
-        const defaultLabel = `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}`
-        setSelectedLocation({
-          lat: coords.lat,
-          lng: coords.lng,
-          label: defaultLabel,
-        })
+        updateSelectedLocation(coords, { source: "current" })
 
         mapInstanceRef.current?.panTo(coords)
         mapInstanceRef.current?.setZoom(15)
@@ -305,10 +322,9 @@ export default function LocationSearchDialog({
 
         geocoderRef.current?.geocode({ location: coords }, (results, status) => {
           if (status === "OK" && results && results[0]) {
-            setSelectedLocation({
-              lat: coords.lat,
-              lng: coords.lng,
-              label: results[0].formatted_address ?? defaultLabel,
+            updateSelectedLocation(coords, {
+              formattedAddress: results[0].formatted_address ?? undefined,
+              source: "current",
             })
           }
         })

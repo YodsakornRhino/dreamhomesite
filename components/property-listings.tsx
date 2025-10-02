@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Grid, List, Search as SearchIcon } from "luc
 import { PROPERTY_TYPE_LABELS } from "@/lib/property"
 import { useAllUserProperties } from "@/hooks/use-all-user-properties"
 import type { UserProperty } from "@/types/user-property"
-import type { LocationFilterValue } from "@/types/location-filter"
+import { CURRENT_LOCATION_LABEL, type LocationFilterValue } from "@/types/location-filter"
 
 import MobileFilterDrawer from "./mobile-filter-drawer"
 import { UserPropertyCard } from "./user-property-card"
@@ -274,10 +274,27 @@ export default function PropertyListings({
                 <label className="mb-2 block text-sm font-medium text-gray-700">พื้นที่การค้นหา</label>
                 {locationFilter ? (
                   <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
-                    <p className="font-medium">
-                      ค้นหาในรัศมี {locationFilter.radiusKm.toLocaleString()} กม.
-                    </p>
-                    <p className="text-xs text-blue-600 sm:text-sm">{locationFilter.label}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white sm:text-sm">
+                        {`ในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
+                      </span>
+                      {locationFilter.source === "current" ? (
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 sm:text-sm">
+                          {CURRENT_LOCATION_LABEL}
+                        </span>
+                      ) : (
+                        <span className="flex min-w-0 items-center text-left text-sm font-medium text-blue-700 sm:text-base">
+                          <span className="truncate">{locationFilter.label}</span>
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={onClearLocation}
+                        className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-700 sm:text-sm"
+                      >
+                        ล้างตำแหน่ง
+                      </button>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -297,13 +314,6 @@ export default function PropertyListings({
                         }`}
                       >
                         {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={onClearLocation}
-                        className="rounded-lg border border-transparent px-3 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-200 hover:bg-white"
-                      >
-                        ล้างตำแหน่ง
                       </button>
                     </div>
                   </div>
@@ -417,14 +427,22 @@ export default function PropertyListings({
                 </p>
                 {locationFilter && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                    <span className="rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">
+                    <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">
                       ภายใน {locationFilter.radiusKm.toLocaleString()} กม.
                     </span>
-                    <span className="text-blue-600">{locationFilter.label}</span>
+                    {locationFilter.source === "current" ? (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 font-medium text-green-700">
+                        {CURRENT_LOCATION_LABEL}
+                      </span>
+                    ) : (
+                      <span className="flex min-w-0 items-center text-blue-600">
+                        <span className="truncate">{locationFilter.label}</span>
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={onClearLocation}
-                      className="text-blue-500 underline-offset-4 hover:underline"
+                      className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 font-medium text-white transition hover:bg-red-700"
                     >
                       ล้างตำแหน่ง
                     </button>

@@ -10,8 +10,12 @@ import HeroSection from "@/components/hero-section"
 import PropertyListings from "@/components/property-listings"
 import CallToAction from "@/components/call-to-action"
 import LocationSearchDialog from "@/components/location-search-dialog"
-import type { LocationFilterValue } from "@/types/location-filter"
-import { DEFAULT_LOCATION_RADIUS_KM } from "@/types/location-filter"
+import type { LocationFilterValue, LocationFilterSource } from "@/types/location-filter"
+import {
+  CURRENT_LOCATION_LABEL,
+  DEFAULT_LOCATION_RADIUS_KM,
+  MAP_LOCATION_FALLBACK_LABEL,
+} from "@/types/location-filter"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,12 +25,16 @@ const parseNumericInput = (value: string): number | null => {
   return Number.isFinite(numericValue) ? numericValue : null
 }
 
+const isValidLocationSource = (value: string | null): value is LocationFilterSource =>
+  value === "current" || value === "pin" || value === "search"
+
 const parseLocationFromParams = (
   params: ReadonlyURLSearchParams,
 ): LocationFilterValue | null => {
   const latParam = params.get("lat")
   const lngParam = params.get("lng")
   const radiusParam = params.get("radius")
+  const sourceParam = params.get("source")
 
   if (!latParam || !lngParam || !radiusParam) return null
 
@@ -38,13 +46,18 @@ const parseLocationFromParams = (
     return null
   }
 
-  const label = params.get("label") ?? `${lat.toFixed(3)}, ${lng.toFixed(3)}`
+  const source = isValidLocationSource(sourceParam) ? sourceParam : undefined
+
+  const label =
+    params.get("label") ??
+    (source === "current" ? CURRENT_LOCATION_LABEL : MAP_LOCATION_FALLBACK_LABEL)
 
   return {
     lat,
     lng,
     radiusKm: Math.max(0.1, radius),
     label,
+    source,
   }
 }
 
@@ -56,7 +69,8 @@ const areLocationsEqual = (a: LocationFilterValue | null, b: LocationFilterValue
     Math.abs(a.lat - b.lat) < 1e-6 &&
     Math.abs(a.lng - b.lng) < 1e-6 &&
     Math.abs(a.radiusKm - b.radiusKm) < 1e-3 &&
-    a.label === b.label
+    a.label === b.label &&
+    a.source === b.source
   )
 }
 
@@ -218,6 +232,9 @@ export default function SearchPage() {
         if (nextValues.location.label) {
           params.set("label", nextValues.location.label)
         }
+        if (nextValues.location.source) {
+          params.set("source", nextValues.location.source)
+        }
       }
 
       if (nextValues.page > 1) {
@@ -353,31 +370,38 @@ export default function SearchPage() {
 
   const handleLocationApplied = useCallback(
     (value: LocationFilterValue | null) => {
-      setLocationFilter(value)
+      const normalizedValue = value
+        ? {
+            ...value,
+            source: isValidLocationSource(value.source ?? null) ? value.source : "pin",
+          }
+        : null
+
+      setLocationFilter(normalizedValue)
       setCurrentPage(1)
 
-      if (value) {
+      if (normalizedValue) {
         const shouldClearSearchTerm =
           !searchTerm || (locationFilter && searchTerm === locationFilter.label)
 
         if (shouldClearSearchTerm) {
           setSearchTerm("")
-          updateQuery({ location: value, searchTerm: "", page: 1 })
+          updateQuery({ location: normalizedValue, searchTerm: "", page: 1 })
         } else {
-          updateQuery({ location: value, page: 1 })
+          updateQuery({ location: normalizedValue, page: 1 })
         }
         setLocationError(null)
         return
       }
 
-      if (!value && locationFilter && searchTerm === locationFilter.label) {
+      if (!normalizedValue && locationFilter && searchTerm === locationFilter.label) {
         setSearchTerm("")
         updateQuery({ location: null, searchTerm: "", page: 1 })
         setLocationError(null)
         return
       }
 
-      updateQuery({ location: value, page: 1 })
+      updateQuery({ location: normalizedValue, page: 1 })
       setLocationError(null)
     },
     [locationFilter, searchTerm, updateQuery],
@@ -409,12 +433,12 @@ export default function SearchPage() {
           lng: position.coords.longitude,
         }
 
-        const label = `ตำแหน่งปัจจุบัน (${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)})`
         const nextValue: LocationFilterValue = {
           lat: coords.lat,
           lng: coords.lng,
           radiusKm: locationFilter?.radiusKm ?? DEFAULT_LOCATION_RADIUS_KM,
-          label,
+          label: CURRENT_LOCATION_LABEL,
+          source: "current",
         }
 
         handleLocationApplied(nextValue)

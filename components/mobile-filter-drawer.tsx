@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { Filter, X } from "lucide-react"
 
 import { PROPERTY_TYPE_LABELS } from "@/lib/property"
-import type { LocationFilterValue } from "@/types/location-filter"
+import { CURRENT_LOCATION_LABEL, type LocationFilterValue } from "@/types/location-filter"
 
 type PriceChangeType = "min" | "max"
 
@@ -107,10 +107,28 @@ export default function MobileFilterDrawer({
               <label className="block text-sm font-medium text-gray-700 mb-2">พื้นที่การค้นหา</label>
               {locationFilter ? (
                 <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
-                  <p className="font-semibold">
-                    ภายใน {locationFilter.radiusKm.toLocaleString()} กม.
-                  </p>
-                  <p className="text-xs text-blue-600">{locationFilter.label}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white sm:text-sm">
+                      {`ในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
+                    </span>
+                    {locationFilter.source === "current" ? (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 sm:text-sm">
+                        {CURRENT_LOCATION_LABEL}
+                      </span>
+                    ) : (
+                      <span className="flex min-w-0 items-center text-left text-sm font-semibold text-blue-700">
+                        <span className="truncate">{locationFilter.label}</span>
+                      </span>
+                    )}
+                    <button
+                      onClick={() => {
+                        onClearLocation()
+                      }}
+                      className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-700"
+                    >
+                      ล้างตำแหน่ง
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={handleOpenLocationPicker}
@@ -130,14 +148,6 @@ export default function MobileFilterDrawer({
                       }`}
                     >
                       {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        onClearLocation()
-                      }}
-                      className="rounded-lg border border-transparent px-4 py-2 text-xs font-semibold text-blue-600 transition hover:border-blue-200 hover:bg-white"
-                    >
-                      ล้างตำแหน่ง
                     </button>
                   </div>
                 </div>

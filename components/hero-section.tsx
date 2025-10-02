@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { MapPin, Home, DollarSign, Search, LocateFixed } from "lucide-react"
 
 import { PROPERTY_TYPE_LABELS } from "@/lib/property"
-import type { LocationFilterValue } from "@/types/location-filter"
+import { CURRENT_LOCATION_LABEL, type LocationFilterValue } from "@/types/location-filter"
 
 interface PriceRange {
   min: number | null
@@ -95,6 +95,11 @@ export default function HeroSection({
     })
   }
 
+  const isUsingCurrentLocation = locationFilter?.source === "current"
+  const locationStatus = isUsingCurrentLocation
+    ? CURRENT_LOCATION_LABEL
+    : locationFilter?.label
+
   return (
     <section className="bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 text-white py-12 sm:py-16 lg:py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -143,21 +148,31 @@ export default function HeroSection({
                   {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
                 </button>
                 {locationFilter ? (
-                  <>
-                    <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 font-medium text-white">
-                      {`ในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={onClearLocation}
-                      className="font-medium text-blue-100 hover:text-white"
-                    >
-                      ล้างตำแหน่ง
-                    </button>
-                    <p className="w-full text-left text-blue-100">
-                      {locationFilter.label}
-                    </p>
-                  </>
+                  <div className="flex w-full flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white sm:text-sm">
+                        {`ในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
+                      </span>
+                      {locationStatus ? (
+                        isUsingCurrentLocation ? (
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 sm:text-sm">
+                            {locationStatus}
+                          </span>
+                        ) : (
+                          <span className="flex min-w-0 items-center text-left text-sm font-medium text-blue-700 sm:text-base">
+                            <span className="truncate">{locationStatus}</span>
+                          </span>
+                        )
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={onClearLocation}
+                        className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-700 sm:text-sm"
+                      >
+                        ล้างตำแหน่ง
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <p className="w-full text-left text-gray-500">
                     ปักหมุดหรือใช้ GPS เพื่อค้นหาทรัพย์ใกล้ตำแหน่งที่สนใจ
