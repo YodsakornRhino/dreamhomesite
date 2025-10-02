@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react"
+import { LocateFixed } from "lucide-react"
 
 import {
   Dialog,
@@ -37,6 +38,8 @@ export default function LocationSearchDialog({
   const [mapsReady, setMapsReady] = useState(false)
   const [mapsError, setMapsError] = useState<string | null>(null)
   const [isLoadingMaps, setIsLoadingMaps] = useState(false)
+  const [isGeolocating, setIsGeolocating] = useState(false)
+  const [geolocationError, setGeolocationError] = useState<string | null>(null)
 
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
   const [radiusKm, setRadiusKm] = useState<number>(DEFAULT_LOCATION_RADIUS_KM)
@@ -96,6 +99,8 @@ export default function LocationSearchDialog({
       setSelectedLocation(null)
       setRadiusKm(DEFAULT_LOCATION_RADIUS_KM)
     }
+    setGeolocationError(null)
+    setIsGeolocating(false)
   }, [open, initialValue])
 
   useEffect(() => {
@@ -257,6 +262,65 @@ export default function LocationSearchDialog({
     onOpenChange(false)
   }
 
+  const describeGeolocationError = (error: GeolocationPositionError) => {
+    switch (error.code) {
+      case error.PERMISSION_DENIED:
+        return "กรุณาอนุญาตให้เข้าถึงตำแหน่งของคุณเพื่อใช้งาน GPS"
+      case error.POSITION_UNAVAILABLE:
+        return "ไม่พบตำแหน่งปัจจุบันของคุณ ลองใหม่อีกครั้ง"
+      case error.TIMEOUT:
+        return "ใช้เวลานานเกินไปในการระบุตำแหน่ง กรุณาลองใหม่"
+      default:
+        return "ไม่สามารถระบุตำแหน่งได้ กรุณาลองใหม่"
+    }
+  }
+
+  const handleUseCurrentLocation = () => {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
+      setGeolocationError("อุปกรณ์ของคุณไม่รองรับการระบุตำแหน่งผ่าน GPS")
+      return
+    }
+
+    setIsGeolocating(true)
+    setGeolocationError(null)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setIsGeolocating(false)
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }
+
+        const defaultLabel = `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}`
+        setSelectedLocation({
+          lat: coords.lat,
+          lng: coords.lng,
+          label: defaultLabel,
+        })
+
+        mapInstanceRef.current?.panTo(coords)
+        mapInstanceRef.current?.setZoom(15)
+        markerRef.current?.setPosition(coords)
+        circleRef.current?.setCenter(coords)
+
+        geocoderRef.current?.geocode({ location: coords }, (results, status) => {
+          if (status === "OK" && results && results[0]) {
+            setSelectedLocation({
+              lat: coords.lat,
+              lng: coords.lng,
+              label: results[0].formatted_address ?? defaultLabel,
+            })
+          }
+        })
+      },
+      (error) => {
+        setIsGeolocating(false)
+        setGeolocationError(describeGeolocationError(error))
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-3xl overflow-hidden p-0 sm:w-[90vw]">
@@ -285,6 +349,24 @@ export default function LocationSearchDialog({
                   placeholder="ค้นหาตำแหน่ง (เช่น ชื่อสถานที่ ถนน หรือจังหวัด)"
                   className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={isGeolocating}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                      isGeolocating
+                        ? "border-blue-200 bg-blue-100 text-blue-400"
+                        : "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                    }`}
+                  >
+                    <LocateFixed size={16} />
+                    {isGeolocating ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
+                  </button>
+                  {geolocationError ? (
+                    <span className="text-xs text-red-600">{geolocationError}</span>
+                  ) : null}
+                </div>
               </div>
 
               <div ref={mapContainerRef} className="h-[420px] w-full overflow-hidden rounded-xl border border-gray-200" />

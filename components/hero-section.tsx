@@ -24,6 +24,9 @@ interface HeroSectionProps {
   }) => void
   onOpenLocationPicker: () => void
   onClearLocation: () => void
+  onUseCurrentLocation: () => void
+  isLocatingCurrentLocation: boolean
+  locationError?: string | null
 }
 
 const PRICE_RANGE_OPTIONS = [
@@ -55,6 +58,9 @@ export default function HeroSection({
   onSearch,
   onOpenLocationPicker,
   onClearLocation,
+  onUseCurrentLocation,
+  isLocatingCurrentLocation,
+  locationError,
 }: HeroSectionProps) {
   const [location, setLocation] = useState(searchTerm)
   const [propertyType, setPropertyType] = useState<string>(selectedPropertyType ?? "")
@@ -123,6 +129,19 @@ export default function HeroSection({
                   <LocateFixed size={14} />
                   เลือกบนแผนที่
                 </button>
+                <button
+                  type="button"
+                  onClick={onUseCurrentLocation}
+                  disabled={isLocatingCurrentLocation}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    isLocatingCurrentLocation
+                      ? "border-blue-200 bg-blue-100 text-blue-400"
+                      : "border-blue-100 bg-white text-blue-600 hover:bg-blue-50"
+                  }`}
+                >
+                  <LocateFixed size={14} />
+                  {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
+                </button>
                 {locationFilter ? (
                   <>
                     <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white">
@@ -141,9 +160,14 @@ export default function HeroSection({
                   </>
                 ) : (
                   <p className="w-full text-left text-xs text-gray-500">
-                    ปักหมุดเพื่อค้นหาทรัพย์ใกล้ตำแหน่งที่สนใจ
+                    ปักหมุดหรือใช้ GPS เพื่อค้นหาทรัพย์ใกล้ตำแหน่งที่สนใจ
                   </p>
                 )}
+                {locationError ? (
+                  <p className="w-full text-left text-xs text-red-200">
+                    {locationError}
+                  </p>
+                ) : null}
               </div>
             </div>
 

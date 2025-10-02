@@ -36,6 +36,9 @@ interface PropertyListingsProps {
   locationFilter: LocationFilterValue | null
   onOpenLocationPicker: () => void
   onClearLocation: () => void
+  onUseCurrentLocation: () => void
+  isLocatingCurrentLocation: boolean
+  locationError?: string | null
 }
 
 const parseNumericInput = (value: string): number | null => {
@@ -117,6 +120,9 @@ export default function PropertyListings({
   locationFilter,
   onOpenLocationPicker,
   onClearLocation,
+  onUseCurrentLocation,
+  isLocatingCurrentLocation,
+  locationError,
 }: PropertyListingsProps) {
   const { properties, loading, error } = useAllUserProperties()
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
@@ -282,6 +288,18 @@ export default function PropertyListings({
                       </button>
                       <button
                         type="button"
+                        onClick={onUseCurrentLocation}
+                        disabled={isLocatingCurrentLocation}
+                        className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
+                          isLocatingCurrentLocation
+                            ? "bg-blue-100 text-blue-400"
+                            : "border border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                        }`}
+                      >
+                        {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
+                      </button>
+                      <button
+                        type="button"
                         onClick={onClearLocation}
                         className="rounded-lg border border-transparent px-3 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-200 hover:bg-white"
                       >
@@ -290,14 +308,31 @@ export default function PropertyListings({
                     </div>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={onOpenLocationPicker}
-                    className="w-full rounded-lg border border-dashed border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
-                  >
-                    ปักหมุดบนแผนที่เพื่อค้นหาใกล้เคียง
-                  </button>
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={onOpenLocationPicker}
+                      className="w-full rounded-lg border border-dashed border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+                    >
+                      ปักหมุดบนแผนที่เพื่อค้นหาใกล้เคียง
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onUseCurrentLocation}
+                      disabled={isLocatingCurrentLocation}
+                      className={`w-full rounded-lg border px-4 py-3 text-sm font-medium transition ${
+                        isLocatingCurrentLocation
+                          ? "border-blue-200 bg-blue-100 text-blue-400"
+                          : "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                      }`}
+                    >
+                      {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบันด้วย GPS"}
+                    </button>
+                  </div>
                 )}
+                {locationError ? (
+                  <p className="mt-2 text-xs text-red-600">{locationError}</p>
+                ) : null}
               </div>
 
               {/* Price Range */}
@@ -542,6 +577,9 @@ export default function PropertyListings({
         locationFilter={locationFilter}
         onOpenLocationPicker={onOpenLocationPicker}
         onClearLocation={onClearLocation}
+        onUseCurrentLocation={onUseCurrentLocation}
+        isLocatingCurrentLocation={isLocatingCurrentLocation}
+        locationError={locationError}
       />
     </section>
   )

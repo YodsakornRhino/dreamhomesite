@@ -21,6 +21,9 @@ interface MobileFilterDrawerProps {
   locationFilter: LocationFilterValue | null
   onOpenLocationPicker: () => void
   onClearLocation: () => void
+  onUseCurrentLocation: () => void
+  isLocatingCurrentLocation: boolean
+  locationError?: string | null
 }
 
 export default function MobileFilterDrawer({
@@ -36,6 +39,9 @@ export default function MobileFilterDrawer({
   locationFilter,
   onOpenLocationPicker,
   onClearLocation,
+  onUseCurrentLocation,
+  isLocatingCurrentLocation,
+  locationError,
 }: MobileFilterDrawerProps) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -114,6 +120,19 @@ export default function MobileFilterDrawer({
                     </button>
                     <button
                       onClick={() => {
+                        onUseCurrentLocation()
+                      }}
+                      disabled={isLocatingCurrentLocation}
+                      className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                        isLocatingCurrentLocation
+                          ? "bg-blue-100 text-blue-400"
+                          : "border border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                      }`}
+                    >
+                      {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
+                    </button>
+                    <button
+                      onClick={() => {
                         onClearLocation()
                       }}
                       className="rounded-lg border border-transparent px-4 py-2 text-xs font-semibold text-blue-600 transition hover:border-blue-200 hover:bg-white"
@@ -123,13 +142,31 @@ export default function MobileFilterDrawer({
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={handleOpenLocationPicker}
-                  className="w-full rounded-lg border border-dashed border-blue-300 px-4 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
-                >
-                  ปักหมุดบนแผนที่เพื่อค้นหาทรัพย์ใกล้คุณ
-                </button>
+                <div className="space-y-3">
+                  <button
+                    onClick={handleOpenLocationPicker}
+                    className="w-full rounded-lg border border-dashed border-blue-300 px-4 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+                  >
+                    ปักหมุดบนแผนที่เพื่อค้นหาทรัพย์ใกล้คุณ
+                  </button>
+                  <button
+                    onClick={() => {
+                      onUseCurrentLocation()
+                    }}
+                    disabled={isLocatingCurrentLocation}
+                    className={`w-full rounded-lg border px-4 py-3 text-sm font-semibold transition ${
+                      isLocatingCurrentLocation
+                        ? "border-blue-200 bg-blue-100 text-blue-400"
+                        : "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                    }`}
+                  >
+                    {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบันด้วย GPS"}
+                  </button>
+                </div>
               )}
+              {locationError ? (
+                <p className="mt-2 text-xs text-red-600">{locationError}</p>
+              ) : null}
             </div>
 
             {/* Price Range */}
