@@ -1,10 +1,83 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { MapPin, Home, DollarSign, Search } from "lucide-react"
 
-export default function HeroSection() {
-  const handleSearch = () => {
-    alert("ฟังก์ชันค้นหาจะกรองอสังหาริมทรัพย์ตามเงื่อนไขของคุณ!")
+import { PROPERTY_TYPE_LABELS } from "@/lib/property"
+
+interface PriceRange {
+  min: number | null
+  max: number | null
+}
+
+interface HeroSectionProps {
+  searchTerm: string
+  selectedPropertyType: string | null
+  priceRange: PriceRange
+  onSearch: (filters: {
+    searchTerm: string
+    propertyType: string | null
+    priceRange: PriceRange
+  }) => void
+}
+
+const PRICE_RANGE_OPTIONS = [
+  { value: "", label: "ช่วงราคา (ทั้งหมด)" },
+  { value: "0-2000000", label: "0 - 2,000,000 ฿", min: 0, max: 2_000_000 },
+  { value: "2000000-5000000", label: "2,000,000 - 5,000,000 ฿", min: 2_000_000, max: 5_000_000 },
+  { value: "5000000-10000000", label: "5,000,000 - 10,000,000 ฿", min: 5_000_000, max: 10_000_000 },
+  { value: "10000000+", label: "10,000,000 ฿ ขึ้นไป", min: 10_000_000, max: null },
+]
+
+const findPriceRangeValue = (range: PriceRange) => {
+  const option = PRICE_RANGE_OPTIONS.find(
+    ({ min, max }) => min === range.min && max === range.max,
+  )
+  return option?.value ?? ""
+}
+
+const parsePriceRangeValue = (value: string): PriceRange => {
+  const option = PRICE_RANGE_OPTIONS.find((item) => item.value === value)
+  if (!option) return { min: null, max: null }
+  return { min: option.min ?? null, max: option.max ?? null }
+}
+
+export default function HeroSection({
+  searchTerm,
+  selectedPropertyType,
+  priceRange,
+  onSearch,
+}: HeroSectionProps) {
+  const [location, setLocation] = useState(searchTerm)
+  const [propertyType, setPropertyType] = useState<string>(selectedPropertyType ?? "")
+  const [selectedPriceRange, setSelectedPriceRange] = useState(() => findPriceRangeValue(priceRange))
+
+  const propertyTypeOptions = useMemo(
+    () => [
+      { value: "", label: "ประเภททั้งหมด" },
+      ...Object.entries(PROPERTY_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+    ],
+    [],
+  )
+
+  useEffect(() => {
+    setLocation(searchTerm)
+  }, [searchTerm])
+
+  useEffect(() => {
+    setPropertyType(selectedPropertyType ?? "")
+  }, [selectedPropertyType])
+
+  useEffect(() => {
+    setSelectedPriceRange(findPriceRangeValue(priceRange))
+  }, [priceRange])
+
+  const handleSubmit = () => {
+    onSearch({
+      searchTerm: location.trim(),
+      propertyType: propertyType || null,
+      priceRange: parsePriceRangeValue(selectedPriceRange),
+    })
   }
 
   return (
@@ -25,6 +98,8 @@ export default function HeroSection() {
               <MapPin className="absolute left-3 top-3 text-gray-400" size={16} />
               <input
                 type="text"
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
                 placeholder="ทำเล"
                 className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
               />
@@ -34,14 +109,15 @@ export default function HeroSection() {
             <div className="relative">
               <Home className="absolute left-3 top-3 text-gray-400" size={16} />
               <select
+                value={propertyType}
+                onChange={(event) => setPropertyType(event.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base appearance-none"
-                defaultValue=""
               >
-                <option value="" disabled>ประเภทอสังหาริมทรัพย์</option>
-                <option>บ้าน</option>
-                <option>อพาร์ตเมนต์</option>
-                <option>คอนโด</option>
-                <option>ที่ดิน</option>
+                {propertyTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -49,20 +125,21 @@ export default function HeroSection() {
             <div className="relative">
               <DollarSign className="absolute left-3 top-3 text-gray-400" size={16} />
               <select
+                value={selectedPriceRange}
+                onChange={(event) => setSelectedPriceRange(event.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base appearance-none"
-                defaultValue=""
               >
-                <option value="" disabled>ช่วงราคา</option>
-                <option>$0 - $200,000</option>
-                <option>$200,000 - $500,000</option>
-                <option>$500,000 - $1,000,000</option>
-                <option>$1,000,000+</option>
+                {PRICE_RANGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
             {/* Search Button */}
             <button
-              onClick={handleSearch}
+              onClick={handleSubmit}
               className="bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center justify-center text-sm sm:text-base"
             >
               <Search className="mr-2" size={16} />
