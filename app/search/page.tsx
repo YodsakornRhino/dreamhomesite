@@ -356,9 +356,16 @@ export default function SearchPage() {
       setLocationFilter(value)
       setCurrentPage(1)
 
-      if (value && (!searchTerm || (locationFilter && searchTerm === locationFilter.label))) {
-        setSearchTerm(value.label)
-        updateQuery({ location: value, searchTerm: value.label, page: 1 })
+      if (value) {
+        const shouldClearSearchTerm =
+          !searchTerm || (locationFilter && searchTerm === locationFilter.label)
+
+        if (shouldClearSearchTerm) {
+          setSearchTerm("")
+          updateQuery({ location: value, searchTerm: "", page: 1 })
+        } else {
+          updateQuery({ location: value, page: 1 })
+        }
         setLocationError(null)
         return
       }

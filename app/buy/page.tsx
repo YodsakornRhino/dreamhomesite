@@ -148,8 +148,8 @@ export default function BuyPage() {
     setLocationFilter((previous) => {
       setSearchTerm((current) => {
         if (value) {
-          if (!current || (previous && current === previous.label)) {
-            return value.label
+          if (previous && current === previous.label) {
+            return ""
           }
           return current
         }
@@ -201,23 +201,13 @@ export default function BuyPage() {
 
         const label = `ตำแหน่งปัจจุบัน (${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)})`
 
-        setLocationFilter((previous) => {
-          const nextValue: LocationFilterValue = {
-            lat: coords.lat,
-            lng: coords.lng,
-            radiusKm: previous?.radiusKm ?? DEFAULT_LOCATION_RADIUS_KM,
-            label,
-          }
-
-          setSearchTerm((current) => {
-            if (!current || (previous && current === previous.label)) {
-              return nextValue.label
-            }
-            return current
-          })
-
-          return nextValue
-        })
+        setSearchTerm("")
+        setLocationFilter((previous) => ({
+          lat: coords.lat,
+          lng: coords.lng,
+          radiusKm: previous?.radiusKm ?? DEFAULT_LOCATION_RADIUS_KM,
+          label,
+        }))
       },
       (error) => {
         setIsLocatingCurrentLocation(false)
