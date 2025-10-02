@@ -1,5 +1,14 @@
 "use client"
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  ChangeEvent,
+  FormEvent,
+  MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -1372,6 +1381,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setIsGalleryOpen((prev) => !prev)
   }
 
+  const handleActiveProfileClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (!activeParticipantId) {
+        event.preventDefault()
+        return
+      }
+
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        event.button !== 0
+      ) {
+        return
+      }
+
+      onClose()
+    },
+    [activeParticipantId, onClose],
+  )
+
   const handleAttachmentClick = (attachment: ChatMessageAttachment) => {
     setSelectedAttachment(attachment)
     setIsMediaViewerOpen(true)
@@ -1798,11 +1830,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           <Link
                             href={activeParticipantId ? `/users/${activeParticipantId}` : "#"}
                             className="text-sm font-semibold text-gray-900 transition hover:text-blue-600"
-                            onClick={(event) => {
-                              if (!activeParticipantId) {
-                                event.preventDefault()
-                              }
-                            }}
+                            onClick={handleActiveProfileClick}
                           >
                             {getDisplayName(activeProfile)}
                           </Link>
