@@ -1,5 +1,6 @@
 "use client"
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -1794,7 +1795,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-gray-900">{getDisplayName(activeProfile)}</span>
+                          <Link
+                            href={activeParticipantId ? `/users/${activeParticipantId}` : "#"}
+                            className="text-sm font-semibold text-gray-900 transition hover:text-blue-600"
+                            onClick={(event) => {
+                              if (!activeParticipantId) {
+                                event.preventDefault()
+                              }
+                            }}
+                          >
+                            {getDisplayName(activeProfile)}
+                          </Link>
                           <span className="text-xs text-gray-500">พูดคุยเกี่ยวกับการซื้อบ้าน</span>
                         </div>
                       </div>
