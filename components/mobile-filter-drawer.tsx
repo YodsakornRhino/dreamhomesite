@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Filter, X } from "lucide-react"
 
 import { PROPERTY_TYPE_LABELS } from "@/lib/property"
+import type { LocationFilterValue } from "@/types/location-filter"
 
 type PriceChangeType = "min" | "max"
 
@@ -17,6 +18,9 @@ interface MobileFilterDrawerProps {
   onPriceRangeChange: (type: PriceChangeType, value: string) => void
   onApplyFilters: () => void
   onClearFilters: () => void
+  locationFilter: LocationFilterValue | null
+  onOpenLocationPicker: () => void
+  onClearLocation: () => void
 }
 
 export default function MobileFilterDrawer({
@@ -29,6 +33,9 @@ export default function MobileFilterDrawer({
   onPriceRangeChange,
   onApplyFilters,
   onClearFilters,
+  locationFilter,
+  onOpenLocationPicker,
+  onClearLocation,
 }: MobileFilterDrawerProps) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -47,6 +54,11 @@ export default function MobileFilterDrawer({
 
   const handlePriceChange = (type: PriceChangeType, value: string) => {
     onPriceRangeChange(type, value)
+  }
+
+  const handleOpenLocationPicker = () => {
+    setIsOpen(false)
+    onOpenLocationPicker()
   }
 
   return (
@@ -82,6 +94,42 @@ export default function MobileFilterDrawer({
               <button onClick={toggleDrawer} className="text-gray-500 hover:text-gray-700">
                 <X size={24} />
               </button>
+            </div>
+
+            {/* Location */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">พื้นที่การค้นหา</label>
+              {locationFilter ? (
+                <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+                  <p className="font-semibold">
+                    ภายใน {locationFilter.radiusKm.toLocaleString()} กม.
+                  </p>
+                  <p className="text-xs text-blue-600">{locationFilter.label}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleOpenLocationPicker}
+                      className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-blue-600 shadow-sm transition hover:bg-blue-100"
+                    >
+                      ปรับตำแหน่ง
+                    </button>
+                    <button
+                      onClick={() => {
+                        onClearLocation()
+                      }}
+                      className="rounded-lg border border-transparent px-4 py-2 text-xs font-semibold text-blue-600 transition hover:border-blue-200 hover:bg-white"
+                    >
+                      ล้างตำแหน่ง
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleOpenLocationPicker}
+                  className="w-full rounded-lg border border-dashed border-blue-300 px-4 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+                >
+                  ปักหมุดบนแผนที่เพื่อค้นหาทรัพย์ใกล้คุณ
+                </button>
+              )}
             </div>
 
             {/* Price Range */}

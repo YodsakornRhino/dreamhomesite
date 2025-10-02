@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Grid, List, Search as SearchIcon } from "luc
 import { PROPERTY_TYPE_LABELS } from "@/lib/property"
 import { useAllUserProperties } from "@/hooks/use-all-user-properties"
 import type { UserProperty } from "@/types/user-property"
+import type { LocationFilterValue } from "@/types/location-filter"
 
 import MobileFilterDrawer from "./mobile-filter-drawer"
 import { UserPropertyCard } from "./user-property-card"
@@ -32,6 +33,9 @@ interface PropertyListingsProps {
   currentPage: number
   onPageChange: (page: number) => void
   itemsPerPage?: number
+  locationFilter: LocationFilterValue | null
+  onOpenLocationPicker: () => void
+  onClearLocation: () => void
 }
 
 const parseNumericInput = (value: string): number | null => {
@@ -50,6 +54,28 @@ const parseArea = (value: string): number | null => {
   if (!value) return null
   const numericValue = Number(value.replace(/[^0-9.]/g, ""))
   return Number.isFinite(numericValue) ? numericValue : null
+}
+
+interface Coordinates {
+  lat: number
+  lng: number
+}
+
+const EARTH_RADIUS_KM = 6371
+
+const toRadians = (degrees: number) => (degrees * Math.PI) / 180
+
+const calculateDistanceKm = (origin: Coordinates, target: Coordinates) => {
+  const dLat = toRadians(target.lat - origin.lat)
+  const dLng = toRadians(target.lng - origin.lng)
+  const lat1 = toRadians(origin.lat)
+  const lat2 = toRadians(target.lat)
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return EARTH_RADIUS_KM * c
 }
 
 const propertyTypeOptions = Object.entries(PROPERTY_TYPE_LABELS).map(([value, label]) => ({
@@ -88,6 +114,9 @@ export default function PropertyListings({
   currentPage,
   onPageChange,
   itemsPerPage = 6,
+  locationFilter,
+  onOpenLocationPicker,
+  onClearLocation,
 }: PropertyListingsProps) {
   const { properties, loading, error } = useAllUserProperties()
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
@@ -107,6 +136,21 @@ export default function PropertyListings({
           .map((value) => value?.toLowerCase() ?? "")
         const matchesSearch = haystack.some((value) => value.includes(normalizedSearch))
         if (!matchesSearch) {
+          return false
+        }
+      }
+
+      if (locationFilter) {
+        if (property.lat == null || property.lng == null) {
+          return false
+        }
+
+        const distance = calculateDistanceKm(
+          { lat: locationFilter.lat, lng: locationFilter.lng },
+          { lat: property.lat, lng: property.lng },
+        )
+
+        if (!Number.isFinite(distance) || distance > locationFilter.radiusKm) {
           return false
         }
       }
@@ -160,6 +204,7 @@ export default function PropertyListings({
     minPrice,
     maxPrice,
     sortOption,
+    locationFilter,
   ])
 
   const totalResults = filteredProperties.length
@@ -202,7 +247,7 @@ export default function PropertyListings({
   }
 
   return (
-    <section className="bg-white py-16">
+    <section id="property-listings" className="bg-white py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-8 lg:flex-row">
           {/* Filters Sidebar */}
@@ -216,6 +261,43 @@ export default function PropertyListings({
                 >
                   ล้างทั้งหมด
                 </button>
+              </div>
+
+              {/* Location Filter */}
+              <div className="mb-4 sm:mb-6">
+                <label className="mb-2 block text-sm font-medium text-gray-700">พื้นที่การค้นหา</label>
+                {locationFilter ? (
+                  <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+                    <p className="font-medium">
+                      ค้นหาในรัศมี {locationFilter.radiusKm.toLocaleString()} กม.
+                    </p>
+                    <p className="text-xs text-blue-600 sm:text-sm">{locationFilter.label}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={onOpenLocationPicker}
+                        className="rounded-lg bg-white px-3 py-1 text-xs font-medium text-blue-600 shadow-sm transition hover:bg-blue-100"
+                      >
+                        ปรับตำแหน่ง
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onClearLocation}
+                        className="rounded-lg border border-transparent px-3 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-200 hover:bg-white"
+                      >
+                        ล้างตำแหน่ง
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onOpenLocationPicker}
+                    className="w-full rounded-lg border border-dashed border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+                  >
+                    ปักหมุดบนแผนที่เพื่อค้นหาใกล้เคียง
+                  </button>
+                )}
               </div>
 
               {/* Price Range */}
@@ -298,6 +380,21 @@ export default function PropertyListings({
                     ? "กำลังโหลดรายการ..."
                     : `พบ ${totalResults.toLocaleString("th-TH") || 0} รายการ`}
                 </p>
+                {locationFilter && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                    <span className="rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">
+                      ภายใน {locationFilter.radiusKm.toLocaleString()} กม.
+                    </span>
+                    <span className="text-blue-600">{locationFilter.label}</span>
+                    <button
+                      type="button"
+                      onClick={onClearLocation}
+                      className="text-blue-500 underline-offset-4 hover:underline"
+                    >
+                      ล้างตำแหน่ง
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0 w-full sm:w-auto">
                 <div className="relative w-full sm:w-64">
@@ -442,6 +539,9 @@ export default function PropertyListings({
           onPageChange(1)
         }}
         onClearFilters={onClearFilters}
+        locationFilter={locationFilter}
+        onOpenLocationPicker={onOpenLocationPicker}
+        onClearLocation={onClearLocation}
       />
     </section>
   )

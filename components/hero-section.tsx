@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { MapPin, Home, DollarSign, Search } from "lucide-react"
+import { MapPin, Home, DollarSign, Search, LocateFixed } from "lucide-react"
 
 import { PROPERTY_TYPE_LABELS } from "@/lib/property"
+import type { LocationFilterValue } from "@/types/location-filter"
 
 interface PriceRange {
   min: number | null
@@ -14,11 +15,15 @@ interface HeroSectionProps {
   searchTerm: string
   selectedPropertyType: string | null
   priceRange: PriceRange
+  locationFilter: LocationFilterValue | null
   onSearch: (filters: {
     searchTerm: string
     propertyType: string | null
     priceRange: PriceRange
+    location: LocationFilterValue | null
   }) => void
+  onOpenLocationPicker: () => void
+  onClearLocation: () => void
 }
 
 const PRICE_RANGE_OPTIONS = [
@@ -46,7 +51,10 @@ export default function HeroSection({
   searchTerm,
   selectedPropertyType,
   priceRange,
+  locationFilter,
   onSearch,
+  onOpenLocationPicker,
+  onClearLocation,
 }: HeroSectionProps) {
   const [location, setLocation] = useState(searchTerm)
   const [propertyType, setPropertyType] = useState<string>(selectedPropertyType ?? "")
@@ -77,6 +85,7 @@ export default function HeroSection({
       searchTerm: location.trim(),
       propertyType: propertyType || null,
       priceRange: parsePriceRangeValue(selectedPriceRange),
+      location: locationFilter,
     })
   }
 
@@ -94,15 +103,48 @@ export default function HeroSection({
         <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 shadow-2xl max-w-4xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {/* Location */}
-            <div className="relative">
-              <MapPin className="absolute left-3 top-3 text-gray-400" size={16} />
-              <input
-                type="text"
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder="ทำเล"
-                className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-              />
+            <div className="space-y-2">
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  placeholder="ทำเลหรือคำค้นหา"
+                  className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onOpenLocationPicker}
+                  className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-100"
+                >
+                  <LocateFixed size={14} />
+                  เลือกบนแผนที่
+                </button>
+                {locationFilter ? (
+                  <>
+                    <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white">
+                      {`ในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onClearLocation}
+                      className="text-xs font-medium text-blue-100 hover:text-white"
+                    >
+                      ล้างตำแหน่ง
+                    </button>
+                    <p className="w-full text-left text-xs text-blue-100">
+                      {locationFilter.label}
+                    </p>
+                  </>
+                ) : (
+                  <p className="w-full text-left text-xs text-gray-500">
+                    ปักหมุดเพื่อค้นหาทรัพย์ใกล้ตำแหน่งที่สนใจ
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Property Type */}

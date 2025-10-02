@@ -1,12 +1,15 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation"
 import { Inter } from "next/font/google"
 
 import HeroSection from "@/components/hero-section"
 import FeaturedProperties from "@/components/featured-properties"
 import PropertyListings from "@/components/property-listings"
 import CallToAction from "@/components/call-to-action"
+import LocationSearchDialog from "@/components/location-search-dialog"
+import type { LocationFilterValue } from "@/types/location-filter"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -16,6 +19,45 @@ const parseNumericInput = (value: string): number | null => {
   return Number.isFinite(numericValue) ? numericValue : null
 }
 
+const parseLocationFromParams = (
+  params: ReadonlyURLSearchParams,
+): LocationFilterValue | null => {
+  const latParam = params.get("lat")
+  const lngParam = params.get("lng")
+  const radiusParam = params.get("radius")
+
+  if (!latParam || !lngParam || !radiusParam) return null
+
+  const lat = Number(latParam)
+  const lng = Number(lngParam)
+  const radius = Number(radiusParam)
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radius)) {
+    return null
+  }
+
+  const label = params.get("label") ?? `${lat.toFixed(3)}, ${lng.toFixed(3)}`
+
+  return {
+    lat,
+    lng,
+    radiusKm: Math.max(0.1, radius),
+    label,
+  }
+}
+
+const areLocationsEqual = (a: LocationFilterValue | null, b: LocationFilterValue | null) => {
+  if (a === b) return true
+  if (!a || !b) return false
+
+  return (
+    Math.abs(a.lat - b.lat) < 1e-6 &&
+    Math.abs(a.lng - b.lng) < 1e-6 &&
+    Math.abs(a.radiusKm - b.radiusKm) < 1e-3 &&
+    a.label === b.label
+  )
+}
+
 interface HeroFilters {
   searchTerm: string
   propertyType: string | null
@@ -23,15 +65,90 @@ interface HeroFilters {
     min: number | null
     max: number | null
   }
+  location: LocationFilterValue | null
+}
+
+type QueryValues = {
+  searchTerm: string
+  propertyType: string | null
+  minPrice: string
+  maxPrice: string
+  bedrooms: string | null
+  location: LocationFilterValue | null
+  page: number
 }
 
 export default function BuyPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedPropertyType, setSelectedPropertyType] = useState<string | null>(null)
-  const [minPrice, setMinPrice] = useState("")
-  const [maxPrice, setMaxPrice] = useState("")
-  const [selectedBedrooms, setSelectedBedrooms] = useState<string | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get("search") ?? "")
+  const [selectedPropertyType, setSelectedPropertyType] = useState<string | null>(() => {
+    const type = searchParams.get("type")
+    return type || null
+  })
+  const [minPrice, setMinPrice] = useState(() => searchParams.get("minPrice") ?? "")
+  const [maxPrice, setMaxPrice] = useState(() => searchParams.get("maxPrice") ?? "")
+  const [selectedBedrooms, setSelectedBedrooms] = useState<string | null>(() => searchParams.get("bedrooms"))
+  const [currentPage, setCurrentPage] = useState(() => {
+    const pageParam = Number(searchParams.get("page") ?? "1")
+    return Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+  })
+  const [locationFilter, setLocationFilter] = useState<LocationFilterValue | null>(() =>
+    parseLocationFromParams(searchParams),
+  )
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false)
+
+  useEffect(() => {
+    const paramSearch = searchParams.get("search") ?? ""
+    if (paramSearch !== searchTerm) {
+      setSearchTerm(paramSearch)
+    }
+
+    const paramType = searchParams.get("type")
+    const nextType = paramType || null
+    if (nextType !== selectedPropertyType) {
+      setSelectedPropertyType(nextType)
+    }
+
+    const paramMin = searchParams.get("minPrice") ?? ""
+    if (paramMin !== minPrice) {
+      setMinPrice(paramMin)
+    }
+
+    const paramMax = searchParams.get("maxPrice") ?? ""
+    if (paramMax !== maxPrice) {
+      setMaxPrice(paramMax)
+    }
+
+    const paramBedrooms = searchParams.get("bedrooms")
+    if (paramBedrooms !== selectedBedrooms) {
+      setSelectedBedrooms(paramBedrooms)
+    }
+
+    const pageParam = Number(searchParams.get("page") ?? "1")
+    const nextPage = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+    if (nextPage !== currentPage) {
+      setCurrentPage(nextPage)
+    }
+
+    const paramLocation = parseLocationFromParams(searchParams)
+    if (!areLocationsEqual(paramLocation, locationFilter)) {
+      setLocationFilter(paramLocation)
+      if (!paramLocation && locationFilter && searchTerm === locationFilter.label) {
+        setSearchTerm("")
+      }
+    }
+  }, [
+    searchParams,
+    searchTerm,
+    selectedPropertyType,
+    minPrice,
+    maxPrice,
+    selectedBedrooms,
+    currentPage,
+    locationFilter,
+  ])
 
   const heroPriceRange = useMemo(
     () => ({
@@ -41,53 +158,208 @@ export default function BuyPage() {
     [minPrice, maxPrice],
   )
 
-  const handleHeroSearch = useCallback((filters: HeroFilters) => {
-    setSearchTerm(filters.searchTerm)
-    setSelectedPropertyType(filters.propertyType)
-    setMinPrice(filters.priceRange.min != null ? String(filters.priceRange.min) : "")
-    setMaxPrice(filters.priceRange.max != null ? String(filters.priceRange.max) : "")
-    setCurrentPage(1)
+  const updateQuery = useCallback(
+    (overrides: Partial<QueryValues>) => {
+      const nextValues: QueryValues = {
+        searchTerm,
+        propertyType: selectedPropertyType,
+        minPrice,
+        maxPrice,
+        bedrooms: selectedBedrooms,
+        location: locationFilter,
+        page: currentPage,
+        ...overrides,
+      }
+
+      const params = new URLSearchParams()
+
+      if (nextValues.searchTerm) {
+        params.set("search", nextValues.searchTerm)
+      }
+
+      if (nextValues.propertyType) {
+        params.set("type", nextValues.propertyType)
+      }
+
+      if (nextValues.minPrice) {
+        params.set("minPrice", nextValues.minPrice)
+      }
+
+      if (nextValues.maxPrice) {
+        params.set("maxPrice", nextValues.maxPrice)
+      }
+
+      if (nextValues.bedrooms) {
+        params.set("bedrooms", nextValues.bedrooms)
+      }
+
+      if (nextValues.location) {
+        params.set("lat", nextValues.location.lat.toFixed(6))
+        params.set("lng", nextValues.location.lng.toFixed(6))
+        params.set("radius", nextValues.location.radiusKm.toString())
+        if (nextValues.location.label) {
+          params.set("label", nextValues.location.label)
+        }
+      }
+
+      if (nextValues.page > 1) {
+        params.set("page", nextValues.page.toString())
+      }
+
+      const queryString = params.toString()
+      router.replace(`/buy${queryString ? `?${queryString}` : ""}`, { scroll: false })
+    },
+    [
+      router,
+      searchTerm,
+      selectedPropertyType,
+      minPrice,
+      maxPrice,
+      selectedBedrooms,
+      locationFilter,
+      currentPage,
+    ],
+  )
+
+  const scrollToResults = useCallback(() => {
+    if (typeof window === "undefined") return
+    const element = document.getElementById("property-listings")
+    element?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [])
 
-  const handleSearchTermChange = useCallback((value: string) => {
-    setSearchTerm(value)
-    setCurrentPage(1)
-  }, [])
+  const handleHeroSearch = useCallback(
+    (filters: HeroFilters) => {
+      const trimmedSearch = filters.searchTerm.trim()
+      const minValue = filters.priceRange.min != null ? String(filters.priceRange.min) : ""
+      const maxValue = filters.priceRange.max != null ? String(filters.priceRange.max) : ""
 
-  const handlePropertyTypeChange = useCallback((propertyType: string | null) => {
-    setSelectedPropertyType(propertyType)
-    setCurrentPage(1)
-  }, [])
+      setSearchTerm(trimmedSearch)
+      setSelectedPropertyType(filters.propertyType)
+      setMinPrice(minValue)
+      setMaxPrice(maxValue)
+      setCurrentPage(1)
 
-  const handleBedroomFilter = useCallback((bedrooms: string) => {
-    setSelectedBedrooms((previous) => (previous === bedrooms ? null : bedrooms))
-    setCurrentPage(1)
-  }, [])
+      updateQuery({
+        searchTerm: trimmedSearch,
+        propertyType: filters.propertyType,
+        minPrice: minValue,
+        maxPrice: maxValue,
+        page: 1,
+        location: filters.location ?? locationFilter,
+      })
 
-  const handlePriceRangeChange = useCallback((type: "min" | "max", value: string) => {
-    if (type === "min") {
-      setMinPrice(value)
-    } else {
-      setMaxPrice(value)
-    }
-    setCurrentPage(1)
-  }, [])
+      scrollToResults()
+    },
+    [locationFilter, scrollToResults, updateQuery],
+  )
+
+  const handleSearchTermChange = useCallback(
+    (value: string) => {
+      const sanitized = value.trim()
+      setSearchTerm(sanitized)
+      setCurrentPage(1)
+      updateQuery({ searchTerm: sanitized, page: 1 })
+    },
+    [updateQuery],
+  )
+
+  const handlePropertyTypeChange = useCallback(
+    (propertyType: string | null) => {
+      setSelectedPropertyType(propertyType)
+      setCurrentPage(1)
+      updateQuery({ propertyType, page: 1 })
+    },
+    [updateQuery],
+  )
+
+  const handleBedroomFilter = useCallback(
+    (bedrooms: string) => {
+      setSelectedBedrooms((previous) => {
+        const nextValue = previous === bedrooms ? null : bedrooms
+        updateQuery({ bedrooms: nextValue, page: 1 })
+        return nextValue
+      })
+      setCurrentPage(1)
+    },
+    [updateQuery],
+  )
+
+  const handlePriceRangeChange = useCallback(
+    (type: "min" | "max", value: string) => {
+      const sanitized = value.trim()
+      if (type === "min") {
+        setMinPrice(sanitized)
+        updateQuery({ minPrice: sanitized, maxPrice, page: 1 })
+      } else {
+        setMaxPrice(sanitized)
+        updateQuery({ maxPrice: sanitized, minPrice, page: 1 })
+      }
+      setCurrentPage(1)
+    },
+    [maxPrice, minPrice, updateQuery],
+  )
 
   const handleClearFilters = useCallback(() => {
     setSelectedBedrooms(null)
     setSelectedPropertyType(null)
     setMinPrice("")
     setMaxPrice("")
+    setSearchTerm("")
+    setLocationFilter(null)
     setCurrentPage(1)
-  }, [])
+    updateQuery({
+      searchTerm: "",
+      propertyType: null,
+      minPrice: "",
+      maxPrice: "",
+      bedrooms: null,
+      location: null,
+      page: 1,
+    })
+  }, [updateQuery])
 
   const handleFiltersApplied = useCallback(() => {
     setCurrentPage(1)
+    updateQuery({ page: 1 })
+  }, [updateQuery])
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPage(page)
+      updateQuery({ page })
+    },
+    [updateQuery],
+  )
+
+  const handleLocationApplied = useCallback(
+    (value: LocationFilterValue | null) => {
+      setLocationFilter(value)
+      setCurrentPage(1)
+
+      if (value && (!searchTerm || (locationFilter && searchTerm === locationFilter.label))) {
+        setSearchTerm(value.label)
+        updateQuery({ location: value, searchTerm: value.label, page: 1 })
+        return
+      }
+
+      if (!value && locationFilter && searchTerm === locationFilter.label) {
+        setSearchTerm("")
+        updateQuery({ location: null, searchTerm: "", page: 1 })
+        return
+      }
+
+      updateQuery({ location: value, page: 1 })
+    },
+    [locationFilter, searchTerm, updateQuery],
+  )
+
+  const handleOpenLocationPicker = useCallback(() => {
+    setIsLocationPickerOpen(true)
   }, [])
 
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page)
-  }, [])
+  const handleClearLocation = useCallback(() => {
+    handleLocationApplied(null)
+  }, [handleLocationApplied])
 
   return (
     <div className={`${inter.className} bg-gray-50`}>
@@ -95,7 +367,10 @@ export default function BuyPage() {
         searchTerm={searchTerm}
         selectedPropertyType={selectedPropertyType}
         priceRange={heroPriceRange}
+        locationFilter={locationFilter}
         onSearch={handleHeroSearch}
+        onOpenLocationPicker={handleOpenLocationPicker}
+        onClearLocation={handleClearLocation}
       />
       <FeaturedProperties />
       <PropertyListings
@@ -112,8 +387,17 @@ export default function BuyPage() {
         onFiltersApplied={handleFiltersApplied}
         currentPage={currentPage}
         onPageChange={handlePageChange}
+        locationFilter={locationFilter}
+        onOpenLocationPicker={handleOpenLocationPicker}
+        onClearLocation={handleClearLocation}
       />
       <CallToAction />
+      <LocationSearchDialog
+        open={isLocationPickerOpen}
+        onOpenChange={setIsLocationPickerOpen}
+        initialValue={locationFilter}
+        onApply={handleLocationApplied}
+      />
     </div>
   )
 }
