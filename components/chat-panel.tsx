@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
+import { usePresenceStatus } from "@/hooks/use-presence-status"
 import { useToast } from "@/hooks/use-toast"
 import type {
   ChatOpenEventDetail,
@@ -95,11 +97,17 @@ interface ChatMessage {
   propertyPreview?: ChatMessagePropertyPreview
 }
 
+interface UserPresenceSummary {
+  state: "online" | "offline"
+  lastActiveAt: Date | null
+}
+
 interface UserProfileSummary {
   uid: string
   name?: string
   email?: string
   photoURL?: string
+  status?: UserPresenceSummary | null
 }
 
 interface PropertyPurchaseStatus {
@@ -107,6 +115,20 @@ interface PropertyPurchaseStatus {
   confirmedBuyerId: string | null
   buyerConfirmed: boolean
   sellerDocumentsConfirmed: boolean
+}
+
+const presenceDotClass = (isOnline: boolean) =>
+  isOnline ? "bg-emerald-500" : "bg-gray-300"
+
+const PresenceStatusRenderer = ({
+  presence,
+  children,
+}: {
+  presence?: UserPresenceSummary | null
+  children: (status: { label: string; isOnline: boolean }) => ReactNode
+}) => {
+  const status = usePresenceStatus(presence)
+  return <>{children(status)}</>
 }
 
 const createChatId = (first: string, second: string) => {
@@ -149,6 +171,42 @@ const getDisplayName = (profile?: UserProfileSummary | null) => {
 const getAvatarFallback = (profile?: UserProfileSummary | null) => {
   const base = profile?.name || profile?.email || "DM"
   return base.substring(0, 2).toUpperCase()
+}
+
+const parseFirestoreTimestamp = (value: unknown): Date | null => {
+  if (!value || typeof value !== "object") return null
+  if (
+    "toDate" in value &&
+    typeof (value as { toDate?: () => Date }).toDate === "function"
+  ) {
+    const date = (value as { toDate: () => Date }).toDate()
+    if (date instanceof Date && !Number.isNaN(date.getTime())) {
+      return date
+    }
+  }
+  return null
+}
+
+const parseUserStatusSummary = (value: unknown): UserPresenceSummary | null => {
+  if (!value || typeof value !== "object") return null
+
+  const record = value as Record<string, unknown>
+  const state =
+    record.state === "online"
+      ? "online"
+      : record.state === "offline"
+      ? "offline"
+      : undefined
+  const lastActiveAt = parseFirestoreTimestamp(record.lastActiveAt)
+
+  if (!state && !lastActiveAt) {
+    return null
+  }
+
+  return {
+    state: state ?? "offline",
+    lastActiveAt: lastActiveAt ?? null,
+  }
 }
 
 const formatThreadTime = (date?: Date | null) => {
@@ -386,6 +444,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [activeParticipantId, user?.uid])
 
   const activeProfile = activeParticipantId ? userMap[activeParticipantId] : undefined
+  const activePresence = usePresenceStatus(activeProfile?.status)
 
   useEffect(() => {
     if (!isOpen) return
@@ -844,6 +903,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               name: typeof data.name === "string" ? data.name : undefined,
               email: typeof data.email === "string" ? data.email : undefined,
               photoURL: typeof data.photoURL === "string" ? data.photoURL : undefined,
+              status: parseUserStatusSummary(data.status),
             }
           })
           setUserMap(nextMap)
@@ -1732,61 +1792,77 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             isHighlighted && !isActive && "animate-pulse",
                           )}
                         >
-                          <Avatar className="h-11 w-11 border border-slate-200">
-                            <AvatarImage src={profile?.photoURL || ""} alt={getDisplayName(profile)} />
-                            <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
-                              {getAvatarFallback(profile)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex min-w-0 flex-1 flex-col">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex flex-col">
-                                <span
-                                  className={cn(
-                                    "truncate text-sm font-semibold text-gray-900",
-                                    isHighlighted && "text-blue-700",
-                                  )}
-                                >
-                                  {getDisplayName(profile)}
-                                </span>
-                                {isPinned && (
-                                  <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-blue-500">
-                                    <Pin className="h-3 w-3 -rotate-45" /> ปักหมุดแล้ว
+                          <PresenceStatusRenderer presence={profile?.status}>
+                            {({ label, isOnline }) => (
+                              <>
+                                <div className="relative">
+                                  <Avatar className="h-11 w-11 border border-slate-200">
+                                    <AvatarImage src={profile?.photoURL || ""} alt={getDisplayName(profile)} />
+                                    <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
+                                      {getAvatarFallback(profile)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span
+                                    className={cn(
+                                      "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white transition",
+                                      presenceDotClass(isOnline),
+                                    )}
+                                    aria-hidden="true"
+                                    title={label}
+                                  />
+                                </div>
+                                <div className="flex min-w-0 flex-1 flex-col">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex flex-col">
+                                      <span
+                                        className={cn(
+                                          "truncate text-sm font-semibold text-gray-900",
+                                          isHighlighted && "text-blue-700",
+                                        )}
+                                      >
+                                        {getDisplayName(profile)}
+                                      </span>
+                                      {isPinned && (
+                                        <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-blue-500">
+                                          <Pin className="h-3 w-3 -rotate-45" /> ปักหมุดแล้ว
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="mt-0.5 text-[11px] uppercase tracking-wide text-gray-400">
+                                      {formatThreadTime(thread.updatedAt)}
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={cn(
+                                      "truncate text-xs text-gray-500",
+                                      isActive && "text-gray-600",
+                                      isHighlighted && !isActive && "font-medium text-blue-600",
+                                    )}
+                                  >
+                                    {thread.lastMessage ? `${previewPrefix}${thread.lastMessage}` : "ยังไม่มีข้อความ"}
                                   </span>
+                                </div>
+                                {user?.uid && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      handleTogglePin(chatId, !isPinned)
+                                    }}
+                                    className={cn(
+                                      "h-8 w-8 rounded-full text-gray-400 transition",
+                                      "hover:text-blue-600",
+                                      isPinned && "text-blue-600",
+                                    )}
+                                  >
+                                    {isPinned ? <Pin className="h-4 w-4 -rotate-45" /> : <PinOff className="h-4 w-4" />}
+                                  </Button>
                                 )}
-                              </div>
-                              <span className="mt-0.5 text-[11px] uppercase tracking-wide text-gray-400">
-                                {formatThreadTime(thread.updatedAt)}
-                              </span>
-                            </div>
-                            <span
-                              className={cn(
-                                "truncate text-xs text-gray-500",
-                                isActive && "text-gray-600",
-                                isHighlighted && !isActive && "font-medium text-blue-600",
-                              )}
-                            >
-                              {thread.lastMessage ? `${previewPrefix}${thread.lastMessage}` : "ยังไม่มีข้อความ"}
-                            </span>
-                          </div>
-                          {user?.uid && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                handleTogglePin(chatId, !isPinned)
-                              }}
-                              className={cn(
-                                "h-8 w-8 rounded-full text-gray-400 transition",
-                                "hover:text-blue-600",
-                                isPinned && "text-blue-600",
-                              )}
-                            >
-                              {isPinned ? <Pin className="h-4 w-4 -rotate-45" /> : <PinOff className="h-4 w-4" />}
-                            </Button>
-                          )}
+                              </>
+                            )}
+                          </PresenceStatusRenderer>
                         </button>
                       )
                     })
@@ -1820,12 +1896,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             <ArrowLeft className="h-4 w-4" />
                           </Button>
                         )}
-                        <Avatar className="h-10 w-10 border border-slate-200">
-                          <AvatarImage src={activeProfile?.photoURL || ""} alt={getDisplayName(activeProfile)} />
-                          <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
-                            {getAvatarFallback(activeProfile)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className="h-10 w-10 border border-slate-200">
+                            <AvatarImage src={activeProfile?.photoURL || ""} alt={getDisplayName(activeProfile)} />
+                            <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
+                              {getAvatarFallback(activeProfile)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span
+                            className={cn(
+                              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white transition",
+                              presenceDotClass(activePresence.isOnline),
+                            )}
+                            aria-hidden="true"
+                            title={activePresence.label}
+                          />
+                        </div>
                         <div className="flex flex-col">
                           <Link
                             href={activeParticipantId ? `/users/${activeParticipantId}` : "#"}
@@ -1834,7 +1920,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           >
                             {getDisplayName(activeProfile)}
                           </Link>
-                          <span className="text-xs text-gray-500">พูดคุยเกี่ยวกับการซื้อบ้าน</span>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                            <span
+                              className={cn(
+                                "h-2.5 w-2.5 rounded-full",
+                                presenceDotClass(activePresence.isOnline),
+                              )}
+                              aria-hidden="true"
+                            />
+                            <span>{activePresence.label}</span>
+                          </div>
+                          <span className="text-xs text-gray-400">พูดคุยเกี่ยวกับการซื้อบ้าน</span>
                         </div>
                       </div>
                       <Button

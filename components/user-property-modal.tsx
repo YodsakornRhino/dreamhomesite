@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
+import { usePresenceStatus } from "@/hooks/use-presence-status";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -266,6 +267,8 @@ export function UserPropertyModal({
       .slice(0, 2)
       .toUpperCase();
   }, [property?.sellerName, sellerProfile?.name]);
+  const { label: sellerPresenceLabel, isOnline: isSellerOnline } =
+    usePresenceStatus(sellerProfile?.status);
   const sellerListingsCount = sellerListings.length;
 
   const handleExpressInterest = useCallback(() => {
@@ -680,6 +683,16 @@ export function UserPropertyModal({
                     <p className="text-base font-semibold text-gray-900">
                       {sellerDisplayName}
                     </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          isSellerOnline ? "bg-emerald-500" : "bg-gray-300",
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span>{sellerPresenceLabel}</span>
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {sellerRoleLabel}
                     </p>

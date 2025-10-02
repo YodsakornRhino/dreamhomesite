@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useUserProperties } from "@/hooks/use-user-properties";
+import { usePresenceStatus } from "@/hooks/use-presence-status";
 import type { UserProperty } from "@/types/user-property";
 import type { PropertyPreviewOpenEventDetail } from "@/types/chat";
 
@@ -87,6 +88,9 @@ export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps
 
   const totalListings = properties.length;
 
+  const { label: profilePresenceLabel, isOnline: isProfileOnline } =
+    usePresenceStatus(profile?.status);
+
   const handleViewDetails = (property: UserProperty) => {
     setSelectedProperty(property);
   };
@@ -152,6 +156,15 @@ export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps
                     <p className="text-2xl font-semibold text-gray-900">
                       {profile.name}
                     </p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          isProfileOnline ? "bg-emerald-500" : "bg-gray-300"
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <span>{profilePresenceLabel}</span>
+                    </div>
                     {profile.email && (
                       <p className="text-sm text-gray-600">
                         อีเมล: {profile.email}

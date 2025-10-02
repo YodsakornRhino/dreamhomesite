@@ -1,3 +1,8 @@
+export interface UserStatus {
+  state: "online" | "offline";
+  lastActiveAt: string | null;
+}
+
 export interface UserProfile {
   uid: string;
   name: string;
@@ -7,4 +12,5 @@ export interface UserProfile {
   phoneVerified: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  status: UserStatus | null;
 }

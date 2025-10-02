@@ -1,6 +1,6 @@
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 
-import type { UserProfile } from "@/types/user-profile";
+import type { UserProfile, UserStatus } from "@/types/user-profile";
 
 const toStringOrNull = (value: unknown): string | null => {
   if (typeof value === "string") return value;
@@ -32,6 +32,23 @@ const toIsoStringOrNull = (value: unknown): string | null => {
   return null;
 };
 
+const toUserStatus = (value: unknown): UserStatus | null => {
+  if (!value || typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+  const state = record.state === "online" ? "online" : record.state === "offline" ? "offline" : undefined;
+  const lastActiveAt = toIsoStringOrNull(record.lastActiveAt);
+
+  if (!state && !lastActiveAt) {
+    return null;
+  }
+
+  return {
+    state: state ?? "offline",
+    lastActiveAt: lastActiveAt ?? null,
+  };
+};
+
 export const mapDocumentToUserProfile = (
   doc: QueryDocumentSnapshot<DocumentData>,
 ): UserProfile => {
@@ -46,5 +63,6 @@ export const mapDocumentToUserProfile = (
     phoneVerified: toBoolean(data.phoneVerified),
     createdAt: toIsoStringOrNull(data.createdAt),
     updatedAt: toIsoStringOrNull(data.updatedAt),
+    status: toUserStatus(data.status),
   };
 };
