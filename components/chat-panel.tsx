@@ -54,6 +54,7 @@ import {
 import { getDownloadURL, uploadFile } from "@/lib/storage"
 import { cn } from "@/lib/utils"
 import { formatPropertyPrice, TRANSACTION_LABELS } from "@/lib/property"
+import { getPresenceLabel, isPresenceOnline } from "@/lib/presence"
 
 interface ChatPanelProps {
   isOpen: boolean
@@ -95,11 +96,17 @@ interface ChatMessage {
   propertyPreview?: ChatMessagePropertyPreview
 }
 
+interface UserPresenceSummary {
+  state: "online" | "offline"
+  lastActiveAt: Date | null
+}
+
 interface UserProfileSummary {
   uid: string
   name?: string
   email?: string
   photoURL?: string
+  status?: UserPresenceSummary | null
 }
 
 interface PropertyPurchaseStatus {
@@ -150,6 +157,45 @@ const getAvatarFallback = (profile?: UserProfileSummary | null) => {
   const base = profile?.name || profile?.email || "DM"
   return base.substring(0, 2).toUpperCase()
 }
+
+const parseFirestoreTimestamp = (value: unknown): Date | null => {
+  if (!value || typeof value !== "object") return null
+  if (
+    "toDate" in value &&
+    typeof (value as { toDate?: () => Date }).toDate === "function"
+  ) {
+    const date = (value as { toDate: () => Date }).toDate()
+    if (date instanceof Date && !Number.isNaN(date.getTime())) {
+      return date
+    }
+  }
+  return null
+}
+
+const parseUserStatusSummary = (value: unknown): UserPresenceSummary | null => {
+  if (!value || typeof value !== "object") return null
+
+  const record = value as Record<string, unknown>
+  const state =
+    record.state === "online"
+      ? "online"
+      : record.state === "offline"
+      ? "offline"
+      : undefined
+  const lastActiveAt = parseFirestoreTimestamp(record.lastActiveAt)
+
+  if (!state && !lastActiveAt) {
+    return null
+  }
+
+  return {
+    state: state ?? "offline",
+    lastActiveAt: lastActiveAt ?? null,
+  }
+}
+
+const getPresenceDotClass = (status?: UserPresenceSummary | null) =>
+  isPresenceOnline(status) ? "bg-emerald-500" : "bg-gray-300"
 
 const formatThreadTime = (date?: Date | null) => {
   if (!date) return ""
@@ -844,6 +890,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               name: typeof data.name === "string" ? data.name : undefined,
               email: typeof data.email === "string" ? data.email : undefined,
               photoURL: typeof data.photoURL === "string" ? data.photoURL : undefined,
+              status: parseUserStatusSummary(data.status),
             }
           })
           setUserMap(nextMap)
@@ -1732,12 +1779,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             isHighlighted && !isActive && "animate-pulse",
                           )}
                         >
-                          <Avatar className="h-11 w-11 border border-slate-200">
-                            <AvatarImage src={profile?.photoURL || ""} alt={getDisplayName(profile)} />
-                            <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
-                              {getAvatarFallback(profile)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <div className="relative">
+                            <Avatar className="h-11 w-11 border border-slate-200">
+                              <AvatarImage src={profile?.photoURL || ""} alt={getDisplayName(profile)} />
+                              <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
+                                {getAvatarFallback(profile)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span
+                              className={cn(
+                                "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white transition",
+                                getPresenceDotClass(profile?.status),
+                              )}
+                              aria-hidden="true"
+                              title={getPresenceLabel(profile?.status)}
+                            />
+                          </div>
                           <div className="flex min-w-0 flex-1 flex-col">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex flex-col">
@@ -1820,12 +1877,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             <ArrowLeft className="h-4 w-4" />
                           </Button>
                         )}
-                        <Avatar className="h-10 w-10 border border-slate-200">
-                          <AvatarImage src={activeProfile?.photoURL || ""} alt={getDisplayName(activeProfile)} />
-                          <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
-                            {getAvatarFallback(activeProfile)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className="h-10 w-10 border border-slate-200">
+                            <AvatarImage src={activeProfile?.photoURL || ""} alt={getDisplayName(activeProfile)} />
+                            <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-600">
+                              {getAvatarFallback(activeProfile)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span
+                            className={cn(
+                              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white transition",
+                              getPresenceDotClass(activeProfile?.status),
+                            )}
+                            aria-hidden="true"
+                            title={getPresenceLabel(activeProfile?.status)}
+                          />
+                        </div>
                         <div className="flex flex-col">
                           <Link
                             href={activeParticipantId ? `/users/${activeParticipantId}` : "#"}
@@ -1834,7 +1901,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           >
                             {getDisplayName(activeProfile)}
                           </Link>
-                          <span className="text-xs text-gray-500">พูดคุยเกี่ยวกับการซื้อบ้าน</span>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                            <span
+                              className={cn(
+                                "h-2.5 w-2.5 rounded-full",
+                                getPresenceDotClass(activeProfile?.status),
+                              )}
+                              aria-hidden="true"
+                            />
+                            <span>{getPresenceLabel(activeProfile?.status)}</span>
+                          </div>
+                          <span className="text-xs text-gray-400">พูดคุยเกี่ยวกับการซื้อบ้าน</span>
                         </div>
                       </div>
                       <Button

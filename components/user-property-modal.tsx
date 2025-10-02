@@ -49,6 +49,7 @@ import {
   TRANSACTION_LABELS,
 } from "@/lib/property";
 import { cn } from "@/lib/utils";
+import { getPresenceLabel, isPresenceOnline } from "@/lib/presence";
 import type { UserProperty } from "@/types/user-property";
 import type { ChatOpenEventDetail, PropertyPreviewPayload } from "@/types/chat";
 
@@ -266,6 +267,14 @@ export function UserPropertyModal({
       .slice(0, 2)
       .toUpperCase();
   }, [property?.sellerName, sellerProfile?.name]);
+  const sellerPresenceLabel = useMemo(
+    () => getPresenceLabel(sellerProfile?.status),
+    [sellerProfile?.status],
+  );
+  const isSellerOnline = useMemo(
+    () => isPresenceOnline(sellerProfile?.status),
+    [sellerProfile?.status],
+  );
   const sellerListingsCount = sellerListings.length;
 
   const handleExpressInterest = useCallback(() => {
@@ -680,6 +689,16 @@ export function UserPropertyModal({
                     <p className="text-base font-semibold text-gray-900">
                       {sellerDisplayName}
                     </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          isSellerOnline ? "bg-emerald-500" : "bg-gray-300",
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span>{sellerPresenceLabel}</span>
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {sellerRoleLabel}
                     </p>

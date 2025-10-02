@@ -42,6 +42,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
+  const updateUserStatus = useCallback(
+    async (uid: string, state: "online" | "offline") => {
+      try {
+        const { serverTimestamp } = await import("firebase/firestore")
+        await setDocument("users", uid, {
+          status: {
+            state,
+            lastActiveAt: serverTimestamp(),
+          },
+        })
+      } catch (statusError) {
+        console.error(`Error updating user status to ${state}:`, statusError)
+      }
+    },
+    [],
+  )
+
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
 
@@ -86,83 +103,90 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // AuthContext.tsx (แทนที่เฉพาะฟังก์ชัน handleSignUp)
-const handleSignUp = async (
-  email: string,
-  password: string,
-  name: string,
-): Promise<User> => {
-  try {
-    setError(null)
-    console.log("Creating user account for:", email)
-
-    const userCredential = await createUserWithEmailAndPassword(email, password)
-    const user = userCredential.user
-    console.log("User account created successfully")
-
-    // ✅ อัปเดตชื่อบน Auth (displayName)
+  const handleSignUp = async (
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<User> => {
     try {
-      await updateProfile(user, { displayName: name })
-    } catch (e) {
-      console.error("Error updating displayName:", e)
-      // ไม่ต้อง throw เพื่อไม่ให้ signup ล้ม
-    }
+      setError(null)
+      console.log("Creating user account for:", email)
 
-    // ✅ ใช้ serverTimestamp สำหรับ createdAt/updatedAt
-    const { serverTimestamp } = await import("firebase/firestore")
-    const now = serverTimestamp()
+      const userCredential = await createUserWithEmailAndPassword(email, password)
+      const user = userCredential.user
+      console.log("User account created successfully")
 
-    // ✅ ส่งอีเมลยืนยัน (ลองก่อน หากพลาดไม่ทำให้ signup ล้ม)
-    try {
-      console.log("Attempting to send verification email...")
-      await sendVerificationEmail()
-      console.log("Verification email sent successfully")
-    } catch (verificationError) {
-      console.error("Error sending verification email:", verificationError)
-      // แจ้งเตือนได้ แต่ไม่ throw
-    }
+      // ✅ อัปเดตชื่อบน Auth (displayName)
+      try {
+        await updateProfile(user, { displayName: name })
+      } catch (e) {
+        console.error("Error updating displayName:", e)
+        // ไม่ต้อง throw เพื่อไม่ให้ signup ล้ม
+      }
 
-    // ✅ สร้าง/อัปเดตเอกสาร users/{uid} ด้วยฟิลด์ตั้งต้น
-    try {
-      await setDocument("users", user.uid, {
-        uid: user.uid,
-        name,
-        email,
-        emailVerified: user.emailVerified ?? false,
-        photoURL: user.photoURL ?? null,
-        providerId: user.providerData?.[0]?.providerId ?? "password",
-        role: "user", // ค่าเริ่มต้น ปรับได้ภายหลัง
+      // ✅ ใช้ serverTimestamp สำหรับ createdAt/updatedAt
+      const { serverTimestamp } = await import("firebase/firestore")
+      const now = serverTimestamp()
+
+      // ✅ ส่งอีเมลยืนยัน (ลองก่อน หากพลาดไม่ทำให้ signup ล้ม)
+      try {
+        console.log("Attempting to send verification email...")
+        await sendVerificationEmail()
+        console.log("Verification email sent successfully")
+      } catch (verificationError) {
+        console.error("Error sending verification email:", verificationError)
+        // แจ้งเตือนได้ แต่ไม่ throw
+      }
+
+      // ✅ สร้าง/อัปเดตเอกสาร users/{uid} ด้วยฟิลด์ตั้งต้น
+      try {
+        await setDocument("users", user.uid, {
+          uid: user.uid,
+          name,
+          email,
+          emailVerified: user.emailVerified ?? false,
+          photoURL: user.photoURL ?? null,
+          providerId: user.providerData?.[0]?.providerId ?? "password",
+          role: "user", // ค่าเริ่มต้น ปรับได้ภายหลัง
           preferences: {
             // โครงสร้างที่ “เพิ่มได้ที่หลัง”
             language: "th",
             theme: "light",
             notifications: true,
           },
-        createdAt: now,
-        updatedAt: now,
-      })
-      console.log("User data stored in Firestore")
-    } catch (firestoreError) {
-      console.error("Error storing user data:", firestoreError)
-      // ไม่ throw เพื่อไม่ให้ขั้นตอนก่อนหน้าล้ม
-    }
+          createdAt: now,
+          updatedAt: now,
+          status: {
+            state: "offline",
+            lastActiveAt: now,
+          },
+        })
+        console.log("User data stored in Firestore")
+      } catch (firestoreError) {
+        console.error("Error storing user data:", firestoreError)
+        // ไม่ throw เพื่อไม่ให้ขั้นตอนก่อนหน้าล้ม
+      }
 
-    return user
-  } catch (error) {
-    console.error("Error signing up:", error)
-    throw error
+      return user
+    } catch (error) {
+      console.error("Error signing up:", error)
+      throw error
+    }
   }
-}
 
 
   const handleSignOut = useCallback(async () => {
     try {
       setError(null)
+      if (user?.uid) {
+        await updateUserStatus(user.uid, "offline")
+      }
       await signOut()
     } catch (error) {
       console.error("Error signing out:", error)
       throw error
     }
-  }, [])
+  }, [updateUserStatus, user?.uid])
 
   const handleResetPassword = async (email: string) => {
     try {
@@ -239,6 +263,9 @@ const handleSignUp = async (
             window.location.reload()
           })
       }, INACTIVITY_LIMIT)
+      if (user?.uid) {
+        void updateUserStatus(user.uid, "online")
+      }
     }
 
     const events = [
@@ -261,7 +288,38 @@ const handleSignUp = async (
         document.removeEventListener(event, resetTimer),
       )
     }
-  }, [user, handleSignOut, toast])
+  }, [handleSignOut, toast, updateUserStatus, user])
+
+  useEffect(() => {
+    const currentUid = user?.uid
+    if (!currentUid) return
+    if (typeof window === "undefined") return
+
+    let interval: ReturnType<typeof setInterval> | undefined
+
+    const markOnline = () => updateUserStatus(currentUid, "online")
+    const markOffline = () => updateUserStatus(currentUid, "offline")
+
+    void markOnline()
+
+    interval = setInterval(() => {
+      void markOnline()
+    }, 60_000)
+
+    const handleBeforeUnload = () => {
+      void markOffline()
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      if (interval) {
+        clearInterval(interval)
+      }
+      void markOffline()
+    }
+  }, [updateUserStatus, user?.uid])
 
   // Refresh the page in all tabs when session timeout occurs
   useEffect(() => {
