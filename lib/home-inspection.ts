@@ -15,6 +15,9 @@ import type {
   HomeInspectionState,
   SellerChecklistStatus,
   BuyerChecklistStatus,
+  HomeInspectionNotification,
+  HomeInspectionNotificationAudience,
+  HomeInspectionNotificationCategory,
 } from "@/types/home-inspection"
 
 const toStringValue = (value: unknown): string => {
@@ -61,6 +64,60 @@ const isIssueStatus = (value: unknown): value is HomeInspectionIssueStatus => {
   )
 }
 
+const isNotificationAudience = (
+  value: unknown,
+): value is HomeInspectionNotificationAudience => {
+  return value === "buyer" || value === "seller" || value === "all"
+}
+
+const isNotificationCategory = (
+  value: unknown,
+): value is HomeInspectionNotificationCategory => {
+  return (
+    value === "general" ||
+    value === "schedule" ||
+    value === "checklist" ||
+    value === "issue" ||
+    value === "note"
+  )
+}
+
+const formatNotificationDate = (value: string | null | undefined): string => {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ""
+  }
+  try {
+    return new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date)
+  } catch (error) {
+    console.error("Failed to format notification date", error)
+    return ""
+  }
+}
+
+const buyerStatusLabels: Record<BuyerChecklistStatus, string> = {
+  pending: "รอตรวจ",
+  accepted: "ผ่าน",
+  "follow-up": "ขอตรวจซ้ำ",
+}
+
+const sellerStatusLabels: Record<SellerChecklistStatus, string> = {
+  scheduled: "พร้อมให้ตรวจ",
+  fixing: "ผู้ขายกำลังแก้",
+  done: "ผู้ขายยืนยันแล้ว",
+}
+
+const issueStatusLabels: Record<HomeInspectionIssueStatus, string> = {
+  pending: "รอตรวจสอบ",
+  "in-progress": "กำลังแก้ไข",
+  "buyer-review": "รอผู้ซื้อตรวจซ้ำ",
+  completed: "แก้ไขเสร็จแล้ว",
+}
+
 const mapChecklistDoc = (
   doc: QueryDocumentSnapshot<DocumentData>,
 ): HomeInspectionChecklistItem => {
@@ -99,6 +156,65 @@ const mapIssueDoc = (doc: QueryDocumentSnapshot<DocumentData>): HomeInspectionIs
     resolvedAt: toOptionalString(data.resolvedAt),
     owner: toOptionalString(data.owner),
   }
+}
+
+const mapNotificationDoc = (
+  doc: QueryDocumentSnapshot<DocumentData>,
+  role: HomeInspectionRole,
+): HomeInspectionNotification | null => {
+  const data = doc.data()
+
+  const audience = isNotificationAudience(data.audience) ? data.audience : "all"
+  if (audience !== "all" && audience !== role) {
+    return null
+  }
+
+  const category = isNotificationCategory(data.category) ? data.category : "general"
+  const createdAt = toIsoString(data.createdAt)
+
+  const readByBuyer = Boolean(data.readByBuyer)
+  const readBySeller = Boolean(data.readBySeller)
+
+  const read = role === "buyer" ? readByBuyer : readBySeller
+
+  return {
+    id: doc.id,
+    title: toStringValue(data.title),
+    message: toStringValue(data.message),
+    category,
+    audience,
+    createdAt,
+    triggeredBy: data.triggeredBy === "seller" ? "seller" : "buyer",
+    relatedId: toOptionalString(data.relatedId),
+    read,
+  }
+}
+
+const createInspectionNotification = async (
+  propertyId: string,
+  input: {
+    title: string
+    message: string
+    category: HomeInspectionNotificationCategory
+    triggeredBy: HomeInspectionRole
+    audience?: HomeInspectionNotificationAudience
+    relatedId?: string | null
+  },
+): Promise<void> => {
+  const audience = input.audience ?? "all"
+  const now = new Date().toISOString()
+
+  await addDocument(`property/${propertyId}/inspectionNotifications`, {
+    title: input.title,
+    message: input.message,
+    category: input.category,
+    audience,
+    triggeredBy: input.triggeredBy,
+    relatedId: input.relatedId ?? null,
+    createdAt: now,
+    readByBuyer: audience === "seller",
+    readBySeller: audience === "buyer",
+  })
 }
 
 const stateDefaults: HomeInspectionState = {
@@ -160,6 +276,30 @@ export const updateInspectionState = async (
   })
 
   await setDocument(`property/${propertyId}/inspection`, "state", payload)
+
+  const changes: string[] = []
+  if (Object.prototype.hasOwnProperty.call(updates, "handoverDate")) {
+    const dateLabel = formatNotificationDate(updates.handoverDate ?? null)
+    changes.push(
+      updates.handoverDate && dateLabel
+        ? `วันที่นัดหมาย: ${dateLabel}`
+        : "ยังไม่ได้ระบุวันส่งมอบ"
+    )
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "handoverNote")) {
+    const note = (updates.handoverNote ?? "").toString().trim()
+    changes.push(note ? `โน้ตเพิ่มเติม: ${note}` : "ลบโน้ตแนบไว้")
+  }
+
+  const message = changes.length > 0 ? changes.join(" • ") : "มีการอัปเดตข้อมูลการนัดหมาย"
+
+  await createInspectionNotification(propertyId, {
+    title: "อัปเดตนัดหมายส่งมอบบ้าน",
+    message,
+    category: "schedule",
+    triggeredBy: updates.lastUpdatedBy,
+  })
 }
 
 export const subscribeToInspectionChecklist = async (
@@ -187,7 +327,7 @@ export const createInspectionChecklistItem = async (
   createdBy: HomeInspectionRole,
 ): Promise<void> => {
   const now = new Date().toISOString()
-  await addDocument(`property/${propertyId}/inspectionChecklist`, {
+  const docRef = await addDocument(`property/${propertyId}/inspectionChecklist`, {
     title: input.title,
     description: input.description ?? "",
     createdBy,
@@ -196,18 +336,70 @@ export const createInspectionChecklistItem = async (
     createdAt: now,
     updatedAt: now,
   })
+
+  const details: string[] = [input.title]
+  if (input.description && input.description.trim().length > 0) {
+    details.push(`รายละเอียด: ${input.description.trim()}`)
+  }
+
+  await createInspectionNotification(propertyId, {
+    title: createdBy === "seller" ? "ผู้ขายเพิ่มรายการตรวจใหม่" : "ผู้ซื้อเพิ่มรายการตรวจใหม่",
+    message: details.join(" • "),
+    category: "checklist",
+    triggeredBy: createdBy,
+    relatedId: docRef.id,
+  })
 }
 
 export const updateInspectionChecklistItem = async (
   propertyId: string,
   itemId: string,
   updates: Partial<Pick<HomeInspectionChecklistItem, "title" | "description" | "sellerStatus" | "buyerStatus">>,
+  meta?: { updatedBy?: HomeInspectionRole; itemTitle?: string },
 ): Promise<void> => {
   const payload = filterUndefined({
     ...updates,
     updatedAt: new Date().toISOString(),
   })
   await updateDocument(`property/${propertyId}/inspectionChecklist`, itemId, payload)
+
+  const changes: string[] = []
+
+  if (
+    Object.prototype.hasOwnProperty.call(updates, "buyerStatus") &&
+    updates.buyerStatus &&
+    buyerStatusLabels[updates.buyerStatus]
+  ) {
+    changes.push(`สถานะผู้ซื้อ: ${buyerStatusLabels[updates.buyerStatus]}`)
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(updates, "sellerStatus") &&
+    updates.sellerStatus &&
+    sellerStatusLabels[updates.sellerStatus]
+  ) {
+    changes.push(`สถานะผู้ขาย: ${sellerStatusLabels[updates.sellerStatus]}`)
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "title") && updates.title) {
+    changes.push(`หัวข้อใหม่: ${updates.title}`)
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "description")) {
+    const description = (updates.description ?? "").toString().trim()
+    changes.push(description ? `รายละเอียด: ${description}` : "ลบรายละเอียดรายการ")
+  }
+
+  const message = changes.length > 0 ? changes.join(" • ") : "มีการอัปเดตรายการตรวจ"
+  const title = meta?.itemTitle ? `อัปเดตรายการตรวจ: ${meta.itemTitle}` : "อัปเดตรายการตรวจ"
+
+  await createInspectionNotification(propertyId, {
+    title,
+    message,
+    category: "checklist",
+    triggeredBy: meta?.updatedBy ?? "buyer",
+    relatedId: itemId,
+  })
 }
 
 export const subscribeToInspectionIssues = async (
@@ -241,7 +433,7 @@ export const createInspectionIssue = async (
   reportedBy: HomeInspectionRole,
 ): Promise<void> => {
   const now = new Date().toISOString()
-  await addDocument(`property/${propertyId}/inspectionIssues`, {
+  const docRef = await addDocument(`property/${propertyId}/inspectionIssues`, {
     title: input.title,
     location: input.location,
     description: input.description ?? "",
@@ -252,6 +444,34 @@ export const createInspectionIssue = async (
     expectedCompletion: input.expectedCompletion ?? null,
     resolvedAt: null,
     owner: input.owner ?? null,
+  })
+
+  const details: string[] = [
+    `หัวข้อ: ${input.title}`,
+    `ตำแหน่ง: ${input.location}`,
+  ]
+
+  if (input.description && input.description.trim().length > 0) {
+    details.push(`รายละเอียด: ${input.description.trim()}`)
+  }
+
+  if (input.expectedCompletion) {
+    const due = formatNotificationDate(input.expectedCompletion)
+    if (due) {
+      details.push(`กำหนดเสร็จ: ${due}`)
+    }
+  }
+
+  if (input.owner && input.owner.trim().length > 0) {
+    details.push(`ผู้รับผิดชอบ: ${input.owner.trim()}`)
+  }
+
+  await createInspectionNotification(propertyId, {
+    title: reportedBy === "buyer" ? "ผู้ซื้อแจ้งปัญหาใหม่" : "ผู้ขายสร้างงานแก้ไขใหม่",
+    message: details.join(" • "),
+    category: "issue",
+    triggeredBy: reportedBy,
+    relatedId: docRef.id,
   })
 }
 
@@ -267,10 +487,100 @@ export const updateInspectionIssue = async (
     resolvedAt: string | null
     owner: string | null
   }>,
+  meta?: { updatedBy?: HomeInspectionRole; issueTitle?: string },
 ): Promise<void> => {
   const payload = filterUndefined({
     ...updates,
     updatedAt: new Date().toISOString(),
   })
   await updateDocument(`property/${propertyId}/inspectionIssues`, issueId, payload)
+
+  const changes: string[] = []
+
+  if (Object.prototype.hasOwnProperty.call(updates, "status") && updates.status) {
+    const label = issueStatusLabels[updates.status]
+    changes.push(label ? `สถานะ: ${label}` : `สถานะใหม่: ${updates.status}`)
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "expectedCompletion")) {
+    const due = formatNotificationDate(updates.expectedCompletion ?? null)
+    changes.push(due ? `กำหนดเสร็จ: ${due}` : "ลบกำหนดเสร็จ")
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "resolvedAt")) {
+    const resolved = formatNotificationDate(updates.resolvedAt ?? null)
+    changes.push(resolved ? `ปิดงานเมื่อ: ${resolved}` : "ยกเลิกการปิดงาน")
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "owner")) {
+    const owner = (updates.owner ?? "").toString().trim()
+    changes.push(owner ? `ผู้รับผิดชอบ: ${owner}` : "ยังไม่ระบุผู้รับผิดชอบ")
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "title") && updates.title) {
+    changes.push(`หัวข้อใหม่: ${updates.title}`)
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "location") && updates.location) {
+    changes.push(`ตำแหน่ง: ${updates.location}`)
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "description")) {
+    const description = (updates.description ?? "").toString().trim()
+    changes.push(description ? `รายละเอียด: ${description}` : "ลบรายละเอียดงาน")
+  }
+
+  const message = changes.length > 0 ? changes.join(" • ") : "มีการอัปเดตรายการแจ้งซ่อม"
+  const title = meta?.issueTitle ? `อัปเดตงานซ่อม: ${meta.issueTitle}` : "อัปเดตงานซ่อม"
+
+  await createInspectionNotification(propertyId, {
+    title,
+    message,
+    category: "issue",
+    triggeredBy: meta?.updatedBy ?? "seller",
+    relatedId: issueId,
+  })
+}
+
+export const subscribeToInspectionNotifications = async (
+  propertyId: string,
+  role: HomeInspectionRole,
+  callback: (notifications: HomeInspectionNotification[]) => void,
+): Promise<() => void> => {
+  return subscribeToCollection(`property/${propertyId}/inspectionNotifications`, (docs) => {
+    const notifications = docs
+      .map((doc) => mapNotificationDoc(doc, role))
+      .filter((notification): notification is HomeInspectionNotification => notification !== null)
+
+    notifications.sort((a, b) => {
+      const timeA = Date.parse(a.createdAt)
+      const timeB = Date.parse(b.createdAt)
+      if (Number.isNaN(timeA) || Number.isNaN(timeB)) {
+        return 0
+      }
+      return timeB - timeA
+    })
+
+    callback(notifications)
+  })
+}
+
+export const markInspectionNotificationsRead = async (
+  propertyId: string,
+  notificationIds: string[],
+  role: HomeInspectionRole,
+): Promise<void> => {
+  if (notificationIds.length === 0) {
+    return
+  }
+
+  const field = role === "buyer" ? "readByBuyer" : "readBySeller"
+
+  await Promise.all(
+    notificationIds.map((id) =>
+      updateDocument(`property/${propertyId}/inspectionNotifications`, id, {
+        [field]: true,
+      }),
+    ),
+  )
 }

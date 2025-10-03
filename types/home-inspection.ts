@@ -40,3 +40,24 @@ export interface HomeInspectionIssue {
   resolvedAt?: string | null;
   owner?: string | null;
 }
+
+export type HomeInspectionNotificationAudience = "buyer" | "seller" | "all";
+
+export type HomeInspectionNotificationCategory =
+  | "general"
+  | "schedule"
+  | "checklist"
+  | "issue"
+  | "note";
+
+export interface HomeInspectionNotification {
+  id: string;
+  title: string;
+  message: string;
+  category: HomeInspectionNotificationCategory;
+  audience: HomeInspectionNotificationAudience;
+  createdAt: string;
+  triggeredBy: HomeInspectionRole;
+  relatedId?: string | null;
+  read: boolean;
+}

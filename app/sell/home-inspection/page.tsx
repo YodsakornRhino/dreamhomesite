@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { format, parseISO } from "date-fns"
 import {
   AlertCircle,
+  Bell,
   Calendar as CalendarIcon,
   ClipboardCheck,
   ClipboardList,
@@ -38,9 +39,11 @@ import { subscribeToDocument } from "@/lib/firestore"
 import {
   createInspectionChecklistItem,
   createInspectionIssue,
+  markInspectionNotificationsRead,
   subscribeToInspectionChecklist,
   subscribeToInspectionIssues,
   subscribeToInspectionState,
+  subscribeToInspectionNotifications,
   updateInspectionChecklistItem,
   updateInspectionIssue,
   updateInspectionState,
@@ -50,9 +53,11 @@ import type {
   HomeInspectionChecklistItem,
   HomeInspectionIssue,
   HomeInspectionIssueStatus,
+  HomeInspectionNotification,
   HomeInspectionState,
   SellerChecklistStatus,
 } from "@/types/home-inspection"
+import type { ChatOpenEventDetail } from "@/types/chat"
 import type { UserProperty } from "@/types/user-property"
 
 const sellerStatusMeta: Record<
@@ -100,6 +105,32 @@ const issueStatusOptions: { value: HomeInspectionIssueStatus; label: string }[] 
   { value: "buyer-review", label: "ส่งให้ผู้ซื้อเช็ก" },
   { value: "completed", label: "ปิดงานเรียบร้อย" },
 ]
+
+const notificationCategoryMeta: Record<
+  HomeInspectionNotification["category"],
+  { label: string; tone: string }
+> = {
+  general: {
+    label: "ทั่วไป",
+    tone: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  schedule: {
+    label: "นัดหมาย",
+    tone: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  },
+  checklist: {
+    label: "เช็คลิสต์",
+    tone: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  },
+  issue: {
+    label: "แจ้งซ่อม",
+    tone: "bg-purple-100 text-purple-700 border-purple-200",
+  },
+  note: {
+    label: "บันทึก",
+    tone: "bg-amber-100 text-amber-700 border-amber-200",
+  },
+}
 
 const safeFormatDate = (value: string) => {
   try {
@@ -161,6 +192,10 @@ export default function SellerHomeInspectionPage() {
   const [creatingIssue, setCreatingIssue] = useState(false)
 
   const [updatingIssues, setUpdatingIssues] = useState<Record<string, boolean>>({})
+
+  const [notifications, setNotifications] = useState<HomeInspectionNotification[]>([])
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -317,6 +352,43 @@ export default function SellerHomeInspectionPage() {
   }, [propertyId, toast])
 
   useEffect(() => {
+    if (!propertyId) {
+      setNotifications([])
+      setNotificationsLoading(false)
+      return
+    }
+
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    setNotificationsLoading(true)
+
+    void (async () => {
+      try {
+        unsubscribe = await subscribeToInspectionNotifications(propertyId, "seller", (items) => {
+          if (!active) return
+          setNotifications(items)
+          setNotificationsLoading(false)
+        })
+      } catch (error) {
+        console.error("Failed to subscribe notifications", error)
+        if (!active) return
+        setNotifications([])
+        setNotificationsLoading(false)
+        toast({
+          variant: "destructive",
+          title: "โหลดการแจ้งเตือนไม่สำเร็จ",
+          description: "ลองรีเฟรชหน้าหรือเชื่อมต่อใหม่อีกครั้ง",
+        })
+      }
+    })()
+
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [propertyId, toast])
+
+  useEffect(() => {
     if (stateLoading) return
     setHandoverDateInput(
       inspectionState.handoverDate ? inspectionState.handoverDate.slice(0, 10) : "",
@@ -412,6 +484,19 @@ export default function SellerHomeInspectionPage() {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [inspectionState.handoverDate, issues, scheduleLabel])
 
+  const unreadNotifications = useMemo(
+    () => notifications.filter((notification) => !notification.read),
+    [notifications],
+  )
+
+  useEffect(() => {
+    if (!notificationsOpen || !propertyId) return
+    const unreadIds = unreadNotifications.map((item) => item.id)
+    if (unreadIds.length === 0) return
+
+    void markInspectionNotificationsRead(propertyId, unreadIds, "seller")
+  }, [notificationsOpen, propertyId, unreadNotifications])
+
   const handleSaveSchedule = async () => {
     if (!propertyId) return
     if (!handoverDateInput) {
@@ -445,6 +530,29 @@ export default function SellerHomeInspectionPage() {
     } finally {
       setSavingSchedule(false)
     }
+  }
+
+  const handleOpenChatPanel = () => {
+    if (typeof window === "undefined") return
+
+    const detail: ChatOpenEventDetail = property
+      ? {
+          participantId: property.confirmedBuyerId || undefined,
+          propertyPreview: {
+            propertyId: property.id,
+            ownerUid: property.userUid,
+            title: property.title,
+            price: property.price,
+            transactionType: property.transactionType,
+            thumbnailUrl: property.photos?.[0] ?? undefined,
+            address: property.address || undefined,
+            city: property.city || undefined,
+            province: property.province || undefined,
+          },
+        }
+      : {}
+
+    window.dispatchEvent(new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", { detail }))
   }
 
   const handleAddChecklistItem = async () => {
@@ -489,7 +597,13 @@ export default function SellerHomeInspectionPage() {
   const handleSellerStatusChange = async (id: string, status: SellerChecklistStatus) => {
     if (!propertyId) return
     try {
-      await updateInspectionChecklistItem(propertyId, id, { sellerStatus: status })
+      const item = checklistItems.find((entry) => entry.id === id)
+      await updateInspectionChecklistItem(
+        propertyId,
+        id,
+        { sellerStatus: status },
+        { updatedBy: "seller", itemTitle: item?.title },
+      )
     } catch (error) {
       console.error("Failed to update seller status", error)
       toast({
@@ -504,10 +618,12 @@ export default function SellerHomeInspectionPage() {
     if (!propertyId) return
     setUpdatingIssues((prev) => ({ ...prev, [id]: true }))
     try {
+      const issue = issues.find((entry) => entry.id === id)
       await updateInspectionIssue(propertyId, id, {
         status,
         resolvedAt: status === "completed" ? new Date().toISOString() : null,
-      })
+      },
+      { updatedBy: "seller", issueTitle: issue?.title })
     } catch (error) {
       console.error("Failed to update issue status", error)
       toast({
@@ -528,9 +644,11 @@ export default function SellerHomeInspectionPage() {
     if (!propertyId) return
     setUpdatingIssues((prev) => ({ ...prev, [id]: true }))
     try {
+      const issue = issues.find((entry) => entry.id === id)
       await updateInspectionIssue(propertyId, id, {
         expectedCompletion: value ? `${value}T09:00:00` : null,
-      })
+      },
+      { updatedBy: "seller", issueTitle: issue?.title })
     } catch (error) {
       console.error("Failed to update issue due date", error)
       toast({
@@ -551,9 +669,11 @@ export default function SellerHomeInspectionPage() {
     if (!propertyId) return
     setUpdatingIssues((prev) => ({ ...prev, [id]: true }))
     try {
+      const issue = issues.find((entry) => entry.id === id)
       await updateInspectionIssue(propertyId, id, {
         owner: value.trim() || null,
-      })
+      },
+      { updatedBy: "seller", issueTitle: issue?.title })
     } catch (error) {
       console.error("Failed to update issue owner", error)
       toast({
@@ -693,6 +813,28 @@ export default function SellerHomeInspectionPage() {
               <div className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-xs font-medium text-slate-600">
                 <Home className="h-4 w-4 text-indigo-500" />
                 {property.title}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button
+                  onClick={handleOpenChatPanel}
+                  variant="outline"
+                  className="flex items-center gap-2 rounded-full border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                >
+                  <MessageCircle className="h-4 w-4" /> เปิดข้อความ
+                </Button>
+                <Button
+                  onClick={() => setNotificationsOpen(true)}
+                  variant="outline"
+                  disabled={notificationsLoading && notifications.length === 0}
+                  className="relative flex items-center gap-2 rounded-full border-amber-200 text-amber-700 hover:bg-amber-50"
+                >
+                  <Bell className="h-4 w-4" /> การแจ้งเตือน
+                  {unreadNotifications.length > 0 && (
+                    <span className="absolute -right-2 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
+                      {unreadNotifications.length > 99 ? "99+" : unreadNotifications.length}
+                    </span>
+                  )}
+                </Button>
               </div>
             </div>
             <Card className="w-full max-w-sm border border-slate-200 bg-slate-900 text-slate-50 shadow-lg">
@@ -1093,6 +1235,58 @@ export default function SellerHomeInspectionPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+              <Bell className="h-5 w-5 text-amber-500" />
+              การแจ้งเตือนทั้งหมด
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto py-2">
+            {notificationsLoading ? (
+              <div className="flex items-center justify-center py-8 text-sm text-slate-500">
+                กำลังโหลดการแจ้งเตือน...
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">
+                ยังไม่มีการแจ้งเตือนจากระบบ
+              </div>
+            ) : (
+              notifications.map((notification) => {
+                const categoryMeta = notificationCategoryMeta[notification.category]
+                return (
+                  <div
+                    key={notification.id}
+                    className={`rounded-2xl border p-4 shadow-sm transition ${
+                      notification.read
+                        ? "border-slate-200 bg-white"
+                        : "border-amber-200 bg-amber-50/70"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                        <p className="text-sm text-slate-600">{notification.message}</p>
+                        <p className="text-xs text-slate-400">
+                          {safeFormatDateTime(notification.createdAt)} • {" "}
+                          {notification.triggeredBy === "buyer" ? "ผู้ซื้อ" : "ผู้ขาย"}
+                        </p>
+                      </div>
+                      <Badge
+                        className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${categoryMeta.tone}`}
+                      >
+                        {categoryMeta.label}
+                      </Badge>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
         <DialogContent className="max-w-lg">
