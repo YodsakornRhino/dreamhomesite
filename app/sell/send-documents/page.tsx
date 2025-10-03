@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { CheckCircle2, ClipboardList, FileText, NotebookPen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -204,6 +205,23 @@ export default function SellerSendDocumentsPage() {
     }
   }
 
+  const handleGoToHandover = () => {
+    if (!remoteConfirmed) {
+      toast({
+        variant: "destructive",
+        title: "กรุณายืนยันการตรวจสอบเอกสารก่อน",
+        description: "กรุณาตรวจสอบและยืนยันเอกสารบังคับให้ครบ เพื่อปลดล็อกขั้นตอนกำหนดวันส่งมอบบ้าน",
+      })
+      return
+    }
+
+    const targetPath = propertyId
+      ? `/sell/home-inspection?propertyId=${propertyId}`
+      : "/sell/home-inspection"
+
+    router.push(targetPath)
+  }
+
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/")
@@ -346,6 +364,22 @@ export default function SellerSendDocumentsPage() {
             >
               {remoteConfirmed ? "ยืนยันแล้ว" : "ยืนยันการตรวจสอบเอกสาร"}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoToHandover}
+              className="border-violet-200 text-violet-700 hover:bg-violet-50"
+            >
+              ไปขั้นตอนนัดหมายส่งมอบบ้าน
+            </Button>
+            {remoteConfirmed && propertyId && (
+              <Link
+                href={`/sell/home-inspection?propertyId=${propertyId}`}
+                className="text-xs text-violet-600 underline"
+              >
+                แชร์ลิงก์ให้ผู้ซื้อร่วมตรวจบ้าน
+              </Link>
+            )}
           </div>
         </div>
       </div>
