@@ -5,12 +5,18 @@ import Image from "next/image"
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import { Inter } from "next/font/google"
 import {
+  Bath,
+  Bed,
+  Car,
+  LocateFixed,
+  MapPin,
+  PartyPopper,
+  Share2,
   Upload,
   Video,
   Camera,
-  MapPin,
-  LocateFixed,
   Trash2,
+  type LucideIcon,
 } from "lucide-react"
 
 import SellAuthPrompt from "@/components/sell-auth-prompt"
@@ -18,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -28,6 +35,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useAuthContext } from "@/contexts/AuthContext"
+import { PropertySharePanel } from "@/components/property-share-panel"
+import { PropertyShareModal } from "@/components/property-share-modal"
 import {
   addDocument,
   getDocument,
@@ -41,6 +50,11 @@ import {
   deleteFile,
   extractStoragePathFromUrl,
 } from "@/lib/storage"
+import {
+  formatPropertyPrice,
+  PROPERTY_TYPE_LABELS,
+  TRANSACTION_LABELS,
+} from "@/lib/property"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
 import type { UserProperty } from "@/types/user-property"
 
@@ -115,8 +129,46 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
   const [submitting, setSubmitting] = useState(false)
   const [propertyLoading, setPropertyLoading] = useState(false)
   const [propertyError, setPropertyError] = useState<string | null>(null)
+  const [createdProperty, setCreatedProperty] = useState<UserProperty | null>(null)
   const initialDataLoadedRef = useRef(false)
   const initialCreatedAtRef = useRef<string>("")
+
+  const resetForm = () => {
+    setSellerName("")
+    setSellerPhone("")
+    setSellerEmail("")
+    setSellerRole("")
+    setTitle("")
+    setPropertyType("")
+    setTransactionType("")
+    setPrice("")
+    setAddress("")
+    setCity("")
+    setProvince("")
+    setPostal("")
+    setLatlng({ lat: null, lng: null })
+    setLandArea("")
+    setUsableArea("")
+    setBedrooms("")
+    setBathrooms("")
+    setParking("")
+    setYearBuilt("")
+    setDescription("")
+    setPhotos([])
+    setExistingPhotoUrls([])
+    setVideo(null)
+    setExistingVideoUrl(null)
+    setPhotoPreviews([])
+    setVideoPreview(null)
+    setRemovedPhotoPaths([])
+    setRemovedVideoPath(null)
+    setErrors({})
+    setTouched({})
+    initialCreatedAtRef.current = ""
+    if (searchRef.current) searchRef.current.value = ""
+    if (photoInputRef.current) photoInputRef.current.value = ""
+    if (videoInputRef.current) videoInputRef.current.value = ""
+  }
 
   const touch = (name: string) =>
     setTouched((t) => ({
@@ -518,7 +570,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
       await ensureUserDocExists()
 
 
-      const propertyBase = {
+      const propertyPayload = {
         userUid: user.uid,
         userRef: ownerRef,
         sellerName,
@@ -549,7 +601,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
         const docRef = await addDocument(
           `users/${user.uid}/user_property`,
           {
-            ...propertyBase,
+            ...propertyPayload,
             photos: [] as string[],
             video: null as string | null,
             isUnderPurchase: false,
@@ -583,7 +635,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
         })
 
         await setDocument("property", newPropertyId, {
-          ...propertyBase,
+          ...propertyPayload,
           userUid: user.uid,
           photos: photoUrls,
           video: videoUrl,
@@ -594,7 +646,21 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
           createdAt,
         })
 
-        alert("บันทึกเรียบร้อย!")
+        const { userRef: _userRef, ...propertyDataWithoutRef } = propertyPayload
+
+        const newProperty: UserProperty = {
+          id: newPropertyId,
+          ...propertyDataWithoutRef,
+          photos: photoUrls,
+          video: videoUrl,
+          createdAt,
+          isUnderPurchase: false,
+          confirmedBuyerId: null,
+          buyerConfirmed: false,
+          sellerDocumentsConfirmed: false,
+        }
+
+        setCreatedProperty(newProperty)
       } else if (mode === "edit" && propertyId) {
         const createdAt =
           initialCreatedAtRef.current || new Date().toISOString()
@@ -619,14 +685,14 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
         }
 
         await setDocument(`users/${user.uid}/user_property`, propertyId, {
-          ...propertyBase,
+          ...propertyPayload,
           photos: finalPhotoUrls,
           video: finalVideoUrl,
           createdAt,
         })
 
         await setDocument("property", propertyId, {
-          ...propertyBase,
+          ...propertyPayload,
           photos: finalPhotoUrls,
           video: finalVideoUrl,
           createdAt,
@@ -664,6 +730,11 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
     }
   }
 
+  const handleStartNewListing = () => {
+    resetForm()
+    setCreatedProperty(null)
+  }
+
   const showErr = (key: string) => touched[key] && errors[key]
   const inputErrClass = (key: string) =>
     showErr(key) ? "border-red-500 focus-visible:ring-red-500" : ""
@@ -690,6 +761,15 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
 
   if (loading) return null
   if (!user) return <SellAuthPrompt />
+
+  if (createdProperty) {
+    return (
+      <SellPropertySuccess
+        property={createdProperty}
+        onCreateAnother={handleStartNewListing}
+      />
+    )
+  }
 
   if (mode === "edit" && propertyLoading) {
     return (
@@ -1278,6 +1358,211 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+interface SellPropertySuccessProps {
+  property: UserProperty
+  onCreateAnother: () => void
+}
+
+function SellPropertySuccess({
+  property,
+  onCreateAnother,
+}: SellPropertySuccessProps) {
+  const [shareOpen, setShareOpen] = useState(false)
+
+  useEffect(() => {
+    setShareOpen(false)
+  }, [property.id])
+
+  const priceLabel = useMemo(
+    () => formatPropertyPrice(property.price, property.transactionType),
+    [property.price, property.transactionType],
+  )
+
+  const transactionLabel =
+    TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
+  const propertyTypeLabel =
+    PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType
+
+  const locationLine = useMemo(
+    () =>
+      [property.address, property.city, property.province]
+        .map((value) => value?.trim())
+        .filter(Boolean)
+        .join(", "),
+    [property.address, property.city, property.province],
+  )
+
+  const listingHref = useMemo(
+    () =>
+      property.userUid
+        ? `/users/${property.userUid}?propertyId=${property.id}`
+        : "/sell",
+    [property.id, property.userUid],
+  )
+
+  const primaryImage = property.photos?.[0] ?? null
+
+  const featureItems = useMemo(
+    () => {
+      const items: {
+        key: string
+        label: string
+        value: string
+        icon: LucideIcon
+      }[] = [
+        {
+          key: "bedrooms",
+          label: "ห้องนอน",
+          value: property.bedrooms || "-",
+          icon: Bed,
+        },
+        {
+          key: "bathrooms",
+          label: "ห้องน้ำ",
+          value: property.bathrooms || "-",
+          icon: Bath,
+        },
+        {
+          key: "usableArea",
+          label: "พื้นที่ใช้สอย",
+          value: property.usableArea || property.landArea || "-",
+          icon: Ruler,
+        },
+      ]
+
+      if (property.parking) {
+        items.push({
+          key: "parking",
+          label: "ที่จอดรถ",
+          value: property.parking,
+          icon: Car,
+        })
+      }
+
+      return items
+    },
+    [property.bathrooms, property.bedrooms, property.landArea, property.parking, property.usableArea],
+  )
+
+  return (
+    <>
+      <div className={`${inter.className} min-h-screen bg-gradient-to-b from-gray-50 to-white`}> 
+        <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10">
+          <div className="rounded-3xl border border-emerald-200 bg-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <PartyPopper className="h-8 w-8" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold text-gray-900 sm:text-3xl">
+              ลงประกาศของคุณสำเร็จแล้ว!
+            </h1>
+            <p className="mt-2 text-sm text-gray-600 sm:text-base">
+              ประกาศถูกเผยแพร่เรียบร้อย แชร์ประกาศเพื่อให้ผู้ซื้อเห็นมากขึ้น
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+            <div className="grid grid-cols-1 gap-0 md:grid-cols-[1.2fr_1fr]">
+              <div className="relative h-60 w-full bg-gray-100 md:h-full">
+                {primaryImage ? (
+                  <Image
+                    src={primaryImage}
+                    alt={property.title}
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 768px) 60vw, 100vw"
+                  />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gray-50 text-gray-400">
+                    <Camera className="h-10 w-10" />
+                    <p className="text-sm">ยังไม่มีรูปภาพสำหรับประกาศนี้</p>
+                  </div>
+                )}
+                <Badge className="absolute left-5 top-5 bg-emerald-500 text-white hover:bg-emerald-500">
+                  เผยแพร่แล้ว
+                </Badge>
+              </div>
+
+              <div className="space-y-6 p-6 sm:p-8">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-blue-600 text-white hover:bg-blue-600">
+                      {transactionLabel}
+                    </Badge>
+                    <Badge variant="outline">{propertyTypeLabel}</Badge>
+                  </div>
+                  <h2 className="text-2xl font-semibold text-gray-900 sm:text-3xl">
+                    {property.title}
+                  </h2>
+                  {locationLine && (
+                    <p className="flex items-center gap-2 text-sm text-gray-600">
+                      <MapPin className="h-4 w-4 text-blue-500" />
+                      {locationLine}
+                    </p>
+                  )}
+                </div>
+
+                <p className="text-3xl font-bold text-blue-600 sm:text-4xl">
+                  {priceLabel}
+                </p>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {featureItems.map(({ key, label, value, icon: Icon }) => (
+                    <div
+                      key={key}
+                      className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50/60 p-3"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">{label}</p>
+                        <p className="text-sm font-semibold text-gray-900">{value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    asChild
+                    className="bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <Link href={listingHref}>ดูประกาศของฉัน</Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => setShareOpen(true)}
+                  >
+                    <Share2 className="h-4 w-4" />
+                    แชร์ประกาศ
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="gap-2 text-gray-600 hover:text-gray-900"
+                    onClick={onCreateAnother}
+                  >
+                    ลงประกาศใหม่อีกครั้ง
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <PropertySharePanel property={property} />
+        </div>
+      </div>
+      <PropertyShareModal
+        open={shareOpen}
+        property={property}
+        onOpenChange={setShareOpen}
+      />
+    </>
   )
 }
 

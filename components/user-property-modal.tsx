@@ -23,6 +23,7 @@ import {
   Phone,
   Mail,
   Ruler,
+  Share2,
   Square,
   Video,
 } from "lucide-react";
@@ -52,6 +53,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { UserProperty } from "@/types/user-property";
 import type { ChatOpenEventDetail, PropertyPreviewPayload } from "@/types/chat";
+import { PropertyShareModal } from "@/components/property-share-modal";
 
 interface UserPropertyModalProps {
   open: boolean;
@@ -72,6 +74,7 @@ export function UserPropertyModal({
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [hasSentInterest, setHasSentInterest] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const userUid = property?.userUid?.trim() ? property.userUid : null;
   const sellerProfileHref = userUid ? `/users/${userUid}` : null;
@@ -89,6 +92,10 @@ export function UserPropertyModal({
   useEffect(() => {
     setActiveMediaIndex(0);
     setHasSentInterest(false);
+  }, [property?.id]);
+
+  useEffect(() => {
+    setShareOpen(false);
   }, [property?.id]);
 
   const mediaItems = useMemo(() => {
@@ -416,8 +423,9 @@ export function UserPropertyModal({
       : null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-full max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:max-w-3xl sm:max-h-[90vh] sm:p-6 md:max-w-5xl lg:max-w-6xl lg:p-8 xl:max-w-7xl">
         <DialogHeader className="space-y-4">
           <div className="space-y-2">
             <DialogTitle className="text-xl font-bold text-gray-900 sm:text-2xl">
@@ -734,6 +742,18 @@ export function UserPropertyModal({
                   )}
                 </div>
 
+                {property?.id && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-center gap-2"
+                    onClick={() => setShareOpen(true)}
+                  >
+                    <Share2 className="h-4 w-4" />
+                    แชร์ประกาศนี้
+                  </Button>
+                )}
+
                 {property.userUid && (
                   <Button
                     className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700"
@@ -781,7 +801,13 @@ export function UserPropertyModal({
             <p className="text-sm text-muted-foreground">กำลังโหลดรายละเอียดล่าสุด...</p>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <PropertyShareModal
+        open={shareOpen && Boolean(property)}
+        property={property}
+        onOpenChange={setShareOpen}
+      />
+    </>
   );
 }
