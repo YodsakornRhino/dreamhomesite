@@ -8,6 +8,7 @@ import {
   Bath,
   Bed,
   Car,
+  Ruler,
   LocateFixed,
   MapPin,
   PartyPopper,
