@@ -7,6 +7,7 @@ export const PROPERTY_TYPE_LABELS: Record<string, string> = {
   house: "บ้าน",
   condo: "คอนโด",
   land: "ที่ดิน",
+  apartment: "อพาร์ตเมนต์",
 }
 
 export const SELLER_ROLE_LABELS: Record<string, string> = {

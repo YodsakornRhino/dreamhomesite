@@ -1,34 +1,230 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Grid, List, ChevronLeft, ChevronRight } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ChevronLeft, ChevronRight, Grid, List, Search as SearchIcon } from "lucide-react"
 
+import { PROPERTY_TYPE_LABELS } from "@/lib/property"
 import { useAllUserProperties } from "@/hooks/use-all-user-properties"
 import type { UserProperty } from "@/types/user-property"
+import { CURRENT_LOCATION_LABEL, type LocationFilterValue } from "@/types/location-filter"
 
 import MobileFilterDrawer from "./mobile-filter-drawer"
 import { UserPropertyCard } from "./user-property-card"
 import { UserPropertyModal } from "./user-property-modal"
 
-const BEDROOM_OPTIONS = ["1+", "2+", "3+", "4+"]
+const BEDROOM_OPTIONS = ["1+", "2+", "3+", "4+"] as const
 
-export default function PropertyListings() {
+type SortOption = "newest" | "price-asc" | "price-desc" | "area-desc"
+
+type PriceChangeType = "min" | "max"
+
+interface PropertyListingsProps {
+  searchTerm: string
+  onSearchTermChange: (value: string) => void
+  selectedPropertyType: string | null
+  onPropertyTypeChange: (value: string | null) => void
+  minPrice: string
+  maxPrice: string
+  onPriceRangeChange: (type: PriceChangeType, value: string) => void
+  selectedBedrooms: string | null
+  onBedroomFilter: (bedrooms: string) => void
+  onClearFilters: () => void
+  onFiltersApplied?: () => void
+  currentPage: number
+  onPageChange: (page: number) => void
+  itemsPerPage?: number
+  locationFilter: LocationFilterValue | null
+  onOpenLocationPicker: () => void
+  onClearLocation: () => void
+  onUseCurrentLocation: () => void
+  isLocatingCurrentLocation: boolean
+  locationError?: string | null
+}
+
+const parseNumericInput = (value: string): number | null => {
+  if (!value) return null
+  const numericValue = Number(value.replace(/,/g, ""))
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+const parseBedrooms = (value: string | null): number | null => {
+  if (!value) return null
+  const numericValue = parseInt(value, 10)
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+const parseArea = (value: string): number | null => {
+  if (!value) return null
+  const numericValue = Number(value.replace(/[^0-9.]/g, ""))
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+interface Coordinates {
+  lat: number
+  lng: number
+}
+
+const EARTH_RADIUS_KM = 6371
+
+const toRadians = (degrees: number) => (degrees * Math.PI) / 180
+
+const calculateDistanceKm = (origin: Coordinates, target: Coordinates) => {
+  const dLat = toRadians(target.lat - origin.lat)
+  const dLng = toRadians(target.lng - origin.lng)
+  const lat1 = toRadians(origin.lat)
+  const lat2 = toRadians(target.lat)
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return EARTH_RADIUS_KM * c
+}
+
+const propertyTypeOptions = Object.entries(PROPERTY_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}))
+
+const buildPageRange = (current: number, total: number) => {
+  const visiblePages = 5
+  let start = Math.max(1, current - Math.floor(visiblePages / 2))
+  let end = Math.min(total, start + visiblePages - 1)
+
+  if (end - start + 1 < visiblePages) {
+    start = Math.max(1, end - visiblePages + 1)
+  }
+
+  const pages: number[] = []
+  for (let page = start; page <= end; page += 1) {
+    pages.push(page)
+  }
+  return pages
+}
+
+export default function PropertyListings({
+  searchTerm,
+  onSearchTermChange,
+  selectedPropertyType,
+  onPropertyTypeChange,
+  minPrice,
+  maxPrice,
+  onPriceRangeChange,
+  selectedBedrooms,
+  onBedroomFilter,
+  onClearFilters,
+  onFiltersApplied,
+  currentPage,
+  onPageChange,
+  itemsPerPage = 6,
+  locationFilter,
+  onOpenLocationPicker,
+  onClearLocation,
+  onUseCurrentLocation,
+  isLocatingCurrentLocation,
+  locationError,
+}: PropertyListingsProps) {
   const { properties, loading, error } = useAllUserProperties()
   const [selectedProperty, setSelectedProperty] = useState<UserProperty | null>(null)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [selectedBedrooms, setSelectedBedrooms] = useState<string | null>(null)
+  const [sortOption, setSortOption] = useState<SortOption>("newest")
+
+  const bedroomFilterValue = useMemo(() => parseBedrooms(selectedBedrooms), [selectedBedrooms])
 
   const filteredProperties = useMemo(() => {
-    if (!selectedBedrooms) return properties
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    const minPriceValue = parseNumericInput(minPrice)
+    const maxPriceValue = parseNumericInput(maxPrice)
 
-    const minBedrooms = parseInt(selectedBedrooms, 10)
-    if (!Number.isFinite(minBedrooms)) return properties
+    const filtered = properties.filter((property) => {
+      if (normalizedSearch) {
+        const haystack = [property.title, property.address, property.city, property.province]
+          .map((value) => value?.toLowerCase() ?? "")
+        const matchesSearch = haystack.some((value) => value.includes(normalizedSearch))
+        if (!matchesSearch) {
+          return false
+        }
+      }
 
-    return properties.filter((property) => {
-      const numericBedrooms = Number(property.bedrooms)
-      return Number.isFinite(numericBedrooms) && numericBedrooms >= minBedrooms
+      if (locationFilter) {
+        if (property.lat == null || property.lng == null) {
+          return false
+        }
+
+        const distance = calculateDistanceKm(
+          { lat: locationFilter.lat, lng: locationFilter.lng },
+          { lat: property.lat, lng: property.lng },
+        )
+
+        if (!Number.isFinite(distance) || distance > locationFilter.radiusKm) {
+          return false
+        }
+      }
+
+      if (selectedPropertyType && property.propertyType !== selectedPropertyType) {
+        return false
+      }
+
+      if (bedroomFilterValue !== null) {
+        const numericBedrooms = Number(property.bedrooms)
+        if (!Number.isFinite(numericBedrooms) || numericBedrooms < bedroomFilterValue) {
+          return false
+        }
+      }
+
+      if (minPriceValue !== null && property.price < minPriceValue) {
+        return false
+      }
+
+      if (maxPriceValue !== null && property.price > maxPriceValue) {
+        return false
+      }
+
+      return true
     })
-  }, [properties, selectedBedrooms])
+
+    if (sortOption === "newest") {
+      return filtered
+    }
+
+    return filtered.sort((a, b) => {
+      switch (sortOption) {
+        case "price-asc":
+          return a.price - b.price
+        case "price-desc":
+          return b.price - a.price
+        case "area-desc": {
+          const areaA = parseArea(a.usableArea) ?? 0
+          const areaB = parseArea(b.usableArea) ?? 0
+          return areaB - areaA
+        }
+        default:
+          return 0
+      }
+    })
+  }, [
+    properties,
+    searchTerm,
+    selectedPropertyType,
+    bedroomFilterValue,
+    minPrice,
+    maxPrice,
+    sortOption,
+    locationFilter,
+  ])
+
+  const totalResults = filteredProperties.length
+  const totalPages = Math.max(1, Math.ceil(totalResults / itemsPerPage))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage
+  const paginatedProperties = filteredProperties.slice(startIndex, startIndex + itemsPerPage)
+  const pageNumbers = useMemo(() => buildPageRange(safeCurrentPage, totalPages), [safeCurrentPage, totalPages])
+
+  useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      onPageChange(safeCurrentPage)
+    }
+  }, [currentPage, safeCurrentPage, onPageChange])
 
   const handleViewDetails = (property: UserProperty) => {
     setSelectedProperty(property)
@@ -41,17 +237,25 @@ export default function PropertyListings() {
   }
 
   const handleApplyFilters = () => {
-    alert("ใช้ตัวกรองแล้ว! ระบบจะกรองอสังหาริมทรัพย์ตามที่คุณเลือก")
+    onFiltersApplied?.()
   }
 
   const handleBedroomFilter = (bedrooms: string) => {
-    setSelectedBedrooms(selectedBedrooms === bedrooms ? null : bedrooms)
+    onBedroomFilter(bedrooms)
+  }
+
+  const handlePropertyTypeToggle = (propertyType: string) => {
+    onPropertyTypeChange(selectedPropertyType === propertyType ? null : propertyType)
+  }
+
+  const handlePriceChange = (type: PriceChangeType, value: string) => {
+    onPriceRangeChange(type, value)
   }
 
   return (
-    <section className="bg-white py-16">
+    <section id="property-listings" className="bg-white py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col gap-8 lg:flex-row">
           {/* Filters Sidebar */}
           <div className="lg:w-1/4">
             <div className="sticky top-24 rounded-lg bg-gray-50 p-4 sm:p-6">
@@ -59,10 +263,86 @@ export default function PropertyListings() {
                 <h3 className="text-lg font-semibold text-gray-800 sm:text-xl">ตัวกรอง</h3>
                 <button
                   className="text-sm text-blue-600 hover:text-blue-700"
-                  onClick={() => setSelectedBedrooms(null)}
+                  onClick={onClearFilters}
                 >
                   ล้างทั้งหมด
                 </button>
+              </div>
+
+              {/* Location Filter */}
+              <div className="mb-4 sm:mb-6">
+                <label className="mb-2 block text-sm font-medium text-gray-700">พื้นที่การค้นหา</label>
+                {locationFilter ? (
+                  <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white sm:text-sm">
+                        {`ในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
+                      </span>
+                      {locationFilter.source === "current" ? (
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 sm:text-sm">
+                          {CURRENT_LOCATION_LABEL}
+                        </span>
+                      ) : (
+                        <span className="flex min-w-0 items-center text-left text-sm font-medium text-blue-700 sm:text-base">
+                          <span className="truncate">{locationFilter.label}</span>
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={onClearLocation}
+                        className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-700 sm:text-sm"
+                      >
+                        ล้างตำแหน่ง
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={onOpenLocationPicker}
+                        className="rounded-lg bg-white px-3 py-1 text-xs font-medium text-blue-600 shadow-sm transition hover:bg-blue-100"
+                      >
+                        ปรับตำแหน่ง
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onUseCurrentLocation}
+                        disabled={isLocatingCurrentLocation}
+                        className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
+                          isLocatingCurrentLocation
+                            ? "bg-blue-100 text-blue-400"
+                            : "border border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                        }`}
+                      >
+                        {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={onOpenLocationPicker}
+                      className="w-full rounded-lg border border-dashed border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+                    >
+                      ปักหมุดบนแผนที่เพื่อค้นหาใกล้เคียง
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onUseCurrentLocation}
+                      disabled={isLocatingCurrentLocation}
+                      className={`w-full rounded-lg border px-4 py-3 text-sm font-medium transition ${
+                        isLocatingCurrentLocation
+                          ? "border-blue-200 bg-blue-100 text-blue-400"
+                          : "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                      }`}
+                    >
+                      {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบันด้วย GPS"}
+                    </button>
+                  </div>
+                )}
+                {locationError ? (
+                  <p className="mt-2 text-xs text-red-600">{locationError}</p>
+                ) : null}
               </div>
 
               {/* Price Range */}
@@ -71,11 +351,17 @@ export default function PropertyListings() {
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="number"
+                    inputMode="numeric"
+                    value={minPrice}
+                    onChange={(event) => handlePriceChange("min", event.target.value)}
                     placeholder="ต่ำสุด"
                     className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <input
                     type="number"
+                    inputMode="numeric"
+                    value={maxPrice}
+                    onChange={(event) => handlePriceChange("max", event.target.value)}
                     placeholder="สูงสุด"
                     className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -86,14 +372,15 @@ export default function PropertyListings() {
               <div className="mb-4 sm:mb-6">
                 <label className="mb-2 block text-sm font-medium text-gray-700">ประเภทอสังหาริมทรัพย์</label>
                 <div className="space-y-2">
-                  {["บ้าน", "อพาร์ตเมนต์", "คอนโด", "ที่ดิน"].map((type) => (
-                    <label key={type} className="flex items-center">
+                  {propertyTypeOptions.map((option) => (
+                    <label key={option.value} className="flex items-center">
                       <input
                         type="checkbox"
                         className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        disabled
+                        checked={selectedPropertyType === option.value}
+                        onChange={() => handlePropertyTypeToggle(option.value)}
                       />
-                      <span className="text-sm sm:text-base">{type}</span>
+                      <span className="text-sm sm:text-base">{option.label}</span>
                     </label>
                   ))}
                 </div>
@@ -109,8 +396,8 @@ export default function PropertyListings() {
                       onClick={() => handleBedroomFilter(bedrooms)}
                       className={`px-2 sm:px-3 py-2 border rounded-lg text-sm transition-colors ${
                         selectedBedrooms === bedrooms
-                          ? "bg-blue-50 border-blue-300 text-blue-600"
-                          : "hover:bg-blue-50 hover:border-blue-300"
+                          ? "border-blue-300 bg-blue-50 text-blue-600"
+                          : "hover:border-blue-300 hover:bg-blue-50"
                       }`}
                     >
                       {bedrooms}
@@ -131,13 +418,57 @@ export default function PropertyListings() {
           {/* Listings */}
           <div className="lg:w-3/4">
             <div className="mb-6 flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-              <h2 className="text-xl font-bold text-gray-800 sm:text-2xl">อสังหาริมทรัพย์ทั้งหมด</h2>
-              <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
-                <select className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-4 sm:text-base">
-                  <option>เรียงโดย: ใหม่ล่าสุด</option>
-                  <option>ราคา: จากต่ำไปสูง</option>
-                  <option>ราคา: จากสูงไปต่ำ</option>
-                  <option>ขนาด: ใหญ่ที่สุดก่อน</option>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 sm:text-2xl">อสังหาริมทรัพย์ทั้งหมด</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {loading
+                    ? "กำลังโหลดรายการ..."
+                    : `พบ ${totalResults.toLocaleString("th-TH") || 0} รายการ`}
+                </p>
+                {locationFilter && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                    <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">
+                      ภายใน {locationFilter.radiusKm.toLocaleString()} กม.
+                    </span>
+                    {locationFilter.source === "current" ? (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 font-medium text-green-700">
+                        {CURRENT_LOCATION_LABEL}
+                      </span>
+                    ) : (
+                      <span className="flex min-w-0 items-center text-blue-600">
+                        <span className="truncate">{locationFilter.label}</span>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onClearLocation}
+                      className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 font-medium text-white transition hover:bg-red-700"
+                    >
+                      ล้างตำแหน่ง
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(event) => onSearchTermChange(event.target.value)}
+                    placeholder="ค้นหาตามชื่อหรือที่อยู่"
+                    className="w-full rounded-lg border px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-base"
+                  />
+                </div>
+                <select
+                  value={sortOption}
+                  onChange={(event) => setSortOption(event.target.value as SortOption)}
+                  className="rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-4 sm:text-base"
+                >
+                  <option value="newest">เรียงโดย: ใหม่ล่าสุด</option>
+                  <option value="price-asc">ราคา: จากต่ำไปสูง</option>
+                  <option value="price-desc">ราคา: จากสูงไปต่ำ</option>
+                  <option value="area-desc">ขนาด: ใหญ่ที่สุดก่อน</option>
                 </select>
                 <div className="flex self-start rounded-lg border sm:self-auto">
                   <button
@@ -178,7 +509,7 @@ export default function PropertyListings() {
               </div>
             ) : error ? (
               <p className="text-sm text-red-600">{error}</p>
-            ) : filteredProperties.length === 0 ? (
+            ) : totalResults === 0 ? (
               <p className="text-gray-500">ไม่พบอสังหาริมทรัพย์ที่ตรงกับการค้นหาของคุณ</p>
             ) : (
               <div
@@ -186,7 +517,7 @@ export default function PropertyListings() {
                   viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
                 }`}
               >
-                {filteredProperties.map((property) => (
+                {paginatedProperties.map((property) => (
                   <UserPropertyCard
                     key={property.id}
                     property={property}
@@ -197,19 +528,47 @@ export default function PropertyListings() {
             )}
 
             {/* Pagination */}
-            <div className="flex justify-center mt-12">
-              <div className="flex items-center space-x-2">
-                <button className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <ChevronLeft size={16} />
-                </button>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg">1</button>
-                <button className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors">2</button>
-                <button className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors">3</button>
-                <button className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <ChevronRight size={16} />
-                </button>
+            {totalResults > 0 && (
+              <div className="mt-12 flex justify-center">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => onPageChange(Math.max(1, safeCurrentPage - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className={`px-3 py-2 border rounded-lg transition-colors ${
+                      safeCurrentPage === 1 ? "cursor-not-allowed text-gray-300" : "hover:bg-gray-50"
+                    }`}
+                    aria-label="หน้าก่อนหน้า"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  {pageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => onPageChange(page)}
+                      className={`px-4 py-2 rounded-lg border transition-colors ${
+                        page === safeCurrentPage
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "hover:bg-gray-50"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => onPageChange(Math.min(totalPages, safeCurrentPage + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className={`px-3 py-2 border rounded-lg transition-colors ${
+                      safeCurrentPage === totalPages
+                        ? "cursor-not-allowed text-gray-300"
+                        : "hover:bg-gray-50"
+                    }`}
+                    aria-label="หน้าถัดไป"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -223,7 +582,22 @@ export default function PropertyListings() {
       <MobileFilterDrawer
         selectedBedrooms={selectedBedrooms}
         onBedroomFilter={handleBedroomFilter}
-        onApplyFilters={handleApplyFilters}
+        selectedPropertyType={selectedPropertyType}
+        onPropertyTypeChange={onPropertyTypeChange}
+        minPrice={minPrice}
+        maxPrice={maxPrice}
+        onPriceRangeChange={onPriceRangeChange}
+        onApplyFilters={() => {
+          handleApplyFilters()
+          onPageChange(1)
+        }}
+        onClearFilters={onClearFilters}
+        locationFilter={locationFilter}
+        onOpenLocationPicker={onOpenLocationPicker}
+        onClearLocation={onClearLocation}
+        onUseCurrentLocation={onUseCurrentLocation}
+        isLocatingCurrentLocation={isLocatingCurrentLocation}
+        locationError={locationError}
       />
     </section>
   )
