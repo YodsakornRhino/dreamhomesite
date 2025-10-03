@@ -56,6 +56,7 @@ import {
 import { getDownloadURL, uploadFile } from "@/lib/storage"
 import { cn } from "@/lib/utils"
 import { formatPropertyPrice, TRANSACTION_LABELS } from "@/lib/property"
+import { createUserNotification } from "@/lib/notifications"
 
 interface ChatPanelProps {
   isOpen: boolean
@@ -1632,6 +1633,34 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           updatedAt: serverTimestamp(),
         }),
       ])
+
+      try {
+        const senderEmail = user.email ?? ""
+        const senderName =
+          (user.displayName && user.displayName.trim().length > 0
+            ? user.displayName.trim()
+            : null) ||
+          (senderEmail && senderEmail.trim().length > 0
+            ? senderEmail.split("@")[0] ?? senderEmail
+            : null) ||
+          "ผู้ใช้ DreamHome"
+
+        const previewMessage =
+          messagePreview && messagePreview.trim().length > 0
+            ? messagePreview
+            : "ส่งข้อความใหม่"
+
+        await createUserNotification(targetUid, {
+          title: `ข้อความใหม่จาก ${senderName}`,
+          message: previewMessage,
+          category: "message",
+          relatedId: chatId,
+          actionType: "open-chat",
+          actionTarget: user.uid,
+        })
+      } catch (error) {
+        console.error("Failed to create chat notification", error)
+      }
     },
     [user?.uid],
   )

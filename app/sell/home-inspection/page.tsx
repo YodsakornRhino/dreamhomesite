@@ -54,12 +54,12 @@ import type {
   HomeInspectionIssue,
   HomeInspectionIssueStatus,
   HomeInspectionNotification,
-  HomeInspectionNotificationCountDetail,
   HomeInspectionState,
   SellerChecklistStatus,
 } from "@/types/home-inspection"
 import type { ChatOpenEventDetail } from "@/types/chat"
 import type { UserProperty } from "@/types/user-property"
+import { markUserNotificationsReadByRelated } from "@/lib/notifications"
 
 const sellerStatusMeta: Record<
   SellerChecklistStatus,
@@ -502,35 +502,6 @@ export default function SellerHomeInspectionPage() {
     () => notifications.filter((notification) => !notification.read),
     [notifications],
   )
-  const unreadNotificationCount = unreadNotifications.length
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    window.dispatchEvent(
-      new CustomEvent<HomeInspectionNotificationCountDetail>(
-        "dreamhome:inspection-notification-count",
-        {
-          detail: { count: unreadNotificationCount },
-        },
-      ),
-    )
-  }, [unreadNotificationCount])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    return () => {
-      window.dispatchEvent(
-        new CustomEvent<HomeInspectionNotificationCountDetail>(
-          "dreamhome:inspection-notification-count",
-          {
-            detail: { count: 0 },
-          },
-        ),
-      )
-    }
-  }, [])
 
   useEffect(() => {
     if (!notificationsOpen || !propertyId) return
@@ -538,7 +509,10 @@ export default function SellerHomeInspectionPage() {
     if (unreadIds.length === 0) return
 
     void markInspectionNotificationsRead(propertyId, unreadIds, "seller")
-  }, [notificationsOpen, propertyId, unreadNotifications])
+    if (user?.uid) {
+      void markUserNotificationsReadByRelated(user.uid, unreadIds)
+    }
+  }, [notificationsOpen, propertyId, unreadNotifications, user?.uid])
 
   const handleSaveSchedule = async () => {
     if (!propertyId) return

@@ -2,11 +2,13 @@ import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 
 import {
   addDocument,
+  getDocument,
   setDocument,
   subscribeToCollection,
   subscribeToDocument,
   updateDocument,
 } from "@/lib/firestore"
+import { createUserNotification } from "@/lib/notifications"
 import type {
   HomeInspectionChecklistItem,
   HomeInspectionIssue,
@@ -80,6 +82,52 @@ const isNotificationCategory = (
     value === "issue" ||
     value === "note"
   )
+}
+
+interface PropertyNotificationContext {
+  sellerUid: string | null
+  buyerUid: string | null
+  propertyTitle: string | null
+}
+
+const defaultPropertyNotificationContext: PropertyNotificationContext = {
+  sellerUid: null,
+  buyerUid: null,
+  propertyTitle: null,
+}
+
+const fetchPropertyNotificationContext = async (
+  propertyId: string,
+): Promise<PropertyNotificationContext> => {
+  try {
+    const doc = await getDocument("property", propertyId)
+    if (!doc) {
+      return defaultPropertyNotificationContext
+    }
+
+    const data = doc.data() as Record<string, unknown>
+    const sellerUid =
+      typeof data.userUid === "string" && data.userUid.trim().length > 0
+        ? data.userUid
+        : null
+    const buyerUid =
+      typeof data.confirmedBuyerId === "string" && data.confirmedBuyerId.trim().length > 0
+        ? data.confirmedBuyerId
+        : null
+    const propertyTitle =
+      typeof data.title === "string" && data.title.trim().length > 0
+        ? data.title.trim()
+        : null
+
+    return {
+      sellerUid,
+      buyerUid,
+      propertyTitle,
+    }
+  } catch (error) {
+    console.error("Failed to resolve property participants for notifications", error)
+    return defaultPropertyNotificationContext
+  }
 }
 
 const formatNotificationDate = (value: string | null | undefined): string => {
@@ -204,7 +252,7 @@ const createInspectionNotification = async (
   const audience = input.audience ?? "all"
   const now = new Date().toISOString()
 
-  await addDocument(`property/${propertyId}/inspectionNotifications`, {
+  const docRef = await addDocument(`property/${propertyId}/inspectionNotifications`, {
     title: input.title,
     message: input.message,
     category: input.category,
@@ -215,6 +263,57 @@ const createInspectionNotification = async (
     readByBuyer: audience === "seller",
     readBySeller: audience === "buyer",
   })
+
+  let contextCache: PropertyNotificationContext | null = null
+  const resolveContext = async () => {
+    if (contextCache) return contextCache
+    contextCache = await fetchPropertyNotificationContext(propertyId)
+    return contextCache
+  }
+
+  const recipients: { uid: string; role: HomeInspectionRole }[] = []
+
+  if (audience === "all" || audience === "seller") {
+    const context = await resolveContext()
+    if (context.sellerUid) {
+      recipients.push({ uid: context.sellerUid, role: "seller" })
+    }
+  }
+
+  if (audience === "all" || audience === "buyer") {
+    const context = await resolveContext()
+    if (context.buyerUid) {
+      recipients.push({ uid: context.buyerUid, role: "buyer" })
+    }
+  }
+
+  if (recipients.length > 0) {
+    const context = await resolveContext()
+    const contextLabel = context.propertyTitle
+      ? `ทรัพย์: ${context.propertyTitle}`
+      : null
+
+    try {
+      await Promise.all(
+        recipients.map((recipient) =>
+          createUserNotification(recipient.uid, {
+            title: input.title,
+            message: input.message,
+            category: "inspection",
+            context: contextLabel,
+            relatedId: docRef.id,
+            actionType: "navigate",
+            actionHref:
+              recipient.role === "buyer"
+                ? `/buy/home-inspection?propertyId=${propertyId}`
+                : `/sell/home-inspection?propertyId=${propertyId}`,
+          }),
+        ),
+      )
+    } catch (error) {
+      console.error("Failed to broadcast inspection notification to users", error)
+    }
+  }
 }
 
 const stateDefaults: HomeInspectionState = {

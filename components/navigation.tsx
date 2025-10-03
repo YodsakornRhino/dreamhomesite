@@ -1,11 +1,19 @@
 "use client"
 
 import type React from "react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Tooltip,
   TooltipTrigger,
@@ -51,12 +59,52 @@ import type {
 import type { UserProperty } from "@/types/user-property"
 import { getDocument } from "@/lib/firestore"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
-import type { HomeInspectionNotificationCountDetail } from "@/types/home-inspection"
+import { subscribeToUserNotifications, markUserNotificationsRead } from "@/lib/notifications"
+import type { UserNotification } from "@/types/notifications"
+import { cn } from "@/lib/utils"
+
+const notificationCategoryMeta: Record<
+  UserNotification["category"],
+  { label: string; tone: string }
+> = {
+  inspection: {
+    label: "การตรวจบ้าน",
+    tone: "bg-blue-100 text-blue-700 border-blue-200",
+  },
+  message: {
+    label: "ข้อความ",
+    tone: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  },
+  system: {
+    label: "ระบบ",
+    tone: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+}
+
+const formatNotificationDateTime = (value: string) => {
+  if (!value) return ""
+
+  try {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return ""
+    }
+
+    return new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date)
+  } catch (error) {
+    console.error("Failed to format notification time", error)
+    return value
+  }
+}
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
   const pathname = usePathname()
+  const router = useRouter()
 
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
@@ -70,7 +118,10 @@ const Navigation: React.FC = () => {
   const [propertyModalLoading, setPropertyModalLoading] = useState(false)
   const [propertyModalProperty, setPropertyModalProperty] = useState<UserProperty | null>(null)
   const activePropertyRequestIdRef = useRef<string | null>(null)
-  const [unreadInspectionNotifications, setUnreadInspectionNotifications] = useState(0)
+  const [userNotifications, setUserNotifications] = useState<UserNotification[]>([])
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -84,33 +135,90 @@ const Navigation: React.FC = () => {
     setIsMobileOpen(false)
   }
 
+  const handleOpenNotifications = useCallback(() => {
+    if (!user) return
+    setIsNotificationDialogOpen(true)
+  }, [user])
+
+  const handleNotificationClick = useCallback(
+    (notification: UserNotification) => {
+      if (notification.actionType === "open-chat" && notification.actionTarget) {
+        setRequestedParticipantId(notification.actionTarget)
+        setIsChatOpen(true)
+        setIsNotificationDialogOpen(false)
+        return
+      }
+
+      if (notification.actionType === "navigate" && notification.actionHref) {
+        setIsNotificationDialogOpen(false)
+        router.push(notification.actionHref)
+      }
+    },
+    [router, setIsChatOpen, setIsNotificationDialogOpen, setRequestedParticipantId],
+  )
+
+  const unreadNotifications = useMemo(
+    () => userNotifications.filter((notification) => !notification.read),
+    [userNotifications],
+  )
+
   useEffect(() => {
     if (!user) {
       setIsChatOpen(false)
       setRequestedParticipantId(null)
-      setUnreadInspectionNotifications(0)
+      setUserNotifications([])
+      setUnreadNotificationCount(0)
+      setNotificationsLoading(false)
+      setIsNotificationDialogOpen(false)
     }
   }, [user])
 
   useEffect(() => {
-    const handleInspectionNotificationCount = (event: Event) => {
-      const detail = (event as CustomEvent<HomeInspectionNotificationCountDetail>).detail
-      const count = detail?.count ?? 0
-      setUnreadInspectionNotifications(Math.max(0, Math.trunc(count)))
+    if (!user?.uid) {
+      return undefined
     }
 
-    window.addEventListener(
-      "dreamhome:inspection-notification-count",
-      handleInspectionNotificationCount,
-    )
+    let unsubNotifications: (() => void) | undefined
+    let cancelled = false
+
+    setNotificationsLoading(true)
+
+    ;(async () => {
+      try {
+        unsubNotifications = await subscribeToUserNotifications(user.uid, (items) => {
+          if (cancelled) return
+
+          setUserNotifications(items)
+          setUnreadNotificationCount(items.filter((item) => !item.read).length)
+          setNotificationsLoading(false)
+        })
+      } catch (error) {
+        console.error("Failed to subscribe user notifications", error)
+        if (cancelled) return
+        setNotificationsLoading(false)
+        toast({
+          variant: "destructive",
+          title: "โหลดการแจ้งเตือนไม่สำเร็จ",
+          description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+        })
+      }
+    })()
 
     return () => {
-      window.removeEventListener(
-        "dreamhome:inspection-notification-count",
-        handleInspectionNotificationCount,
-      )
+      cancelled = true
+      unsubNotifications?.()
     }
-  }, [])
+  }, [toast, user?.uid])
+
+  useEffect(() => {
+    if (!isNotificationDialogOpen || !user?.uid) return
+    if (unreadNotifications.length === 0) return
+
+    void markUserNotificationsRead(
+      user.uid,
+      unreadNotifications.map((notification) => notification.id),
+    )
+  }, [isNotificationDialogOpen, unreadNotifications, user?.uid])
 
   const buildPlaceholderProperty = useCallback(
     (preview: PropertyPreviewPayload, fallbackOwner?: string | null): UserProperty => {
@@ -390,15 +498,15 @@ const Navigation: React.FC = () => {
                   <Button
                     variant="ghost"
                     className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0"
-                    onClick={handleOpenInspectionNotifications}
+                    onClick={handleOpenNotifications}
                   >
                     <Bell className="h-4 w-4" />
                     <span className="sr-only">เปิดการแจ้งเตือน</span>
-                    {unreadInspectionNotifications > 0 && (
+                    {unreadNotificationCount > 0 && (
                       <span className="absolute right-0 top-0 inline-flex h-4 min-w-[16px] translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
-                        {unreadInspectionNotifications > 99
+                        {unreadNotificationCount > 99
                           ? "99+"
-                          : unreadInspectionNotifications}
+                          : unreadNotificationCount}
                       </span>
                     )}
                   </Button>
@@ -445,7 +553,7 @@ const Navigation: React.FC = () => {
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleOpenInspectionNotifications}>
+                      <DropdownMenuItem onClick={handleOpenNotifications}>
                         <Bell className="mr-2 h-4 w-4" />
                         <span>การแจ้งเตือน</span>
                       </DropdownMenuItem>
@@ -545,6 +653,88 @@ const Navigation: React.FC = () => {
           </div>
         </div>
       </nav>
+
+      <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>การแจ้งเตือนทั้งหมด</DialogTitle>
+            <DialogDescription>
+              ติดตามความเคลื่อนไหวล่าสุดจากการตรวจบ้านและการสนทนาของคุณ
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {notificationsLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={`notification-skeleton-${index}`}
+                    className="h-20 w-full animate-pulse rounded-2xl bg-slate-100"
+                  />
+                ))}
+              </div>
+            ) : userNotifications.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-500">
+                ยังไม่มีการแจ้งเตือนใหม่ในขณะนี้
+              </p>
+            ) : (
+              <div className="max-h-[60vh] overflow-y-auto pr-3">
+                <div className="space-y-3 pb-1">
+                  {userNotifications.map((notification) => {
+                    const categoryMeta = notificationCategoryMeta[notification.category]
+                    const timeLabel = formatNotificationDateTime(notification.createdAt)
+
+                    return (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => handleNotificationClick(notification)}
+                        className={cn(
+                          "w-full rounded-2xl border p-4 text-left transition-colors",
+                          notification.read
+                            ? "border-slate-200 bg-white hover:bg-slate-50"
+                            : "border-blue-200 bg-blue-50/60 hover:bg-blue-100/70",
+                          notification.actionType ? "cursor-pointer" : "cursor-default",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                              categoryMeta.tone,
+                            )}
+                          >
+                            {categoryMeta.label}
+                          </Badge>
+                          {timeLabel && (
+                            <span className="text-xs text-slate-500">{timeLabel}</span>
+                          )}
+                        </div>
+                        <div className="mt-3 space-y-1">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {notification.title}
+                          </p>
+                          <p className="text-sm text-slate-600">{notification.message}</p>
+                          {notification.context && (
+                            <p className="text-xs text-slate-500">{notification.context}</p>
+                          )}
+                        </div>
+                        {notification.actionType && (
+                          <span className="mt-3 inline-flex items-center text-xs font-medium text-blue-600">
+                            {notification.actionType === "open-chat"
+                              ? "เปิดบทสนทนา"
+                              : "ดูรายละเอียด"}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modals */}
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />

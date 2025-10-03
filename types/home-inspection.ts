@@ -62,6 +62,3 @@ export interface HomeInspectionNotification {
   read: boolean;
 }
 
-export interface HomeInspectionNotificationCountDetail {
-  count: number;
-}
