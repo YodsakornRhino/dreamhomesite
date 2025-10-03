@@ -362,10 +362,27 @@ export default function SearchPage() {
 
   const handlePageChange = useCallback(
     (page: number) => {
+      if (page === currentPage) {
+        return
+      }
+
       setCurrentPage(page)
       updateQuery({ page })
+
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          const listingsSection = document.getElementById("property-listings")
+
+          if (listingsSection) {
+            listingsSection.scrollIntoView({ behavior: "smooth", block: "start" })
+            return
+          }
+
+          window.scrollTo({ top: 0, behavior: "smooth" })
+        })
+      }
     },
-    [updateQuery],
+    [currentPage, updateQuery],
   )
 
   const handleLocationApplied = useCallback(
