@@ -272,6 +272,71 @@ const sanitizePropertyPreview = (preview: PropertyPreviewPayload) => {
   }
 }
 
+const buildPreviewFromPropertyRecord = (
+  propertyId: string,
+  record: Record<string, unknown>,
+): ChatMessagePropertyPreview | null => {
+  const ownerUid =
+    typeof record.userUid === "string" && record.userUid.trim().length > 0
+      ? record.userUid
+      : null
+
+  const title =
+    typeof record.title === "string" && record.title.trim().length > 0
+      ? record.title
+      : null
+
+  if (!ownerUid || !title) {
+    return null
+  }
+
+  let price: number | null = null
+  if (typeof record.price === "number" && Number.isFinite(record.price)) {
+    price = record.price
+  } else if (typeof record.price === "string") {
+    const parsed = Number(record.price)
+    price = Number.isFinite(parsed) ? parsed : null
+  }
+
+  const transactionType =
+    typeof record.transactionType === "string" && record.transactionType.trim().length > 0
+      ? record.transactionType
+      : null
+
+  const address =
+    typeof record.address === "string" && record.address.trim().length > 0
+      ? record.address
+      : null
+
+  const city =
+    typeof record.city === "string" && record.city.trim().length > 0 ? record.city : null
+
+  const province =
+    typeof record.province === "string" && record.province.trim().length > 0
+      ? record.province
+      : null
+
+  let thumbnailUrl: string | null = null
+  if (Array.isArray(record.photos)) {
+    const firstPhoto = record.photos.find(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
+    )
+    thumbnailUrl = firstPhoto ?? null
+  }
+
+  return sanitizePropertyPreview({
+    propertyId,
+    ownerUid,
+    title,
+    price,
+    transactionType,
+    thumbnailUrl,
+    address,
+    city,
+    province,
+  })
+}
+
 const formatPropertyPreviewSummary = (preview: PropertyPreviewPayload) => {
   const title = preview.title.trim()
   return title ? `สนใจประกาศ: ${title}` : "สนใจประกาศนี้"
@@ -318,6 +383,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     useState<string | null>(null)
   const [propertyStatusMap, setPropertyStatusMap] = useState<
     Record<string, PropertyPurchaseStatus>
+  >({})
+  const [propertyPreviewMap, setPropertyPreviewMap] = useState<
+    Record<string, ChatMessagePropertyPreview>
   >({})
   const propertySubscriptionsRef = useRef<Record<string, () => void>>({})
   const [buyerConfirmationPreview, setBuyerConfirmationPreview] =
@@ -492,6 +560,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 delete next[propertyId]
                 return next
               })
+              setPropertyPreviewMap((current) => {
+                if (!current[propertyId]) {
+                  return current
+                }
+                const { [propertyId]: _removed, ...rest } = current
+                return rest
+              })
               return
             }
 
@@ -512,6 +587,39 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 sellerDocumentsConfirmed,
               },
             }))
+
+            const preview = buildPreviewFromPropertyRecord(propertyId, record)
+            setPropertyPreviewMap((current) => {
+              if (!preview) {
+                if (!current[propertyId]) {
+                  return current
+                }
+                const { [propertyId]: _removed, ...rest } = current
+                return rest
+              }
+
+              const existing = current[propertyId]
+              if (existing) {
+                const isSame =
+                  existing.title === preview.title &&
+                  existing.price === preview.price &&
+                  existing.transactionType === preview.transactionType &&
+                  existing.thumbnailUrl === preview.thumbnailUrl &&
+                  existing.address === preview.address &&
+                  existing.city === preview.city &&
+                  existing.province === preview.province &&
+                  existing.ownerUid === preview.ownerUid
+
+                if (isSame) {
+                  return current
+                }
+              }
+
+              return {
+                ...current,
+                [propertyId]: preview,
+              }
+            })
           })
 
           if (cancelled) {
@@ -560,10 +668,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       return
     }
 
-    const preview = messages.find(
-      (message): message is ChatMessage & { propertyPreview: ChatMessagePropertyPreview } =>
-        Boolean(message.propertyPreview && message.propertyPreview.propertyId === nextPropertyId),
-    )?.propertyPreview
+    const preview =
+      messages.find(
+        (message): message is ChatMessage & { propertyPreview: ChatMessagePropertyPreview } =>
+          Boolean(message.propertyPreview && message.propertyPreview.propertyId === nextPropertyId),
+      )?.propertyPreview ?? propertyPreviewMap[nextPropertyId]
 
     if (preview) {
       lastBuyerConfirmationPropertyIdRef.current = preview.propertyId ?? nextPropertyId
@@ -573,6 +682,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     buyerConfirmationPreview?.propertyId,
     messages,
     propertyStatusMap,
+    propertyPreviewMap,
     user?.uid,
   ])
 
