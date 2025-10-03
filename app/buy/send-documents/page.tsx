@@ -182,7 +182,7 @@ export default function BuyerSendDocumentsPage() {
                             : "/buy/home-inspection"
                         }
                       >
-                        ไปหน้า Demo ตรวจรับบ้าน
+                        ไปหน้าตรวจรับบ้านจริง
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     </Button>

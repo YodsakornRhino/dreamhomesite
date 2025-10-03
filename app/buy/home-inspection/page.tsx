@@ -1,8 +1,9 @@
-"use client";
+"use client"
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
-import { format, parseISO } from "date-fns";
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { format, parseISO } from "date-fns"
 import {
   AlertCircle,
   Calendar as CalendarIcon,
@@ -15,56 +16,36 @@ import {
   ShieldCheck,
   Sparkles,
   Wrench,
-} from "lucide-react";
+} from "lucide-react"
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { useAuthContext } from "@/contexts/AuthContext"
+import { useToast } from "@/hooks/use-toast"
+import { subscribeToDocument } from "@/lib/firestore"
+import {
+  createInspectionChecklistItem,
+  createInspectionIssue,
+  subscribeToInspectionChecklist,
+  subscribeToInspectionIssues,
+  subscribeToInspectionState,
+  updateInspectionChecklistItem,
+  updateInspectionState,
+} from "@/lib/home-inspection"
+import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
+import type { HomeInspectionChecklistItem, HomeInspectionIssue, HomeInspectionState } from "@/types/home-inspection"
+import type { UserProperty } from "@/types/user-property"
 
-interface BuyerChecklistItem {
-  id: string;
-  title: string;
-  description: string;
-  sellerStatus: "scheduled" | "fixing" | "done";
-  buyerStatus: "pending" | "accepted" | "follow-up";
-  lastUpdatedAt: string;
-}
-
-type BuyerIssueStatus = "pending" | "in-progress" | "resolved";
-
-interface BuyerIssue {
-  id: string;
-  title: string;
-  location: string;
-  description: string;
-  status: BuyerIssueStatus;
-  reportedAt: string;
-  sellerOwner: string;
-  expectedCompletion?: string;
-  resolvedAt?: string;
-}
-
-const sellerStatusMeta: Record<BuyerChecklistItem["sellerStatus"], { label: string; tone: string }> = {
-  scheduled: {
-    label: "พร้อมให้ตรวจ",
-    tone: "bg-blue-100 text-blue-700 border-blue-200",
-  },
-  fixing: {
-    label: "ผู้ขายกำลังแก้",
-    tone: "bg-amber-100 text-amber-700 border-amber-200",
-  },
-  done: {
-    label: "ผู้ขายยืนยันแล้ว",
-    tone: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  },
-};
-
-const buyerStatusMeta: Record<BuyerChecklistItem["buyerStatus"], { label: string; tone: string; description: string }> = {
+const buyerStatusMeta: Record<
+  HomeInspectionChecklistItem["buyerStatus"],
+  { label: string; tone: string; description: string }
+> = {
   pending: {
     label: "รอตรวจ",
     tone: "bg-slate-100 text-slate-700 border-slate-200",
@@ -80,141 +61,328 @@ const buyerStatusMeta: Record<BuyerChecklistItem["buyerStatus"], { label: string
     tone: "bg-purple-100 text-purple-700 border-purple-200",
     description: "ต้องการให้ผู้ขายปรับปรุงเพิ่ม",
   },
-};
+}
 
-const issueStatusMeta: Record<BuyerIssueStatus, { label: string; tone: string }> = {
+const sellerStatusMeta: Record<
+  HomeInspectionChecklistItem["sellerStatus"],
+  { label: string; tone: string; description: string }
+> = {
+  scheduled: {
+    label: "พร้อมให้ตรวจ",
+    tone: "bg-blue-100 text-blue-700 border-blue-200",
+    description: "ผู้ขายระบุว่าจะเตรียมรายการนี้ให้ตรวจได้",
+  },
+  fixing: {
+    label: "ผู้ขายกำลังแก้",
+    tone: "bg-amber-100 text-amber-700 border-amber-200",
+    description: "อยู่ระหว่างปรับปรุงตามข้อสังเกต",
+  },
+  done: {
+    label: "ผู้ขายยืนยันแล้ว",
+    tone: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    description: "ผู้ขายระบุว่ารายการนี้พร้อมส่งมอบ",
+  },
+}
+
+const issueStatusMeta: Record<
+  HomeInspectionIssue["status"],
+  { label: string; tone: string; description: string }
+> = {
   pending: {
     label: "รอตรวจสอบ",
     tone: "bg-amber-100 text-amber-700 border-amber-200",
+    description: "ผู้ขายยังไม่ได้ตอบรับงานแก้ไข",
   },
   "in-progress": {
     label: "ผู้ขายกำลังแก้",
     tone: "bg-blue-100 text-blue-700 border-blue-200",
+    description: "ผู้ขายรับเรื่องแล้วและอยู่ระหว่างแก้ไข",
   },
-  resolved: {
-    label: "ตรวจแล้วเรียบร้อย",
+  "buyer-review": {
+    label: "รอตรวจซ้ำ",
+    tone: "bg-purple-100 text-purple-700 border-purple-200",
+    description: "ผู้ขายแจ้งว่าแก้แล้วและรอผู้ซื้อยืนยัน",
+  },
+  completed: {
+    label: "แก้ไขเสร็จแล้ว",
     tone: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    description: "รายการนี้ถูกปิดงานเรียบร้อย",
   },
-};
+}
 
-const initialPlan = {
-  sellerDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-  location: "โครงการ Dream Ville บางนา",
-  sellerContact: "คุณฟ้า (ตัวแทนผู้ขาย)",
-};
+const defaultState: HomeInspectionState = {
+  handoverDate: null,
+  handoverNote: "",
+  lastUpdatedAt: null,
+  lastUpdatedBy: null,
+}
 
-const initialChecklist: BuyerChecklistItem[] = [
-  {
-    id: "structure",
-    title: "ตรวจโครงสร้างและผนัง",
-    description: "เช็คผิวผนัง รอยแตกร้าว และการปรับระดับพื้น",
-    sellerStatus: "scheduled",
-    buyerStatus: "pending",
-    lastUpdatedAt: new Date().toISOString(),
-  },
-  {
-    id: "plumbing",
-    title: "ระบบน้ำและสุขภัณฑ์",
-    description: "เปิดวาล์ว ทดสอบแรงดันน้ำ และดูการรั่วซึม",
-    sellerStatus: "fixing",
-    buyerStatus: "follow-up",
-    lastUpdatedAt: new Date().toISOString(),
-  },
-  {
-    id: "electrical",
-    title: "ระบบไฟฟ้าและสวิตช์",
-    description: "ตรวจปลั๊ก แสงสว่าง และเบรกเกอร์",
-    sellerStatus: "done",
-    buyerStatus: "accepted",
-    lastUpdatedAt: new Date().toISOString(),
-  },
-];
+const safeFormatDate = (value: string) => {
+  try {
+    return format(parseISO(value), "d MMM yyyy")
+  } catch (error) {
+    console.error("Failed to format date", error)
+    return value
+  }
+}
 
-const initialIssues: BuyerIssue[] = [
-  {
-    id: "kitchen-cabinet",
-    title: "บานตู้ครัวปิดไม่สนิท",
-    location: "ห้องครัว",
-    description: "ขอให้ผู้ขายปรับบานพับเพื่อให้ปิดสนิท",
-    status: "in-progress",
-    reportedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    sellerOwner: "ทีมช่างผู้ขาย",
-    expectedCompletion: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "bathroom-silicone",
-    title: "ยาแนวห้องน้ำหลุด",
-    location: "ห้องน้ำชั้นบน",
-    description: "ต้องการให้เก็บซิลิโคนรอบอ่างอาบน้ำใหม่",
-    status: "pending",
-    reportedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    sellerOwner: "Foreman คุณเอ็ม",
-  },
-];
+const safeFormatDateTime = (value: string) => {
+  try {
+    return format(parseISO(value), "d MMM yyyy HH:mm")
+  } catch (error) {
+    console.error("Failed to format datetime", error)
+    return value
+  }
+}
 
 export default function BuyerHomeInspectionPage() {
-  const [activeTab, setActiveTab] = useState<string>("overview");
-  const [preferredDate, setPreferredDate] = useState<string>(() => initialPlan.sellerDate.slice(0, 10));
-  const [buyerNote, setBuyerNote] = useState<string>("");
-  const [checklistItems, setChecklistItems] = useState<BuyerChecklistItem[]>(initialChecklist);
-  const [issues, setIssues] = useState<BuyerIssue[]>(initialIssues);
-  const [newChecklistTitle, setNewChecklistTitle] = useState("");
-  const [newChecklistDescription, setNewChecklistDescription] = useState("");
-  const [reportDialogOpen, setReportDialogOpen] = useState(false);
-  const [reportTitle, setReportTitle] = useState("");
-  const [reportDescription, setReportDescription] = useState("");
-  const [reportLocation, setReportLocation] = useState("");
-  const [reportExpectedDate, setReportExpectedDate] = useState("");
+  const searchParams = useSearchParams()
+  const propertyId = searchParams.get("propertyId")
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuthContext()
+  const { toast } = useToast()
 
-  const confirmedDateLabel = useMemo(() => {
-    try {
-      return format(parseISO(`${preferredDate}T09:00:00`), "d MMM yyyy");
-    } catch {
-      return preferredDate;
+  const [property, setProperty] = useState<UserProperty | null>(null)
+  const [propertyLoading, setPropertyLoading] = useState(true)
+  const [inspectionState, setInspectionState] = useState<HomeInspectionState>(defaultState)
+  const [stateLoading, setStateLoading] = useState(true)
+  const [checklistItems, setChecklistItems] = useState<HomeInspectionChecklistItem[]>([])
+  const [checklistLoading, setChecklistLoading] = useState(true)
+  const [issues, setIssues] = useState<HomeInspectionIssue[]>([])
+  const [issuesLoading, setIssuesLoading] = useState(true)
+
+  const [activeTab, setActiveTab] = useState<string>("overview")
+  const [handoverDateInput, setHandoverDateInput] = useState("")
+  const [handoverNoteInput, setHandoverNoteInput] = useState("")
+  const [savingSchedule, setSavingSchedule] = useState(false)
+
+  const [newChecklistTitle, setNewChecklistTitle] = useState("")
+  const [newChecklistDescription, setNewChecklistDescription] = useState("")
+  const [addingChecklist, setAddingChecklist] = useState(false)
+
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportTitle, setReportTitle] = useState("")
+  const [reportDescription, setReportDescription] = useState("")
+  const [reportLocation, setReportLocation] = useState("")
+  const [reportExpectedDate, setReportExpectedDate] = useState("")
+  const [creatingIssue, setCreatingIssue] = useState(false)
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/")
     }
-  }, [preferredDate]);
+  }, [authLoading, router, user])
 
-  const sellerDateLabel = useMemo(() => {
-    return format(parseISO(initialPlan.sellerDate), "d MMM yyyy");
-  }, []);
+  useEffect(() => {
+    if (!propertyId) {
+      setProperty(null)
+      setPropertyLoading(false)
+      return
+    }
 
-  const displayDateLabel = confirmedDateLabel || sellerDateLabel;
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    setPropertyLoading(true)
+
+    void (async () => {
+      try {
+        unsubscribe = await subscribeToDocument("property", propertyId, (doc) => {
+          if (!active) return
+          setProperty(doc ? mapDocumentToUserProperty(doc) : null)
+          setPropertyLoading(false)
+        })
+      } catch (error) {
+        console.error("Failed to subscribe property", error)
+        if (!active) return
+        setProperty(null)
+        setPropertyLoading(false)
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถโหลดข้อมูลประกาศได้",
+          description: "กรุณาลองรีเฟรชหน้าหรือกลับไปเลือกประกาศใหม่",
+        })
+      }
+    })()
+
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [propertyId, toast])
+
+  useEffect(() => {
+    if (!propertyId) {
+      setInspectionState(defaultState)
+      setStateLoading(false)
+      return
+    }
+
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    setStateLoading(true)
+
+    void (async () => {
+      try {
+        unsubscribe = await subscribeToInspectionState(propertyId, (state) => {
+          if (!active) return
+          setInspectionState(state)
+          setStateLoading(false)
+        })
+      } catch (error) {
+        console.error("Failed to subscribe inspection state", error)
+        if (!active) return
+        setInspectionState(defaultState)
+        setStateLoading(false)
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถโหลดข้อมูลนัดหมายได้",
+          description: "ตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง",
+        })
+      }
+    })()
+
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [propertyId, toast])
+
+  useEffect(() => {
+    if (!propertyId) {
+      setChecklistItems([])
+      setChecklistLoading(false)
+      return
+    }
+
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    setChecklistLoading(true)
+
+    void (async () => {
+      try {
+        unsubscribe = await subscribeToInspectionChecklist(propertyId, (items) => {
+          if (!active) return
+          setChecklistItems(items)
+          setChecklistLoading(false)
+        })
+      } catch (error) {
+        console.error("Failed to subscribe checklist", error)
+        if (!active) return
+        setChecklistItems([])
+        setChecklistLoading(false)
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถโหลดเช็คลิสต์ได้",
+          description: "ลองรีเฟรชหน้าเพื่อเชื่อมต่อใหม่",
+        })
+      }
+    })()
+
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [propertyId, toast])
+
+  useEffect(() => {
+    if (!propertyId) {
+      setIssues([])
+      setIssuesLoading(false)
+      return
+    }
+
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    setIssuesLoading(true)
+
+    void (async () => {
+      try {
+        unsubscribe = await subscribeToInspectionIssues(propertyId, (items) => {
+          if (!active) return
+          setIssues(items)
+          setIssuesLoading(false)
+        })
+      } catch (error) {
+        console.error("Failed to subscribe issues", error)
+        if (!active) return
+        setIssues([])
+        setIssuesLoading(false)
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถโหลดรายการแจ้งซ่อมได้",
+          description: "กรุณาลองใหม่อีกครั้ง",
+        })
+      }
+    })()
+
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [propertyId, toast])
+
+  useEffect(() => {
+    if (stateLoading) return
+    setHandoverDateInput(
+      inspectionState.handoverDate ? inspectionState.handoverDate.slice(0, 10) : "",
+    )
+    setHandoverNoteInput(inspectionState.handoverNote ?? "")
+  }, [inspectionState.handoverDate, inspectionState.handoverNote, stateLoading])
+
+  const isLoading =
+    authLoading ||
+    propertyLoading ||
+    stateLoading ||
+    checklistLoading ||
+    issuesLoading
+
+  const scheduleLabel = useMemo(() => {
+    if (!inspectionState.handoverDate) return "ยังไม่ได้เลือกวันนัดหมาย"
+    return safeFormatDate(inspectionState.handoverDate)
+  }, [inspectionState.handoverDate])
+
+  const scheduleUpdatedAtLabel = useMemo(() => {
+    if (!inspectionState.lastUpdatedAt) return null
+    return safeFormatDateTime(inspectionState.lastUpdatedAt)
+  }, [inspectionState.lastUpdatedAt])
+
+  const propertyLocation = useMemo(() => {
+    if (!property) return "ยังไม่ระบุสถานที่นัดหมาย"
+    if (property.address) return property.address
+    const segments = [property.city, property.province].filter(Boolean)
+    return segments.join(", ") || "ยังไม่ระบุสถานที่นัดหมาย"
+  }, [property])
+
+  const sellerContact = useMemo(() => {
+    if (!property) return "ยังไม่ระบุข้อมูลผู้ขาย"
+    const segments = [property.sellerName, property.sellerPhone].filter(Boolean)
+    return segments.join(" • ") || "ยังไม่ระบุข้อมูลผู้ขาย"
+  }, [property])
 
   const overviewStats = useMemo(() => {
-    const total = checklistItems.length;
-    const accepted = checklistItems.filter((item) => item.buyerStatus === "accepted").length;
-    const followUp = checklistItems.filter((item) => item.buyerStatus === "follow-up").length;
+    const total = checklistItems.length
+    const accepted = checklistItems.filter((item) => item.buyerStatus === "accepted").length
+    const followUp = checklistItems.filter((item) => item.buyerStatus === "follow-up").length
     return {
       total,
       accepted,
       followUp,
       completion: total > 0 ? Math.round((accepted / total) * 100) : 0,
-    };
-  }, [checklistItems]);
+    }
+  }, [checklistItems])
 
   const timelineEvents = useMemo(() => {
-    const buyerDateIso = preferredDate
-      ? new Date(`${preferredDate}T09:00:00`).toISOString()
-      : initialPlan.sellerDate;
+    const events: { id: string; title: string; description: string; date: string; tone: string }[] = []
 
-    const events: { id: string; title: string; description: string; date: string; tone: string }[] = [
-      {
-        id: "seller-proposed",
-        title: "ผู้ขายเสนอวันส่งมอบ",
-        description: format(parseISO(initialPlan.sellerDate), "EEEE d MMMM yyyy"),
-        date: initialPlan.sellerDate,
-        tone: "border-blue-200 bg-blue-50",
-      },
-      {
-        id: "buyer-confirm",
-        title: "ผู้ซื้อเลือกวันที่สะดวก",
-        description: confirmedDateLabel
-          ? `ตรวจเช้าตามที่สะดวก (${confirmedDateLabel})`
-          : "รอผู้ซื้อยืนยันเวลาที่สะดวก",
-        date: buyerDateIso,
+    if (inspectionState.handoverDate) {
+      events.push({
+        id: "handover",
+        title: "วันที่นัดส่งมอบ",
+        description: scheduleLabel,
+        date: inspectionState.handoverDate,
         tone: "border-emerald-200 bg-emerald-50",
-      },
-    ];
+      })
+    }
 
     issues.forEach((issue) => {
       events.push({
@@ -223,86 +391,202 @@ export default function BuyerHomeInspectionPage() {
         description: issue.location,
         date: issue.reportedAt,
         tone: "border-amber-200 bg-amber-50",
-      });
+      })
 
       if (issue.expectedCompletion) {
         events.push({
-          id: `${issue.id}-due`,
-          title: `กำหนดแก้ไขโดย ${issue.sellerOwner}`,
-          description: format(parseISO(issue.expectedCompletion), "d MMM yyyy"),
-          date: issue.expectedCompletion,
-          tone: "border-purple-200 bg-purple-50",
-        });
-      }
-
-      if (issue.resolvedAt) {
-        events.push({
-          id: `${issue.id}-resolved`,
-          title: `ปิดงาน: ${issue.title}`,
-          description: format(parseISO(issue.resolvedAt), "d MMM yyyy"),
-          date: issue.resolvedAt,
-          tone: "border-emerald-200 bg-emerald-50",
-        });
-      }
-    });
-
-    return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [issues, preferredDate, confirmedDateLabel]);
-
-  const handleUpdateBuyerStatus = (id: string, status: BuyerChecklistItem["buyerStatus"]) => {
-    setChecklistItems((items) =>
-      items.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              buyerStatus: status,
-              lastUpdatedAt: new Date().toISOString(),
-            }
-          : item,
-      ),
-    );
-  };
-
-  const handleAddChecklistItem = () => {
-    if (!newChecklistTitle.trim()) return;
-
-    const newItem: BuyerChecklistItem = {
-      id: `custom-${Date.now()}`,
-      title: newChecklistTitle.trim(),
-      description: newChecklistDescription.trim() || "ระบุรายละเอียดสิ่งที่ต้องการตรวจ",
-      sellerStatus: "scheduled",
-      buyerStatus: "pending",
-      lastUpdatedAt: new Date().toISOString(),
-    };
-
-    setChecklistItems((items) => [newItem, ...items]);
-    setNewChecklistTitle("");
-    setNewChecklistDescription("");
-  };
-
-  const handleSubmitIssue = () => {
-    if (!reportTitle.trim() || !reportLocation.trim()) {
-      return;
+          id: `${issue.id}-expected`,
+          title: `กำหนดแก้ไขโดย ${issue.owner ?? "ผู้ขาย"}`,
+        description: safeFormatDate(issue.expectedCompletion),
+        date: issue.expectedCompletion,
+        tone: "border-blue-200 bg-blue-50",
+      })
     }
 
-    const issue: BuyerIssue = {
-      id: `issue-${Date.now()}`,
-      title: reportTitle.trim(),
-      location: reportLocation.trim(),
-      description: reportDescription.trim() || "",
-      status: "pending",
-      reportedAt: new Date().toISOString(),
-      sellerOwner: "รอผู้ขายมอบหมาย",
-      expectedCompletion: reportExpectedDate ? `${reportExpectedDate}T09:00:00` : undefined,
-    };
+    if (issue.resolvedAt) {
+      events.push({
+        id: `${issue.id}-resolved`,
+        title: `ปิดงาน: ${issue.title}`,
+        description: `${issue.location} • ${safeFormatDate(issue.resolvedAt)}`,
+        date: issue.resolvedAt,
+        tone: "border-purple-200 bg-purple-50",
+      })
+    }
+  })
 
-    setIssues((current) => [issue, ...current]);
-    setReportDialogOpen(false);
-    setReportTitle("");
-    setReportDescription("");
-    setReportLocation("");
-    setReportExpectedDate("");
-  };
+    return events
+      .filter((event) => !Number.isNaN(Date.parse(event.date)))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [inspectionState.handoverDate, issues, scheduleLabel])
+
+  const handleSaveSchedule = async () => {
+    if (!propertyId) return
+    setSavingSchedule(true)
+    try {
+      await updateInspectionState(propertyId, {
+        handoverDate: handoverDateInput ? `${handoverDateInput}T09:00:00` : null,
+        handoverNote: handoverNoteInput,
+        lastUpdatedBy: "buyer",
+      })
+      toast({
+        title: "บันทึกวันนัดหมายแล้ว",
+        description: "ระบบจะส่งแจ้งเตือนไปยังผู้ขายผ่านแชท DreamHome",
+      })
+    } catch (error) {
+      console.error("Failed to save schedule", error)
+      toast({
+        variant: "destructive",
+        title: "บันทึกวันนัดหมายไม่สำเร็จ",
+        description: "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setSavingSchedule(false)
+    }
+  }
+
+  const handleUpdateBuyerStatus = async (
+    id: string,
+    status: HomeInspectionChecklistItem["buyerStatus"],
+  ) => {
+    if (!propertyId) return
+    try {
+      await updateInspectionChecklistItem(propertyId, id, { buyerStatus: status })
+    } catch (error) {
+      console.error("Failed to update buyer status", error)
+      toast({
+        variant: "destructive",
+        title: "อัปเดตสถานะไม่สำเร็จ",
+        description: "กรุณาลองใหม่อีกครั้ง",
+      })
+    }
+  }
+
+  const handleAddChecklistItem = async () => {
+    if (!propertyId) return
+    if (!newChecklistTitle.trim()) return
+
+    setAddingChecklist(true)
+    try {
+      await createInspectionChecklistItem(
+        propertyId,
+        {
+          title: newChecklistTitle.trim(),
+          description: newChecklistDescription.trim() || "ระบุรายละเอียดสิ่งที่ต้องการตรวจ",
+        },
+        "buyer",
+      )
+      setNewChecklistTitle("")
+      setNewChecklistDescription("")
+      toast({
+        title: "เพิ่มรายการตรวจเรียบร้อย",
+        description: "DreamHome ได้แชร์รายการนี้ให้ผู้ขายแล้ว",
+      })
+    } catch (error) {
+      console.error("Failed to add checklist item", error)
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถเพิ่มรายการได้",
+        description: "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setAddingChecklist(false)
+    }
+  }
+
+  const handleSubmitIssue = async () => {
+    if (!propertyId) return
+    if (!reportTitle.trim() || !reportLocation.trim()) {
+      toast({
+        variant: "destructive",
+        title: "กรุณากรอกหัวข้อและตำแหน่ง",
+      })
+      return
+    }
+
+    setCreatingIssue(true)
+    try {
+      await createInspectionIssue(
+        propertyId,
+        {
+          title: reportTitle.trim(),
+          location: reportLocation.trim(),
+          description: reportDescription.trim() || undefined,
+          expectedCompletion: reportExpectedDate
+            ? `${reportExpectedDate}T09:00:00`
+            : undefined,
+        },
+        "buyer",
+      )
+      setReportDialogOpen(false)
+      setReportTitle("")
+      setReportDescription("")
+      setReportLocation("")
+      setReportExpectedDate("")
+      toast({
+        title: "ส่งคำขอแก้ไขแล้ว",
+        description: "ผู้ขายจะได้รับการแจ้งเตือนใน Defect Tracking",
+      })
+    } catch (error) {
+      console.error("Failed to create issue", error)
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถสร้างรายการแจ้งซ่อมได้",
+        description: "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setCreatingIssue(false)
+    }
+  }
+
+  if (!propertyId) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-slate-50 px-4">
+        <Card className="max-w-lg border-none bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-slate-900">
+              ต้องระบุรหัสประกาศ
+            </CardTitle>
+            <CardDescription className="text-sm text-slate-600">
+              กรุณาเปิดลิงก์จากประกาศที่ได้รับการยืนยัน หรือระบุพารามิเตอร์ propertyId ใน URL
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-slate-50 px-4">
+        <div className="flex flex-col items-center gap-3 text-slate-600">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-500" />
+          <p className="text-sm">กำลังโหลดข้อมูลการตรวจรับบ้าน...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!property) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-slate-50 px-4">
+        <Card className="max-w-lg border-none bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-slate-900">
+              ไม่พบข้อมูลประกาศ
+            </CardTitle>
+            <CardDescription className="text-sm text-slate-600">
+              ตรวจสอบว่าคุณมีสิทธิ์เข้าถึงประกาศนี้หรือยังไม่ได้ลบประกาศออกจากระบบ
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="bg-indigo-600 text-white hover:bg-indigo-700">
+              <Link href="/buy/send-documents">กลับไปหน้าส่งเอกสาร</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-10">
@@ -313,23 +597,29 @@ export default function BuyerHomeInspectionPage() {
               <ClipboardList className="h-4 w-4" />
               ขั้นตอนตรวจรับบ้าน (ผู้ซื้อ)
             </div>
-            <Badge className="rounded-full border border-indigo-200 bg-indigo-50 text-[10px] font-semibold tracking-wide text-indigo-700">
-              Demo Preview
-            </Badge>
+            {inspectionState.handoverDate ? (
+              <Badge className="rounded-full border border-emerald-200 bg-emerald-50 text-[10px] font-semibold tracking-wide text-emerald-600">
+                นัดหมายยืนยันแล้ว
+              </Badge>
+            ) : (
+              <Badge className="rounded-full border border-amber-200 bg-amber-50 text-[10px] font-semibold tracking-wide text-amber-600">
+                รอยืนยันวันส่งมอบ
+              </Badge>
+            )}
           </div>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-3 lg:max-w-2xl">
               <h1 className="text-3xl font-semibold text-slate-900">เตรียมตรวจรับบ้านร่วมกับผู้ขายอย่างมั่นใจ</h1>
               <p className="text-sm text-slate-600 sm:text-base">
-                หน้านี้จำลองประสบการณ์ของผู้ซื้อที่สามารถเลือกวันนัดหมาย ตรวจรายการเช็คร่วมกับผู้ขาย และรายงานปัญหาเพื่อติดตามกับทีมผู้ขายได้แบบเรียลไทม์
+                DreamHome จะบันทึกนัดหมาย เช็คลิสต์ และรายการแก้ไขให้ผู้ซื้อและผู้ขายเห็นตรงกันแบบเรียลไทม์ เพื่อให้การส่งมอบเป็นไปอย่างราบรื่น
               </p>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                DreamHome จะบันทึกการเปลี่ยนแปลงทั้งหมดไว้ในไทม์ไลน์ร่วมกัน
+                อัปเดตทุกการเปลี่ยนแปลงผ่านแชทรวมกับทีมขายได้ทันที
               </div>
               <div className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-xs font-medium text-slate-600">
                 <Sparkles className="h-4 w-4 text-indigo-500" />
-                เหมาะสำหรับใช้เป็น Demo โชว์ลูกค้าและผู้มีส่วนเกี่ยวข้อง
+                ข้อมูลจริงจากประกาศ: {property.title}
               </div>
             </div>
             <Card className="w-full max-w-sm border-none bg-slate-900 text-slate-50 shadow-lg">
@@ -339,19 +629,19 @@ export default function BuyerHomeInspectionPage() {
                   วันที่ผู้ซื้อเลือกไว้
                 </CardTitle>
                 <CardDescription className="text-sm text-slate-300">
-                  {displayDateLabel} • {initialPlan.location}
+                  {scheduleLabel} • {propertyLocation}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
                 <div className="space-y-1">
                   <p className="text-xs uppercase tracking-wide text-slate-400">ผู้ขายติดต่อ</p>
-                  <p className="font-medium text-slate-100">{initialPlan.sellerContact}</p>
+                  <p className="font-medium text-slate-100">{sellerContact}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-800/70 p-3">
                   <p className="text-xs text-slate-300">โน้ตถึงผู้ขาย</p>
                   <Textarea
-                    value={buyerNote}
-                    onChange={(event) => setBuyerNote(event.target.value)}
+                    value={handoverNoteInput}
+                    onChange={(event) => setHandoverNoteInput(event.target.value)}
                     placeholder="ระบุสิ่งที่ต้องเตรียมหรือคำถามเพิ่มเติม"
                     className="mt-2 min-h-[72px] border-none bg-transparent text-slate-100 placeholder:text-slate-500"
                   />
@@ -363,12 +653,21 @@ export default function BuyerHomeInspectionPage() {
                   <Input
                     id="preferred-date"
                     type="date"
-                    value={preferredDate}
-                    onChange={(event) => setPreferredDate(event.target.value)}
+                    value={handoverDateInput}
+                    onChange={(event) => setHandoverDateInput(event.target.value)}
                     className="border-none bg-slate-800 text-slate-100"
                   />
-                  <p className="text-xs text-slate-400">วันที่ผู้ขายเสนอ: {sellerDateLabel}</p>
+                  {scheduleUpdatedAtLabel && (
+                    <p className="text-xs text-slate-400">อัปเดตล่าสุด {scheduleUpdatedAtLabel}</p>
+                  )}
                 </div>
+                <Button
+                  onClick={handleSaveSchedule}
+                  disabled={savingSchedule}
+                  className="w-full bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-60"
+                >
+                  บันทึกวันนัดหมาย
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -376,13 +675,22 @@ export default function BuyerHomeInspectionPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="flex w-full flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium data-[state=active]:border-indigo-600 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+            <TabsTrigger
+              value="overview"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium data-[state=active]:border-indigo-600 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+            >
               <CalendarIcon className="mr-2 h-4 w-4" /> ภาพรวม
             </TabsTrigger>
-            <TabsTrigger value="checklist" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium data-[state=active]:border-emerald-600 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+            <TabsTrigger
+              value="checklist"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium data-[state=active]:border-emerald-600 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            >
               <ClipboardCheck className="mr-2 h-4 w-4" /> เช็คลิสต์ร่วมกัน
             </TabsTrigger>
-            <TabsTrigger value="issues" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium data-[state=active]:border-purple-600 data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+            <TabsTrigger
+              value="issues"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium data-[state=active]:border-purple-600 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
+            >
               <Wrench className="mr-2 h-4 w-4" /> ปัญหา / แจ้งซ่อม
             </TabsTrigger>
           </TabsList>
@@ -401,10 +709,17 @@ export default function BuyerHomeInspectionPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="h-2 w-full rounded-full bg-slate-200">
-                    <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${overviewStats.completion}%` }} />
+                    <div
+                      className="h-2 rounded-full bg-emerald-500"
+                      style={{ width: `${overviewStats.completion}%` }}
+                    />
                   </div>
                   <p className="text-xs text-slate-500">รวม {overviewStats.total} รายการในเช็คลิสต์</p>
-                  <Button asChild variant="outline" className="w-fit border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="w-fit border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  >
                     <Link href="#checklist">ไปที่รายการตรวจ</Link>
                   </Button>
                 </CardContent>
@@ -423,7 +738,7 @@ export default function BuyerHomeInspectionPage() {
                 <CardContent className="space-y-2 text-sm text-slate-600">
                   <div className="flex items-center gap-2">
                     <Compass className="h-4 w-4 text-slate-500" />
-                    {initialPlan.location}
+                    {propertyLocation}
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-slate-500" />
@@ -431,7 +746,7 @@ export default function BuyerHomeInspectionPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-slate-500" />
-                    DreamHome Sync กับฝั่งผู้ขายอัตโนมัติ
+                    ข้อมูลซิงค์กับฝั่งผู้ขายแบบเรียลไทม์
                   </div>
                 </CardContent>
               </Card>
@@ -441,82 +756,138 @@ export default function BuyerHomeInspectionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
                   <CalendarIcon className="h-5 w-5 text-indigo-500" />
-                  ไทม์ไลน์ล่าสุด
+                  ไทม์ไลน์การตรวจรับ
                 </CardTitle>
                 <CardDescription className="text-sm text-slate-600">
-                  ดูเหตุการณ์สำคัญที่ผู้ซื้อและผู้ขายทำร่วมกัน
+                  รวมเหตุการณ์สำคัญระหว่างนัดหมายและการแก้ไขข้อบกพร่อง
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {timelineEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className={`flex flex-col gap-1 rounded-2xl border p-4 text-sm text-slate-700 ${event.tone}`}
-                  >
-                    <p className="font-semibold text-slate-900">{event.title}</p>
-                    <p>{event.description}</p>
-                    <p className="text-xs text-slate-500">{format(parseISO(event.date), "d MMM yyyy")}</p>
+                {timelineEvents.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    ยังไม่มีเหตุการณ์ในไทม์ไลน์ เริ่มจากการยืนยันวันส่งมอบหรือสร้างรายการแจ้งซ่อม
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {timelineEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        className={`flex items-start gap-3 rounded-2xl border p-3 text-sm text-slate-600 ${event.tone}`}
+                      >
+                        <CalendarIcon className="mt-0.5 h-4 w-4 text-indigo-500" />
+                        <div>
+                          <p className="font-semibold text-slate-900">{event.title}</p>
+                          <p>{event.description}</p>
+                          <p className="text-xs text-slate-500">
+                            {format(parseISO(event.date), "d MMM yyyy")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="checklist" className="space-y-6" id="checklist">
-            <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-              <div className="space-y-4">
-                {checklistItems.map((item) => (
-                  <Card key={item.id} className="border border-slate-200 bg-white shadow-sm">
-                    <CardHeader className="space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <CardTitle className="text-base font-semibold text-slate-900">{item.title}</CardTitle>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${sellerStatusMeta[item.sellerStatus].tone}`}>
-                            {sellerStatusMeta[item.sellerStatus].label}
-                          </Badge>
-                          <Badge className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${buyerStatusMeta[item.buyerStatus].tone}`}>
-                            {buyerStatusMeta[item.buyerStatus].label}
-                          </Badge>
+            <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+              <Card className="border-none bg-white shadow-sm">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <ClipboardCheck className="h-5 w-5 text-emerald-500" />
+                    รายการที่ต้องตรวจ
+                  </CardTitle>
+                  <CardDescription className="text-sm text-slate-600">
+                    อัปเดตสถานะร่วมกับผู้ขายได้แบบเรียลไทม์
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {checklistItems.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      ยังไม่มีรายการตรวจ เริ่มจากการเพิ่มรายการใหม่หรือให้ผู้ขายเพิ่มจากฝั่งของตน
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {checklistItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-base font-semibold text-slate-900">{item.title}</p>
+                              <p className="text-sm text-slate-600">{item.description}</p>
+                              <p className="text-xs text-slate-500">
+                                เพิ่มโดย {item.createdBy === "buyer" ? "ผู้ซื้อ" : "ผู้ขาย"}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <Badge
+                                className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${sellerStatusMeta[item.sellerStatus].tone}`}
+                              >
+                                {sellerStatusMeta[item.sellerStatus].label}
+                              </Badge>
+                              <Badge
+                                className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${buyerStatusMeta[item.buyerStatus].tone}`}
+                              >
+                                {buyerStatusMeta[item.buyerStatus].label}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                            <span>{buyerStatusMeta[item.buyerStatus].description}</span>
+                            <span>•</span>
+                            <span>{sellerStatusMeta[item.sellerStatus].description}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant={item.buyerStatus === "accepted" ? "default" : "outline"}
+                              className={`rounded-full ${
+                                item.buyerStatus === "accepted"
+                                  ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              }`}
+                              onClick={() => handleUpdateBuyerStatus(item.id, "accepted")}
+                            >
+                              ผ่านแล้ว
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={item.buyerStatus === "follow-up" ? "default" : "outline"}
+                              className={`rounded-full ${
+                                item.buyerStatus === "follow-up"
+                                  ? "bg-purple-500 text-white hover:bg-purple-600"
+                                  : "border-purple-200 text-purple-700 hover:bg-purple-50"
+                              }`}
+                              onClick={() => handleUpdateBuyerStatus(item.id, "follow-up")}
+                            >
+                              ขอแก้เพิ่ม
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={item.buyerStatus === "pending" ? "default" : "outline"}
+                              className={`rounded-full ${
+                                item.buyerStatus === "pending"
+                                  ? "bg-slate-900 text-white hover:bg-slate-800"
+                                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                              }`}
+                              onClick={() => handleUpdateBuyerStatus(item.id, "pending")}
+                            >
+                              รอตรวจอีกครั้ง
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <CardDescription className="text-sm text-slate-600">{item.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-xs text-slate-500">อัปเดตล่าสุด {format(parseISO(item.lastUpdatedAt), "d MMM yyyy HH:mm")}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant={item.buyerStatus === "accepted" ? "default" : "outline"}
-                          className={item.buyerStatus === "accepted" ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}
-                          onClick={() => handleUpdateBuyerStatus(item.id, "accepted")}
-                        >
-                          ยืนยันผ่านแล้ว
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={item.buyerStatus === "follow-up" ? "default" : "outline"}
-                          className={item.buyerStatus === "follow-up" ? "bg-purple-600 text-white hover:bg-purple-700" : "border-purple-200 text-purple-700 hover:bg-purple-50"}
-                          onClick={() => handleUpdateBuyerStatus(item.id, "follow-up")}
-                        >
-                          ขอให้แก้ไขเพิ่ม
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={item.buyerStatus === "pending" ? "default" : "outline"}
-                          className={item.buyerStatus === "pending" ? "bg-slate-600 text-white hover:bg-slate-700" : "border-slate-200 text-slate-700 hover:bg-slate-50"}
-                          onClick={() => handleUpdateBuyerStatus(item.id, "pending")}
-                        >
-                          ยังไม่ได้ตรวจ
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <Card className="h-fit border border-dashed border-indigo-200 bg-indigo-50 shadow-none">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-indigo-900">
-                    <ClipboardCheck className="h-5 w-5" />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border border-indigo-100 bg-indigo-50/60 shadow-sm">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="text-base font-semibold text-indigo-900">
                     เพิ่มรายการที่อยากตรวจเพิ่ม
                   </CardTitle>
                   <CardDescription className="text-sm text-indigo-700">
@@ -548,7 +919,11 @@ export default function BuyerHomeInspectionPage() {
                       className="border-indigo-200 bg-white"
                     />
                   </div>
-                  <Button onClick={handleAddChecklistItem} className="w-full bg-indigo-600 text-white hover:bg-indigo-700">
+                  <Button
+                    onClick={handleAddChecklistItem}
+                    disabled={addingChecklist}
+                    className="w-full bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+                  >
                     เพิ่มเข้าเช็คลิสต์
                   </Button>
                   <p className="text-xs text-indigo-700/80">
@@ -567,45 +942,63 @@ export default function BuyerHomeInspectionPage() {
                   บันทึกสิ่งที่พบระหว่างการตรวจรับ ผู้ขายจะเห็นและอัปเดตสถานะได้ทันที
                 </p>
               </div>
-              <Button onClick={() => setReportDialogOpen(true)} className="bg-purple-600 text-white hover:bg-purple-700">
+              <Button
+                onClick={() => setReportDialogOpen(true)}
+                className="bg-purple-600 text-white hover:bg-purple-700"
+              >
                 <AlertCircle className="mr-2 h-4 w-4" /> สร้างรายการซ่อม
               </Button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {issues.map((issue) => (
-                <Card key={issue.id} className="border border-slate-200 bg-white shadow-sm">
-                  <CardHeader className="space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <CardTitle className="text-base font-semibold text-slate-900">{issue.title}</CardTitle>
-                      <Badge className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${issueStatusMeta[issue.status].tone}`}>
-                        {issueStatusMeta[issue.status].label}
-                      </Badge>
-                    </div>
-                    <CardDescription className="text-sm text-slate-600">{issue.location}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm text-slate-600">
-                    <p>{issue.description}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                      <span>รายงานเมื่อ {format(parseISO(issue.reportedAt), "d MMM yyyy")}</span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600">
-                        <ShieldCheck className="h-3 w-3" />
-                        {issue.sellerOwner}
-                      </span>
-                    </div>
-                    {issue.expectedCompletion && (
-                      <p className="text-xs text-slate-500">
-                        กำหนดเสร็จ: {format(parseISO(issue.expectedCompletion), "d MMM yyyy")}
-                      </p>
-                    )}
-                    {issue.resolvedAt && (
-                      <p className="text-xs text-emerald-600">
-                        ปิดงานเมื่อ {format(parseISO(issue.resolvedAt), "d MMM yyyy")}
-                      </p>
-                    )}
+              {issues.length === 0 ? (
+                <Card className="border border-dashed border-slate-200 bg-white shadow-sm md:col-span-2">
+                  <CardContent className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center text-sm text-slate-500">
+                    <Wrench className="h-8 w-8 text-slate-300" />
+                    <p>ยังไม่มีรายการแจ้งซ่อมจากผู้ซื้อ</p>
+                    <p>กดปุ่ม “สร้างรายการซ่อม” เพื่อส่งให้ผู้ขายติดตามใน Defect Tracking</p>
                   </CardContent>
                 </Card>
-              ))}
+              ) : (
+                issues.map((issue) => (
+                  <Card key={issue.id} className="border border-slate-200 bg-white shadow-sm">
+                    <CardHeader className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="text-base font-semibold text-slate-900">{issue.title}</CardTitle>
+                        <Badge
+                          className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${issueStatusMeta[issue.status].tone}`}
+                        >
+                          {issueStatusMeta[issue.status].label}
+                        </Badge>
+                      </div>
+                      <CardDescription className="text-sm text-slate-600">{issue.location}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm text-slate-600">
+                      <p>{issue.description}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <span>รายงานเมื่อ {format(parseISO(issue.reportedAt), "d MMM yyyy")}</span>
+                        {issue.owner && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600">
+                            <ShieldCheck className="h-3 w-3" />
+                            {issue.owner}
+                          </span>
+                        )}
+                      </div>
+                      {issue.expectedCompletion && (
+                        <p className="text-xs text-slate-500">
+                          กำหนดเสร็จ: {format(parseISO(issue.expectedCompletion), "d MMM yyyy")}
+                        </p>
+                      )}
+                      {issue.resolvedAt && (
+                        <p className="text-xs text-emerald-600">
+                          ปิดงานเมื่อ {format(parseISO(issue.resolvedAt), "d MMM yyyy")}
+                        </p>
+                      )}
+                      <p className="text-xs text-slate-500">{issueStatusMeta[issue.status].description}</p>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
         </Tabs>
@@ -616,7 +1009,7 @@ export default function BuyerHomeInspectionPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
               <AlertCircle className="h-5 w-5 text-purple-600" />
-              แจ้งปัญหาใหม่ (Demo)
+              แจ้งปัญหาใหม่
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -639,23 +1032,23 @@ export default function BuyerHomeInspectionPage() {
                 id="issue-location"
                 value={reportLocation}
                 onChange={(event) => setReportLocation(event.target.value)}
-                placeholder="ระบุห้องหรือบริเวณ"
+                placeholder="เช่น ห้องนอนใหญ่"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="issue-description" className="text-xs font-semibold text-slate-700">
-                รายละเอียดเพิ่มเติม
+                รายละเอียดเพิ่มเติม (ไม่บังคับ)
               </Label>
               <Textarea
                 id="issue-description"
                 value={reportDescription}
                 onChange={(event) => setReportDescription(event.target.value)}
-                placeholder="อธิบายลักษณะปัญหา หรือแนบรายละเอียดที่อยากแจ้ง"
+                placeholder="บรรยายเพิ่มเติมเพื่อให้ทีมผู้ขายเข้าใจปัญหา"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="issue-expected-date" className="text-xs font-semibold text-slate-700">
-                อยากให้แก้เสร็จภายใน (ไม่บังคับ)
+                ต้องการให้เสร็จภายใน (ไม่บังคับ)
               </Label>
               <Input
                 id="issue-expected-date"
@@ -665,16 +1058,25 @@ export default function BuyerHomeInspectionPage() {
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setReportDialogOpen(false)}
+                className="border-slate-200 text-slate-700 hover:bg-slate-100"
+                disabled={creatingIssue}
+              >
                 ยกเลิก
               </Button>
-              <Button onClick={handleSubmitIssue} className="bg-purple-600 text-white hover:bg-purple-700">
-                บันทึกปัญหา
+              <Button
+                onClick={handleSubmitIssue}
+                disabled={creatingIssue}
+                className="bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60"
+              >
+                ส่งให้ผู้ขาย
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }
