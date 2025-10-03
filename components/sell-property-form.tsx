@@ -8,6 +8,7 @@ import {
   Bath,
   Bed,
   Car,
+  ArrowLeft,
   Ruler,
   LocateFixed,
   MapPin,
@@ -1375,6 +1376,10 @@ function SellPropertySuccess({
 
   useEffect(() => {
     setShareOpen(false)
+
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    }
   }, [property.id])
 
   const priceLabel = useMemo(
@@ -1450,9 +1455,22 @@ function SellPropertySuccess({
 
   return (
     <>
-      <div className={`${inter.className} min-h-screen bg-gradient-to-b from-gray-50 to-white`}> 
-        <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10">
-          <div className="rounded-3xl border border-emerald-200 bg-white px-6 py-8 text-center shadow-sm sm:px-10 sm:py-10">
+      <div className={`${inter.className} min-h-screen bg-gradient-to-b from-gray-50 to-white`}>
+        <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10">
+          <div className="flex justify-start">
+            <Button
+              asChild
+              variant="ghost"
+              className="group gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <Link href="/sell" className="flex items-center">
+                <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-1" />
+                กลับ
+              </Link>
+            </Button>
+          </div>
+
+          <div className="rounded-3xl border border-emerald-200 bg-white px-6 py-8 text-center shadow-sm animate-fade-in-down sm:px-10 sm:py-10">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
               <PartyPopper className="h-8 w-8" />
             </div>
@@ -1464,7 +1482,7 @@ function SellPropertySuccess({
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+          <div className="overflow-hidden rounded-3xl border bg-white shadow-sm animate-fade-in-up">
             <div className="grid grid-cols-1 gap-0 md:grid-cols-[1.2fr_1fr]">
               <div className="relative h-60 w-full bg-gray-100 md:h-full">
                 {primaryImage ? (
@@ -1555,7 +1573,9 @@ function SellPropertySuccess({
             </div>
           </div>
 
-          <PropertySharePanel property={property} />
+          <div className="animate-fade-in-up">
+            <PropertySharePanel property={property} />
+          </div>
         </div>
       </div>
       <PropertyShareModal
