@@ -328,8 +328,8 @@ export default function LocationSearchDialog({
         return "ไม่พบตำแหน่งปัจจุบันของคุณ ลองใหม่อีกครั้ง"
       case error.TIMEOUT:
         return "ใช้เวลานานเกินไปในการระบุตำแหน่ง กรุณาลองใหม่"
-      default:
-        return "ไม่สามารถระบุตำแหน่งได้ กรุณาลองใหม่"
+    default:
+      return "เกิดข้อผิดพลาดในการเข้าถึงตำแหน่ง กรุณาลองใหม่"
     }
   }
 

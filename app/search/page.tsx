@@ -103,7 +103,7 @@ const describeGeolocationError = (error: GeolocationPositionError) => {
     case error.TIMEOUT:
       return "ใช้เวลานานเกินไปในการระบุตำแหน่ง กรุณาลองใหม่"
     default:
-      return "ไม่สามารถระบุตำแหน่งได้ กรุณาลองใหม่"
+      return "เกิดข้อผิดพลาดในการเข้าถึงตำแหน่ง กรุณาลองใหม่"
   }
 }
 
