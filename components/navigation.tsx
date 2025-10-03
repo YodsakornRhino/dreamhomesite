@@ -33,6 +33,7 @@ import {
   LogOut,
   User,
   Mail,
+  Bell,
   AlertCircle,
   Loader2,
 } from "lucide-react"
@@ -50,6 +51,7 @@ import type {
 import type { UserProperty } from "@/types/user-property"
 import { getDocument } from "@/lib/firestore"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
+import type { HomeInspectionNotificationCountDetail } from "@/types/home-inspection"
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
@@ -68,6 +70,7 @@ const Navigation: React.FC = () => {
   const [propertyModalLoading, setPropertyModalLoading] = useState(false)
   const [propertyModalProperty, setPropertyModalProperty] = useState<UserProperty | null>(null)
   const activePropertyRequestIdRef = useRef<string | null>(null)
+  const [unreadInspectionNotifications, setUnreadInspectionNotifications] = useState(0)
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -85,8 +88,29 @@ const Navigation: React.FC = () => {
     if (!user) {
       setIsChatOpen(false)
       setRequestedParticipantId(null)
+      setUnreadInspectionNotifications(0)
     }
   }, [user])
+
+  useEffect(() => {
+    const handleInspectionNotificationCount = (event: Event) => {
+      const detail = (event as CustomEvent<HomeInspectionNotificationCountDetail>).detail
+      const count = detail?.count ?? 0
+      setUnreadInspectionNotifications(Math.max(0, Math.trunc(count)))
+    }
+
+    window.addEventListener(
+      "dreamhome:inspection-notification-count",
+      handleInspectionNotificationCount,
+    )
+
+    return () => {
+      window.removeEventListener(
+        "dreamhome:inspection-notification-count",
+        handleInspectionNotificationCount,
+      )
+    }
+  }, [])
 
   const buildPlaceholderProperty = useCallback(
     (preview: PropertyPreviewPayload, fallbackOwner?: string | null): UserProperty => {
@@ -197,6 +221,12 @@ const Navigation: React.FC = () => {
     },
     [buildPlaceholderProperty, loadPropertyById, propertyModalProperty],
   )
+
+  const handleOpenInspectionNotifications = useCallback(() => {
+    if (typeof window === "undefined") return
+
+    window.dispatchEvent(new CustomEvent("dreamhome:open-inspection-notifications"))
+  }, [])
 
   useEffect(() => {
     const handleOpenChat = (event: Event) => {
@@ -359,6 +389,21 @@ const Navigation: React.FC = () => {
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <Button
                     variant="ghost"
+                    className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0"
+                    onClick={handleOpenInspectionNotifications}
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span className="sr-only">เปิดการแจ้งเตือน</span>
+                    {unreadInspectionNotifications > 0 && (
+                      <span className="absolute right-0 top-0 inline-flex h-4 min-w-[16px] translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
+                        {unreadInspectionNotifications > 99
+                          ? "99+"
+                          : unreadInspectionNotifications}
+                      </span>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
                     className="h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0"
                     onClick={() => setIsChatOpen(true)}
                   >
@@ -399,6 +444,10 @@ const Navigation: React.FC = () => {
                       <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleOpenInspectionNotifications}>
+                        <Bell className="mr-2 h-4 w-4" />
+                        <span>การแจ้งเตือน</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setIsChatOpen(true)}>
                         <Mail className="mr-2 h-4 w-4" />

@@ -47,6 +47,7 @@ import type {
   HomeInspectionChecklistItem,
   HomeInspectionIssue,
   HomeInspectionNotification,
+  HomeInspectionNotificationCountDetail,
   HomeInspectionState,
 } from "@/types/home-inspection"
 import type { UserProperty } from "@/types/user-property"
@@ -205,6 +206,19 @@ export default function BuyerHomeInspectionPage() {
   const [notifications, setNotifications] = useState<HomeInspectionNotification[]>([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+
+  useEffect(() => {
+    const handleOpenNotifications = () => setNotificationsOpen(true)
+
+    window.addEventListener("dreamhome:open-inspection-notifications", handleOpenNotifications)
+
+    return () => {
+      window.removeEventListener(
+        "dreamhome:open-inspection-notifications",
+        handleOpenNotifications,
+      )
+    }
+  }, [])
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -499,6 +513,35 @@ export default function BuyerHomeInspectionPage() {
     () => notifications.filter((notification) => !notification.read),
     [notifications],
   )
+  const unreadNotificationCount = unreadNotifications.length
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    window.dispatchEvent(
+      new CustomEvent<HomeInspectionNotificationCountDetail>(
+        "dreamhome:inspection-notification-count",
+        {
+          detail: { count: unreadNotificationCount },
+        },
+      ),
+    )
+  }, [unreadNotificationCount])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent<HomeInspectionNotificationCountDetail>(
+          "dreamhome:inspection-notification-count",
+          {
+            detail: { count: 0 },
+          },
+        ),
+      )
+    }
+  }, [])
 
   useEffect(() => {
     if (!notificationsOpen || !propertyId) return

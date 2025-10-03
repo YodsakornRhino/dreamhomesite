@@ -61,3 +61,7 @@ export interface HomeInspectionNotification {
   relatedId?: string | null;
   read: boolean;
 }
+
+export interface HomeInspectionNotificationCountDetail {
+  count: number;
+}
