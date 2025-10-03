@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -369,9 +370,14 @@ export default function SellerHomeInspectionPage() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              <Home className="h-4 w-4" />
-              ขั้นตอนส่งมอบบ้าน
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                <Home className="h-4 w-4" />
+                ขั้นตอนส่งมอบบ้าน (ผู้ขาย)
+              </div>
+              <Badge className="rounded-full border border-blue-200 bg-blue-50 text-[10px] font-semibold tracking-wide text-blue-700">
+                Demo Flow
+              </Badge>
             </div>
             <h1 className="text-3xl font-semibold text-gray-900">
               กำหนดวันส่งมอบและตรวจเช็คสภาพบ้าน

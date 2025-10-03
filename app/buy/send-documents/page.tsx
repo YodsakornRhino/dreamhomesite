@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AlertCircle, CheckCircle2, ClipboardList, FileText, NotebookPen } from "lucide-react"
+import { AlertCircle, ArrowRight, CheckCircle2, ClipboardList, FileText, NotebookPen } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -165,9 +165,27 @@ export default function BuyerSendDocumentsPage() {
                   </div>
                 )}
                 {sellerConfirmed && (
-                  <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    ผู้ขายพร้อมรับเอกสารตัวจริงแล้ว
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      ผู้ขายพร้อมรับเอกสารตัวจริงแล้ว
+                    </div>
+                    <Button
+                      asChild
+                      size="sm"
+                      className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                    >
+                      <Link
+                        href={
+                          propertyId
+                            ? `/buy/home-inspection?propertyId=${propertyId}`
+                            : "/buy/home-inspection"
+                        }
+                      >
+                        ไปหน้า Demo ตรวจรับบ้าน
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
                   </div>
                 )}
               </div>
