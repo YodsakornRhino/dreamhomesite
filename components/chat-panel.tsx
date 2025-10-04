@@ -41,6 +41,7 @@ import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { usePresenceStatus } from "@/hooks/use-presence-status"
 import { useToast } from "@/hooks/use-toast"
+import useNotificationSound from "@/hooks/use-notification-sound"
 import type {
   ChatOpenEventDetail,
   PropertyPreviewOpenEventDetail,
@@ -306,7 +307,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const messageEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
   const lastThreadTimestampsRef = useRef<Record<string, number>>({})
   const initialThreadSnapshotRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
@@ -974,45 +974,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [toast, user?.uid])
 
-  const playNotificationSound = useCallback(async () => {
-    try {
-      if (typeof window === "undefined") return
-
-      const AudioContextConstructor =
-        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!AudioContextConstructor) return
-
-      const audioContext = audioContextRef.current ?? new AudioContextConstructor()
-
-      if (audioContext.state === "suspended") {
-        await audioContext.resume()
-      }
-
-      const now = audioContext.currentTime
-      const oscillator = audioContext.createOscillator()
-      const gain = audioContext.createGain()
-
-      const peakGain = 0.7
-      const fadeOutTime = 0.6
-
-      oscillator.type = "sine"
-      oscillator.frequency.setValueAtTime(880, now)
-
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(peakGain, now + 0.05)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOutTime)
-
-      oscillator.connect(gain)
-      gain.connect(audioContext.destination)
-
-      oscillator.start(now)
-      oscillator.stop(now + fadeOutTime)
-
-      audioContextRef.current = audioContext
-    } catch (error) {
-      console.error("Failed to play notification sound", error)
-    }
-  }, [])
+  const playNotificationSound = useNotificationSound()
 
   useEffect(() => {
     if (!user?.uid) return

@@ -53,6 +53,7 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import ChatPanel from "./chat-panel"
+import useNotificationSound from "@/hooks/use-notification-sound"
 import type {
   ChatOpenEventDetail,
   PropertyPreviewOpenEventDetail,
@@ -124,6 +125,9 @@ const Navigation: React.FC = () => {
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false)
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const notificationIdsRef = useRef<Set<string>>(new Set())
+  const notificationInitializedRef = useRef(false)
+  const playNotificationSound = useNotificationSound()
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -172,6 +176,8 @@ const Navigation: React.FC = () => {
       setUnreadNotificationCount(0)
       setNotificationsLoading(false)
       setIsNotificationDialogOpen(false)
+      notificationIdsRef.current = new Set()
+      notificationInitializedRef.current = false
     }
   }, [user])
 
@@ -184,15 +190,30 @@ const Navigation: React.FC = () => {
     let cancelled = false
 
     setNotificationsLoading(true)
+    notificationIdsRef.current = new Set()
+    notificationInitializedRef.current = false
 
     ;(async () => {
       try {
         unsubNotifications = await subscribeToUserNotifications(user.uid, (items) => {
           if (cancelled) return
 
+          const previousIds = notificationIdsRef.current
+          const currentIds = new Set(items.map((item) => item.id))
+          const hasNewUnread =
+            notificationInitializedRef.current &&
+            items.some((item) => !item.read && !previousIds.has(item.id))
+
           setUserNotifications(items)
           setUnreadNotificationCount(items.filter((item) => !item.read).length)
           setNotificationsLoading(false)
+
+          if (hasNewUnread) {
+            void playNotificationSound()
+          }
+
+          notificationIdsRef.current = currentIds
+          notificationInitializedRef.current = true
         })
       } catch (error) {
         console.error("Failed to subscribe user notifications", error)
@@ -210,7 +231,7 @@ const Navigation: React.FC = () => {
       cancelled = true
       unsubNotifications?.()
     }
-  }, [toast, user?.uid])
+  }, [playNotificationSound, toast, user?.uid])
 
   useEffect(() => {
     if (!isNotificationDialogOpen || !user?.uid) return

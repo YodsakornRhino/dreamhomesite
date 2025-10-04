@@ -47,6 +47,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
+import useNotificationSound from "@/hooks/use-notification-sound"
 import { subscribeToDocument } from "@/lib/firestore"
 import {
   attachInspectionIssuePhotos,
@@ -223,6 +224,14 @@ export default function SellerHomeInspectionPage() {
   const [notifications, setNotifications] = useState<HomeInspectionNotification[]>([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationIdsRef = useRef<Set<string>>(new Set())
+  const notificationsPrimedRef = useRef(false)
+  const playNotificationSound = useNotificationSound()
+
+  useEffect(() => {
+    notificationIdsRef.current = new Set()
+    notificationsPrimedRef.current = false
+  }, [propertyId])
 
   useEffect(() => {
     return () => {
@@ -445,6 +454,26 @@ export default function SellerHomeInspectionPage() {
       unsubscribe?.()
     }
   }, [propertyId, toast])
+
+  useEffect(() => {
+    const currentIds = new Set(notifications.map((item) => item.id))
+    if (!notificationsPrimedRef.current) {
+      notificationIdsRef.current = currentIds
+      notificationsPrimedRef.current = true
+      return
+    }
+
+    const previousIds = notificationIdsRef.current
+    const hasNewUnread = notifications.some(
+      (notification) => !notification.read && !previousIds.has(notification.id),
+    )
+
+    notificationIdsRef.current = currentIds
+
+    if (hasNewUnread) {
+      void playNotificationSound()
+    }
+  }, [notifications, playNotificationSound])
 
   useEffect(() => {
     if (stateLoading) return
