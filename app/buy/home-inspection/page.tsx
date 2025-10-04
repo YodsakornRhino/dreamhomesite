@@ -1,28 +1,40 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import type { ChangeEvent } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { format, parseISO } from "date-fns"
 import {
   AlertCircle,
   Bell,
+  BellRing,
   Calendar as CalendarIcon,
   CheckCircle2,
   ClipboardCheck,
   ClipboardList,
   Clock,
   Compass,
+  Image as ImageIcon,
   MessageCircle,
   ShieldCheck,
   Sparkles,
+  Trash2,
+  Upload,
   Wrench,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -31,9 +43,12 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { subscribeToDocument } from "@/lib/firestore"
 import {
+  attachInspectionIssuePhotos,
   createInspectionChecklistItem,
   createInspectionIssue,
+  deleteInspectionChecklistItem,
   markInspectionNotificationsRead,
+  remindInspectionIssue,
   subscribeToInspectionChecklist,
   subscribeToInspectionIssues,
   subscribeToInspectionState,
@@ -51,6 +66,8 @@ import type {
 } from "@/types/home-inspection"
 import type { UserProperty } from "@/types/user-property"
 import { markUserNotificationsReadByRelated } from "@/lib/notifications"
+import { getDownloadURL, uploadFile } from "@/lib/storage"
+import { sanitizeFileName } from "@/lib/utils"
 
 const buyerStatusMeta: Record<
   HomeInspectionChecklistItem["buyerStatus"],
@@ -202,10 +219,36 @@ export default function BuyerHomeInspectionPage() {
   const [reportLocation, setReportLocation] = useState("")
   const [reportExpectedDate, setReportExpectedDate] = useState("")
   const [creatingIssue, setCreatingIssue] = useState(false)
+  const [reportBeforePhotos, setReportBeforePhotos] = useState<
+    { file: File; preview: string }[]
+  >([])
+  const beforePhotoInputRef = useRef<HTMLInputElement | null>(null)
 
   const [notifications, setNotifications] = useState<HomeInspectionNotification[]>([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [checklistItemToDelete, setChecklistItemToDelete] =
+    useState<HomeInspectionChecklistItem | null>(null)
+  const [deletingChecklist, setDeletingChecklist] = useState(false)
+  const [issueReminderState, setIssueReminderState] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    return () => {
+      reportBeforePhotos.forEach((entry) => URL.revokeObjectURL(entry.preview))
+    }
+  }, [reportBeforePhotos])
+
+  useEffect(() => {
+    if (!reportDialogOpen) {
+      setReportBeforePhotos((prev) => {
+        prev.forEach((entry) => URL.revokeObjectURL(entry.preview))
+        return []
+      })
+      if (beforePhotoInputRef.current) {
+        beforePhotoInputRef.current.value = ""
+      }
+    }
+  }, [reportDialogOpen])
 
   useEffect(() => {
     const handleOpenNotifications = () => setNotificationsOpen(true)
@@ -628,6 +671,110 @@ export default function BuyerHomeInspectionPage() {
     }
   }
 
+  const handleChecklistDeleteClick = (item: HomeInspectionChecklistItem) => {
+    setChecklistItemToDelete(item)
+  }
+
+  const handleConfirmDeleteChecklist = async () => {
+    if (!propertyId || !checklistItemToDelete) return
+    setDeletingChecklist(true)
+    try {
+      await deleteInspectionChecklistItem(propertyId, checklistItemToDelete.id, {
+        removedBy: "buyer",
+        itemTitle: checklistItemToDelete.title,
+      })
+      toast({
+        title: "ลบรายการออกจากเช็คลิสต์แล้ว",
+        description: "DreamHome แจ้งเตือนผู้ขายให้รับทราบ",
+      })
+      setChecklistItemToDelete(null)
+    } catch (error) {
+      console.error("Failed to delete checklist item", error)
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถลบรายการได้",
+        description: "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setDeletingChecklist(false)
+    }
+  }
+
+  const handleReportBeforePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    if (files.length === 0) {
+      setReportBeforePhotos((prev) => {
+        prev.forEach((entry) => URL.revokeObjectURL(entry.preview))
+        return []
+      })
+      return
+    }
+
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"))
+
+    if (imageFiles.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "อัปโหลดได้เฉพาะรูปภาพ",
+      })
+      setReportBeforePhotos((prev) => {
+        prev.forEach((entry) => URL.revokeObjectURL(entry.preview))
+        return []
+      })
+      return
+    }
+
+    setReportBeforePhotos((prev) => {
+      prev.forEach((entry) => URL.revokeObjectURL(entry.preview))
+      return imageFiles.map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      }))
+    })
+  }
+
+  const handleRemoveBeforePhoto = (preview: string) => {
+    setReportBeforePhotos((prev) => {
+      const next = prev.filter((entry) => entry.preview !== preview)
+      const removed = prev.find((entry) => entry.preview === preview)
+      if (removed) {
+        URL.revokeObjectURL(removed.preview)
+      }
+      return next
+    })
+    if (beforePhotoInputRef.current && beforePhotoInputRef.current.files?.length === 1) {
+      beforePhotoInputRef.current.value = ""
+    }
+  }
+
+  const handleIssueReminderClick = async (issue: HomeInspectionIssue) => {
+    if (!propertyId) return
+    setIssueReminderState((prev) => ({ ...prev, [issue.id]: true }))
+    try {
+      await remindInspectionIssue(propertyId, issue.id, {
+        triggeredBy: "buyer",
+        issueTitle: issue.title,
+      })
+      toast({
+        title: "ส่งการแจ้งเตือนให้ผู้ขายแล้ว",
+        description: "ระบบจะกระตุ้นให้ผู้ขายอัปเดตความคืบหน้า",
+      })
+    } catch (error) {
+      console.error("Failed to remind seller", error)
+      toast({
+        variant: "destructive",
+        title: "เตือนผู้ขายไม่สำเร็จ",
+        description: "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setIssueReminderState((prev) => {
+        const next = { ...prev }
+        delete next[issue.id]
+        return next
+      })
+    }
+  }
+
   const handleSubmitIssue = async () => {
     if (!propertyId) return
     if (!reportTitle.trim() || !reportLocation.trim()) {
@@ -640,7 +787,7 @@ export default function BuyerHomeInspectionPage() {
 
     setCreatingIssue(true)
     try {
-      await createInspectionIssue(
+      const issueId = await createInspectionIssue(
         propertyId,
         {
           title: reportTitle.trim(),
@@ -652,11 +799,43 @@ export default function BuyerHomeInspectionPage() {
         },
         "buyer",
       )
+      if (reportBeforePhotos.length > 0) {
+        const baseTimestamp = Date.now()
+        const uploads = await Promise.all(
+          reportBeforePhotos.map(async (entry, index) => {
+            const safeOriginalName = entry.file.name || `before-${index + 1}.jpg`
+            const storagePath = `inspection-issues/${propertyId}/${issueId}/before/${baseTimestamp}-${index}-${sanitizeFileName(safeOriginalName)}`
+            const metadata =
+              entry.file.type && entry.file.type.length > 0
+                ? { contentType: entry.file.type }
+                : undefined
+            const uploadResult = await uploadFile(storagePath, entry.file, metadata)
+            const fullPath = uploadResult.metadata.fullPath ?? storagePath
+            const downloadUrl = await getDownloadURL(fullPath)
+            return {
+              url: downloadUrl,
+              storagePath: fullPath,
+              uploadedBy: "buyer" as const,
+            }
+          }),
+        )
+
+        await attachInspectionIssuePhotos(propertyId, issueId, "before", uploads, {
+          issueTitle: reportTitle.trim(),
+        })
+      }
       setReportDialogOpen(false)
       setReportTitle("")
       setReportDescription("")
       setReportLocation("")
       setReportExpectedDate("")
+      setReportBeforePhotos((prev) => {
+        prev.forEach((entry) => URL.revokeObjectURL(entry.preview))
+        return []
+      })
+      if (beforePhotoInputRef.current) {
+        beforePhotoInputRef.current.value = ""
+      }
       toast({
         title: "ส่งคำขอแก้ไขแล้ว",
         description: "ผู้ขายจะได้รับการแจ้งเตือนใน Defect Tracking",
@@ -979,17 +1158,28 @@ export default function BuyerHomeInspectionPage() {
                                 เพิ่มโดย {item.createdBy === "buyer" ? "ผู้ซื้อ" : "ผู้ขาย"}
                               </p>
                             </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <Badge
-                                className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${sellerStatusMeta[item.sellerStatus].tone}`}
+                            <div className="flex items-start gap-2">
+                              <div className="flex flex-col items-end gap-2">
+                                <Badge
+                                  className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${sellerStatusMeta[item.sellerStatus].tone}`}
+                                >
+                                  {sellerStatusMeta[item.sellerStatus].label}
+                                </Badge>
+                                <Badge
+                                  className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${buyerStatusMeta[item.buyerStatus].tone}`}
+                                >
+                                  {buyerStatusMeta[item.buyerStatus].label}
+                                </Badge>
+                              </div>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-slate-400 hover:text-red-600"
+                                onClick={() => handleChecklistDeleteClick(item)}
+                                aria-label="ลบรายการเช็คลิสต์"
                               >
-                                {sellerStatusMeta[item.sellerStatus].label}
-                              </Badge>
-                              <Badge
-                                className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${buyerStatusMeta[item.buyerStatus].tone}`}
-                              >
-                                {buyerStatusMeta[item.buyerStatus].label}
-                              </Badge>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -1132,6 +1322,54 @@ export default function BuyerHomeInspectionPage() {
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm text-slate-600">
                       <p>{issue.description}</p>
+                      {issue.beforePhotos.length > 0 && (
+                        <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+                          <p className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                            <ImageIcon className="h-4 w-4 text-slate-500" /> รูปก่อนแก้ไข
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {issue.beforePhotos.map((photo) => (
+                              <a
+                                key={photo.id}
+                                href={photo.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative block h-20 w-28 overflow-hidden rounded-lg border border-slate-200"
+                              >
+                                <img
+                                  src={photo.url}
+                                  alt={`Before fix ${issue.title}`}
+                                  className="h-full w-full object-cover transition group-hover:scale-105"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {issue.afterPhotos.length > 0 && (
+                        <div className="space-y-2 rounded-xl bg-emerald-50/60 p-3">
+                          <p className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                            <ImageIcon className="h-4 w-4 text-emerald-500" /> รูปหลังแก้ไข
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {issue.afterPhotos.map((photo) => (
+                              <a
+                                key={photo.id}
+                                href={photo.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative block h-20 w-28 overflow-hidden rounded-lg border border-emerald-200"
+                              >
+                                <img
+                                  src={photo.url}
+                                  alt={`After fix ${issue.title}`}
+                                  className="h-full w-full object-cover transition group-hover:scale-105"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                         <span>รายงานเมื่อ {format(parseISO(issue.reportedAt), "d MMM yyyy")}</span>
                         {issue.owner && (
@@ -1152,6 +1390,19 @@ export default function BuyerHomeInspectionPage() {
                         </p>
                       )}
                       <p className="text-xs text-slate-500">{issueStatusMeta[issue.status].description}</p>
+                      {issue.status !== "completed" && (
+                        <div className="pt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full border-amber-200 text-amber-600 hover:bg-amber-50"
+                            onClick={() => handleIssueReminderClick(issue)}
+                            disabled={Boolean(issueReminderState[issue.id])}
+                          >
+                            <BellRing className="mr-2 h-4 w-4" /> เตือนผู้ขาย
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))
@@ -1213,6 +1464,46 @@ export default function BuyerHomeInspectionPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={Boolean(checklistItemToDelete)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setChecklistItemToDelete(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              ยืนยันการลบรายการตรวจ
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              {checklistItemToDelete
+                ? `ต้องการลบ "${checklistItemToDelete.title}" ออกจากเช็คลิสต์ใช่หรือไม่?`
+                : "ต้องการลบรายการนี้ออกจากเช็คลิสต์ใช่หรือไม่"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setChecklistItemToDelete(null)}
+              className="border-slate-200 text-slate-600 hover:bg-slate-100"
+              disabled={deletingChecklist}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={handleConfirmDeleteChecklist}
+              disabled={deletingChecklist}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              ลบรายการ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -1254,6 +1545,55 @@ export default function BuyerHomeInspectionPage() {
                 onChange={(event) => setReportDescription(event.target.value)}
                 placeholder="บรรยายเพิ่มเติมเพื่อให้ทีมผู้ขายเข้าใจปัญหา"
               />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-slate-700">
+                แนบรูปก่อนแก้ไข (ไม่บังคับ)
+              </Label>
+              <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 p-4">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Upload className="h-4 w-4 text-slate-400" /> เพิ่มรูปเพื่อให้ผู้ขายเห็นปัญหาชัดเจน
+                </div>
+                <Input
+                  ref={beforePhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleReportBeforePhotoChange}
+                  disabled={creatingIssue}
+                />
+                {reportBeforePhotos.length === 0 ? (
+                  <p className="text-xs text-slate-500">
+                    เลือกรูปความเสียหายก่อนแก้ไขเพื่อให้ผู้ขายประเมินงานได้ง่ายขึ้น
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {reportBeforePhotos.map((entry) => (
+                      <div
+                        key={entry.preview}
+                        className="relative h-20 w-28 overflow-hidden rounded-lg border border-slate-200"
+                      >
+                        <img
+                          src={entry.preview}
+                          alt="ภาพก่อนแก้ไข"
+                          className="h-full w-full object-cover"
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="absolute right-1 top-1 h-6 w-6 rounded-full bg-white/80 text-red-500 hover:bg-white"
+                          onClick={() => handleRemoveBeforePhoto(entry.preview)}
+                          disabled={creatingIssue}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="sr-only">ลบรูปนี้</span>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="issue-expected-date" className="text-xs font-semibold text-slate-700">

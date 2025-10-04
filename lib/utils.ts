@@ -5,6 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_")
+}
+
 // Normalize phone numbers to E.164.
 // Removes non-digit characters and converts Thai numbers
 // starting with "0" to use the "+66" country code.

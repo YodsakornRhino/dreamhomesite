@@ -2,6 +2,7 @@ import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 
 import {
   addDocument,
+  deleteDocument,
   getDocument,
   setDocument,
   subscribeToCollection,
@@ -14,6 +15,7 @@ import type {
   HomeInspectionChecklistItem,
   HomeInspectionIssue,
   HomeInspectionIssueStatus,
+  HomeInspectionIssuePhoto,
   HomeInspectionRole,
   HomeInspectionState,
   SellerChecklistStatus,
@@ -192,6 +194,45 @@ const mapIssueDoc = (doc: QueryDocumentSnapshot<DocumentData>): HomeInspectionIs
 
   const status = isIssueStatus(data.status) ? data.status : "pending"
 
+  const mapIssuePhotos = (value: unknown): HomeInspectionIssuePhoto[] => {
+    if (!Array.isArray(value)) {
+      return []
+    }
+
+    return value
+      .map((entry, index): HomeInspectionIssuePhoto | null => {
+        if (!entry || typeof entry !== "object") {
+          return null
+        }
+
+        const record = entry as Record<string, unknown>
+        const idValue = toStringValue(record.id)
+        const id = idValue && idValue.trim().length > 0 ? idValue : `${index}`
+        const url = toStringValue(record.url)
+        if (!url) {
+          return null
+        }
+
+        const storagePath =
+          typeof record.storagePath === "string" && record.storagePath.trim().length > 0
+            ? record.storagePath
+            : null
+
+        const uploadedAtRaw = toIsoString(record.uploadedAt)
+        const uploadedAt = uploadedAtRaw || new Date().toISOString()
+        const uploadedBy = record.uploadedBy === "seller" ? "seller" : "buyer"
+
+        return {
+          id,
+          url,
+          storagePath,
+          uploadedAt,
+          uploadedBy,
+        }
+      })
+      .filter((photo): photo is HomeInspectionIssuePhoto => photo !== null)
+  }
+
   return {
     id: doc.id,
     title: toStringValue(data.title),
@@ -204,6 +245,8 @@ const mapIssueDoc = (doc: QueryDocumentSnapshot<DocumentData>): HomeInspectionIs
     expectedCompletion: toOptionalString(data.expectedCompletion),
     resolvedAt: toOptionalString(data.resolvedAt),
     owner: toOptionalString(data.owner),
+    beforePhotos: mapIssuePhotos(data.beforePhotos),
+    afterPhotos: mapIssuePhotos(data.afterPhotos),
   }
 }
 
@@ -531,6 +574,30 @@ export const updateInspectionChecklistItem = async (
   })
 }
 
+export const deleteInspectionChecklistItem = async (
+  propertyId: string,
+  itemId: string,
+  meta?: { removedBy?: HomeInspectionRole; itemTitle?: string },
+): Promise<void> => {
+  await deleteDocument(`property/${propertyId}/inspectionChecklist`, itemId)
+
+  const remover = meta?.removedBy === "seller" ? "seller" : "buyer"
+  const title =
+    remover === "seller" ? "ผู้ขายลบรายการตรวจ" : "ผู้ซื้อลบรายการตรวจออกจากเช็คลิสต์"
+
+  const message = meta?.itemTitle
+    ? `ลบรายการ “${meta.itemTitle}” ออกจากเช็คลิสต์`
+    : "มีการลบรายการออกจากเช็คลิสต์"
+
+  await createInspectionNotification(propertyId, {
+    title,
+    message,
+    category: "checklist",
+    triggeredBy: remover,
+    relatedId: itemId,
+  })
+}
+
 export const subscribeToInspectionIssues = async (
   propertyId: string,
   callback: (issues: HomeInspectionIssue[]) => void,
@@ -560,7 +627,7 @@ export const createInspectionIssue = async (
     owner?: string | null
   },
   reportedBy: HomeInspectionRole,
-): Promise<void> => {
+): Promise<string> => {
   const now = new Date().toISOString()
   const docRef = await addDocument(`property/${propertyId}/inspectionIssues`, {
     title: input.title,
@@ -573,6 +640,8 @@ export const createInspectionIssue = async (
     expectedCompletion: input.expectedCompletion ?? null,
     resolvedAt: null,
     owner: input.owner ?? null,
+    beforePhotos: [],
+    afterPhotos: [],
   })
 
   const details: string[] = [
@@ -602,6 +671,8 @@ export const createInspectionIssue = async (
     triggeredBy: reportedBy,
     relatedId: docRef.id,
   })
+
+  return docRef.id
 }
 
 export const updateInspectionIssue = async (
@@ -615,6 +686,8 @@ export const updateInspectionIssue = async (
     expectedCompletion: string | null
     resolvedAt: string | null
     owner: string | null
+    beforePhotos: HomeInspectionIssuePhoto[]
+    afterPhotos: HomeInspectionIssuePhoto[]
   }>,
   meta?: { updatedBy?: HomeInspectionRole; issueTitle?: string },
 ): Promise<void> => {
@@ -659,6 +732,20 @@ export const updateInspectionIssue = async (
     changes.push(description ? `รายละเอียด: ${description}` : "ลบรายละเอียดงาน")
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(updates, "beforePhotos") &&
+    Array.isArray(updates.beforePhotos)
+  ) {
+    changes.push(`ปรับรูปก่อนแก้ไข: ${updates.beforePhotos.length} รูป`)
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(updates, "afterPhotos") &&
+    Array.isArray(updates.afterPhotos)
+  ) {
+    changes.push(`ปรับรูปหลังแก้ไข: ${updates.afterPhotos.length} รูป`)
+  }
+
   const message = changes.length > 0 ? changes.join(" • ") : "มีการอัปเดตรายการแจ้งซ่อม"
   const title = meta?.issueTitle ? `อัปเดตงานซ่อม: ${meta.issueTitle}` : "อัปเดตงานซ่อม"
 
@@ -668,6 +755,95 @@ export const updateInspectionIssue = async (
     category: "issue",
     triggeredBy: meta?.updatedBy ?? "seller",
     relatedId: issueId,
+  })
+}
+
+export const attachInspectionIssuePhotos = async (
+  propertyId: string,
+  issueId: string,
+  type: "before" | "after",
+  photos: {
+    url: string
+    storagePath?: string | null
+    uploadedBy: HomeInspectionRole
+    uploadedAt?: string
+    id?: string
+  }[],
+  meta?: { issueTitle?: string },
+): Promise<void> => {
+  if (photos.length === 0) {
+    return
+  }
+
+  const { arrayUnion } = await import("firebase/firestore")
+
+  const entries = photos.map((photo) => ({
+    id:
+      photo.id && photo.id.trim().length > 0
+        ? photo.id
+        : `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    url: photo.url,
+    storagePath: photo.storagePath ?? null,
+    uploadedAt: photo.uploadedAt ?? new Date().toISOString(),
+    uploadedBy: photo.uploadedBy,
+  }))
+
+  const now = new Date().toISOString()
+  const field = type === "before" ? "beforePhotos" : "afterPhotos"
+
+  await updateDocument(`property/${propertyId}/inspectionIssues`, issueId, {
+    [field]: arrayUnion(...entries),
+    updatedAt: now,
+  })
+
+  const count = entries.length
+  const actor = entries[0]?.uploadedBy ?? "buyer"
+  const title =
+    type === "before"
+      ? "เพิ่มรูปก่อนแก้ไขงานซ่อม"
+      : "ผู้ขายอัปโหลดรูปหลังแก้ไข"
+
+  const issueTitle = meta?.issueTitle ? ` (${meta.issueTitle})` : ""
+  const message =
+    type === "before"
+      ? `แนบรูปก่อนแก้ไข ${count} รูป${issueTitle}`
+      : `แนบรูปหลังแก้ไข ${count} รูป${issueTitle}`
+
+  const audience: HomeInspectionNotificationAudience =
+    type === "before" ? "seller" : type === "after" ? "buyer" : "all"
+
+  await createInspectionNotification(propertyId, {
+    title,
+    message,
+    category: "issue",
+    triggeredBy: actor,
+    relatedId: issueId,
+    audience,
+  })
+}
+
+export const remindInspectionIssue = async (
+  propertyId: string,
+  issueId: string,
+  options: { triggeredBy: HomeInspectionRole; issueTitle?: string; note?: string },
+): Promise<void> => {
+  const targetAudience: HomeInspectionNotificationAudience =
+    options.triggeredBy === "buyer" ? "seller" : "buyer"
+
+  const issueTitle = options.issueTitle ? `: ${options.issueTitle}` : ""
+  const message = options.note
+    ? options.note
+    : options.triggeredBy === "buyer"
+    ? `ผู้ซื้อขอความคืบหน้างาน${issueTitle}`
+    : `ผู้ขายแจ้งเตือนงานซ่อม${issueTitle}`
+
+  await createInspectionNotification(propertyId, {
+    title: options.triggeredBy === "buyer" ? "เตือนผู้ขายให้อัปเดตงาน" : "เตือนผู้ซื้อให้อัปเดตงาน",
+    message,
+    category: "issue",
+    triggeredBy: options.triggeredBy,
+    relatedId: issueId,
+    audience: targetAudience,
   })
 }
 

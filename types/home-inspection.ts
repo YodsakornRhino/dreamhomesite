@@ -10,6 +10,14 @@ export interface HomeInspectionState {
 export type BuyerChecklistStatus = "pending" | "accepted" | "follow-up";
 export type SellerChecklistStatus = "scheduled" | "fixing" | "done";
 
+export interface HomeInspectionIssuePhoto {
+  id: string;
+  url: string;
+  storagePath?: string | null;
+  uploadedAt: string;
+  uploadedBy: HomeInspectionRole;
+}
+
 export interface HomeInspectionChecklistItem {
   id: string;
   title: string;
@@ -39,6 +47,8 @@ export interface HomeInspectionIssue {
   expectedCompletion?: string | null;
   resolvedAt?: string | null;
   owner?: string | null;
+  beforePhotos: HomeInspectionIssuePhoto[];
+  afterPhotos: HomeInspectionIssuePhoto[];
 }
 
 export type HomeInspectionNotificationAudience = "buyer" | "seller" | "all";
