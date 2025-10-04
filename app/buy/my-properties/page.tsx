@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { CheckCircle2, FileText, Home, ListChecks, MapPin } from "lucide-react";
@@ -10,9 +10,12 @@ import { CheckCircle2, FileText, Home, ListChecks, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useBuyerProperties } from "@/hooks/use-buyer-properties";
 import { formatPropertyPrice, TRANSACTION_LABELS } from "@/lib/property";
+import { useToast } from "@/hooks/use-toast";
+import { cancelPropertyPurchase } from "@/lib/property-purchase";
 import type { BuyerProperty } from "@/types/buyer-property";
 
 const safeFormatDate = (value: string | null) => {
@@ -51,6 +54,9 @@ export default function BuyerPropertiesPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuthContext();
   const { properties, loading, error } = useBuyerProperties(user?.uid ?? null);
+  const { toast } = useToast();
+  const [cancelTarget, setCancelTarget] = useState<BuyerProperty | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -60,9 +66,70 @@ export default function BuyerPropertiesPage() {
 
   const showEmptyState = !loading && properties.length === 0;
 
+  const handleCloseDialog = (open: boolean) => {
+    if (!open && !cancelling) {
+      setCancelTarget(null);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelTarget) return;
+
+    if (!user?.uid) {
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถยกเลิกได้",
+        description: "กรุณาเข้าสู่ระบบก่อน",
+      });
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      await cancelPropertyPurchase(cancelTarget.propertyId, "buyer");
+      toast({
+        title: "ยกเลิกรายการซื้อเรียบร้อย",
+        description: `ระบบได้ล้างข้อมูลการตรวจของ ${cancelTarget.title}`,
+      });
+      setCancelTarget(null);
+    } catch (error) {
+      console.error("Failed to cancel buyer property", error);
+      toast({
+        variant: "destructive",
+        title: "ยกเลิกไม่สำเร็จ",
+        description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 py-10">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
+        <Dialog open={Boolean(cancelTarget)} onOpenChange={handleCloseDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold text-slate-900">ยกเลิกการซื้อประกาศนี้หรือไม่?</DialogTitle>
+              <DialogDescription className="text-sm text-slate-600">
+                ระบบจะลบข้อมูลการตรวจและการแจ้งเตือนทั้งหมดของประกาศนี้ เพื่อคืนสถานะให้ผู้ซื้อรายอื่น
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+                กลับไปก่อน
+              </Button>
+              <Button
+                onClick={handleConfirmCancel}
+                disabled={cancelling}
+                className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {cancelling ? "กำลังยกเลิก..." : "ยืนยันการยกเลิก"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <div className="space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
             <Home className="h-4 w-4" />
@@ -229,6 +296,14 @@ export default function BuyerPropertiesPage() {
                           <Link href={`/buy/home-inspection?propertyId=${property.propertyId}#timeline`}>
                             ติดตามการส่งบ้าน
                           </Link>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={() => setCancelTarget(property)}
+                        >
+                          ยกเลิกรายการนี้
                         </Button>
                       </div>
                     </div>

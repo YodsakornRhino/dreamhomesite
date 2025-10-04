@@ -2,6 +2,7 @@ import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 
 import {
   addDocument,
+  deleteDocument,
   getDocuments,
   subscribeToCollection,
   updateDocument,
@@ -169,4 +170,28 @@ export const markUserNotificationsReadByRelated = async (
       ),
     );
   }
+};
+
+export const deleteUserNotificationsByRelatedId = async (
+  userId: string,
+  relatedId: string,
+): Promise<void> => {
+  if (!relatedId) return;
+
+  const { where } = await import("firebase/firestore");
+
+  const docs = await getDocuments(
+    `users/${userId}/notifications`,
+    where("relatedId", "==", relatedId),
+  );
+
+  if (docs.length === 0) return;
+
+  await Promise.all(
+    docs.map((doc) =>
+      deleteDocument(`users/${userId}/notifications`, doc.id).catch((error) => {
+        console.error("Failed to delete user notification", error);
+      }),
+    ),
+  );
 };

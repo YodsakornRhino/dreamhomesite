@@ -58,6 +58,7 @@ import {
   updateInspectionState,
 } from "@/lib/home-inspection"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
+import { cancelPropertyPurchase } from "@/lib/property-purchase"
 import type { ChatOpenEventDetail } from "@/types/chat"
 import type {
   HomeInspectionChecklistItem,
@@ -235,6 +236,9 @@ export default function BuyerHomeInspectionPage() {
   const notificationIdsRef = useRef<Set<string>>(new Set())
   const notificationsPrimedRef = useRef(false)
   const playNotificationSound = useNotificationSound()
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const propertyAccessGuardRef = useRef(false)
 
   useEffect(() => {
     notificationIdsRef.current = new Set()
@@ -277,6 +281,27 @@ export default function BuyerHomeInspectionPage() {
       router.replace("/")
     }
   }, [authLoading, router, user])
+
+  useEffect(() => {
+    if (propertyLoading) return
+    if (!property) return
+    if (!user?.uid) return
+
+    if (property.isUnderPurchase && property.confirmedBuyerId === user.uid) {
+      propertyAccessGuardRef.current = false
+      return
+    }
+
+    if (!propertyAccessGuardRef.current) {
+      propertyAccessGuardRef.current = true
+      toast({
+        variant: "destructive",
+        title: "ประกาศนี้ไม่พร้อมให้ตรวจแล้ว",
+        description: "ระบบได้ยกเลิกการซื้อสำหรับประกาศนี้",
+      })
+      router.replace("/buy/my-properties")
+    }
+  }, [property, propertyLoading, router, toast, user?.uid])
 
   useEffect(() => {
     if (!propertyId) {
@@ -645,6 +670,56 @@ export default function BuyerHomeInspectionPage() {
     window.dispatchEvent(new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", { detail }))
   }
 
+  const handleCancelPurchase = async () => {
+    if (!propertyId) {
+      toast({
+        variant: "destructive",
+        title: "ไม่พบประกาศ",
+        description: "กรุณากลับไปเลือกประกาศจากรายการอีกครั้ง",
+      })
+      return
+    }
+
+    if (!user?.uid) {
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถยกเลิกได้",
+        description: "กรุณาเข้าสู่ระบบก่อน",
+      })
+      return
+    }
+
+    if (!property || property.confirmedBuyerId !== user.uid) {
+      toast({
+        variant: "destructive",
+        title: "ยกเลิกไม่สำเร็จ",
+        description: "ประกาศนี้ไม่ได้อยู่ในรายการของคุณ",
+      })
+      return
+    }
+
+    setCancelling(true)
+    try {
+      await cancelPropertyPurchase(propertyId, "buyer")
+      propertyAccessGuardRef.current = true
+      toast({
+        title: "ยกเลิกการซื้อเรียบร้อย",
+        description: "ระบบได้ล้างข้อมูลการตรวจและคืนประกาศให้พร้อมขาย",
+      })
+      setCancelDialogOpen(false)
+      router.replace("/buy/my-properties")
+    } catch (error) {
+      console.error("Failed to cancel inspection purchase", error)
+      toast({
+        variant: "destructive",
+        title: "ยกเลิกไม่สำเร็จ",
+        description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   const handleUpdateBuyerStatus = async (
     id: string,
     status: HomeInspectionChecklistItem["buyerStatus"],
@@ -932,8 +1007,34 @@ export default function BuyerHomeInspectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
+    <>
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-slate-900">
+              ยืนยันการยกเลิกรายการซื้อนี้
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              ระบบจะลบเช็คลิสต์ รายงานปัญหา และนัดหมายทั้งหมด เพื่อคืนสถานะประกาศให้ผู้ซื้อรายอื่น
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              กลับไปก่อน
+            </Button>
+            <Button
+              onClick={handleCancelPurchase}
+              disabled={cancelling}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {cancelling ? "กำลังยกเลิก..." : "ยืนยันการยกเลิก"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="min-h-screen bg-slate-50 py-10">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
         <div className="space-y-4 rounded-3xl bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
@@ -984,6 +1085,14 @@ export default function BuyerHomeInspectionPage() {
                       {unreadNotifications.length > 99 ? "99+" : unreadNotifications.length}
                     </span>
                   )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCancelDialogOpen(true)}
+                  className="flex items-center gap-2 rounded-full border-red-200 text-red-600 hover:bg-red-50"
+                >
+                  ยกเลิกรายการซื้อ
                 </Button>
               </div>
             </div>
@@ -1655,6 +1764,8 @@ export default function BuyerHomeInspectionPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
+      </div>
+    </>
   )
 }

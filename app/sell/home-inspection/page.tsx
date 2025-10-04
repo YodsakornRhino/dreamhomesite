@@ -65,6 +65,7 @@ import {
   updateInspectionState,
 } from "@/lib/home-inspection"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
+import { cancelPropertyPurchase } from "@/lib/property-purchase"
 import type {
   HomeInspectionChecklistItem,
   HomeInspectionIssue,
@@ -227,6 +228,8 @@ export default function SellerHomeInspectionPage() {
   const notificationIdsRef = useRef<Set<string>>(new Set())
   const notificationsPrimedRef = useRef(false)
   const playNotificationSound = useNotificationSound()
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     notificationIdsRef.current = new Set()
@@ -643,6 +646,56 @@ export default function SellerHomeInspectionPage() {
       : {}
 
     window.dispatchEvent(new CustomEvent<ChatOpenEventDetail>("dreamhome:open-chat", { detail }))
+  }
+
+  const handleCancelPurchase = async () => {
+    if (!propertyId) {
+      toast({
+        variant: "destructive",
+        title: "ไม่พบประกาศ",
+        description: "กรุณากลับไปเลือกประกาศจากรายการอีกครั้ง",
+      })
+      return
+    }
+
+    if (!user?.uid) {
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถยกเลิกได้",
+        description: "กรุณาเข้าสู่ระบบก่อน",
+      })
+      return
+    }
+
+    if (!property || !property.confirmedBuyerId) {
+      toast({
+        variant: "destructive",
+        title: "ยังไม่มีผู้ซื้อ",
+        description: "ประกาศนี้ยังไม่มีผู้ซื้อที่ยืนยันไว้",
+      })
+      return
+    }
+
+    setCancelling(true)
+    try {
+      await cancelPropertyPurchase(propertyId, "seller")
+      toast({
+        title: "ยกเลิกการซื้อเรียบร้อย",
+        description: property.title
+          ? `ระบบคืนสถานะประกาศ ${property.title} แล้ว`
+          : "ระบบคืนสถานะประกาศเรียบร้อย",
+      })
+      setCancelDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to cancel inspection purchase as seller", error)
+      toast({
+        variant: "destructive",
+        title: "ยกเลิกไม่สำเร็จ",
+        description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setCancelling(false)
+    }
   }
 
   const handleAddChecklistItem = async () => {
@@ -1076,8 +1129,32 @@ export default function SellerHomeInspectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
+    <>
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-slate-900">ยกเลิกการซื้อสำหรับผู้ซื้อนี้</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              ระบบจะลบเช็คลิสต์ รายการแจ้งซ่อม และนัดหมายทั้งหมด เพื่อให้ประกาศพร้อมสำหรับผู้ซื้อรายถัดไป
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
+              กลับไปก่อน
+            </Button>
+            <Button
+              onClick={handleCancelPurchase}
+              disabled={cancelling}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {cancelling ? "กำลังยกเลิก..." : "ยืนยันการยกเลิก"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="min-h-screen bg-slate-50 py-10">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
         <div className="space-y-4 rounded-3xl bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
@@ -1129,6 +1206,16 @@ export default function SellerHomeInspectionPage() {
                     </span>
                   )}
                 </Button>
+                {property.confirmedBuyerId && property.isUnderPurchase && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCancelDialogOpen(true)}
+                    className="flex items-center gap-2 rounded-full border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    ยกเลิกรายการซื้อ
+                  </Button>
+                )}
               </div>
             </div>
             <Card className="w-full max-w-sm border border-slate-200 bg-slate-900 text-slate-50 shadow-lg">
@@ -1844,6 +1931,8 @@ export default function SellerHomeInspectionPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
+      </div>
+    </>
   )
 }

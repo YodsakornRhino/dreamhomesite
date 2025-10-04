@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { subscribeToDocument, updateDocument } from "@/lib/firestore"
+import { cancelPropertyPurchase } from "@/lib/property-purchase"
 
 interface DocumentItem {
   id: string
@@ -73,6 +75,10 @@ export default function SellerSendDocumentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [remoteConfirmed, setRemoteConfirmed] = useState(false)
   const [buyerUid, setBuyerUid] = useState<string | null>(null)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [propertyTitle, setPropertyTitle] = useState<string | null>(null)
+  const [isUnderPurchase, setIsUnderPurchase] = useState(false)
 
   const requiredCompletedCount = useMemo(
     () => REQUIRED_DOCUMENTS.filter((doc) => checkedState[doc.id]).length,
@@ -127,6 +133,12 @@ export default function SellerSendDocumentsPage() {
             }
             return confirmed
           })
+          setPropertyTitle(
+            typeof data?.title === "string" && data.title.trim().length > 0
+              ? (data.title as string)
+              : null,
+          )
+          setIsUnderPurchase(Boolean(data?.isUnderPurchase))
         })
       } catch (error) {
         console.error("Failed to subscribe seller send documents", error)
@@ -221,6 +233,56 @@ export default function SellerSendDocumentsPage() {
     }
   }
 
+  const handleCancelPurchase = async () => {
+    if (!propertyId) {
+      toast({
+        variant: "destructive",
+        title: "ไม่พบประกาศ",
+        description: "กรุณาเปิดหน้าจากแชทของประกาศอีกครั้ง",
+      })
+      return
+    }
+
+    if (!user?.uid) {
+      toast({
+        variant: "destructive",
+        title: "ไม่สามารถยกเลิกได้",
+        description: "กรุณาเข้าสู่ระบบในฐานะผู้ขาย",
+      })
+      return
+    }
+
+    if (!buyerUid) {
+      toast({
+        variant: "destructive",
+        title: "ยังไม่มีผู้ซื้อ",
+        description: "ประกาศนี้ยังไม่มีผู้ซื้อที่ยืนยันไว้",
+      })
+      return
+    }
+
+    setCancelling(true)
+    try {
+      await cancelPropertyPurchase(propertyId, "seller")
+      toast({
+        title: "ยกเลิกการซื้อเรียบร้อย",
+        description: propertyTitle
+          ? `ระบบคืนสถานะประกาศ ${propertyTitle} แล้ว`
+          : "ระบบคืนสถานะประกาศเรียบร้อย",
+      })
+      setCancelDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to cancel property purchase as seller", error)
+      toast({
+        variant: "destructive",
+        title: "ยกเลิกไม่สำเร็จ",
+        description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+      })
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   const handleGoToHandover = () => {
     if (!remoteConfirmed) {
       toast({
@@ -247,6 +309,29 @@ export default function SellerSendDocumentsPage() {
   return (
     <div className="min-h-[70vh] bg-gray-50 py-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
+        <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold text-slate-900">ยกเลิกรายการซื้อสำหรับผู้ซื้อนี้</DialogTitle>
+              <DialogDescription className="text-sm text-slate-600">
+                ระบบจะลบข้อมูลการตรวจและแจ้งเตือนทั้งหมด เพื่อให้คุณรอผู้ซื้อรายถัดไปได้ทันที
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
+                กลับไปก่อน
+              </Button>
+              <Button
+                onClick={handleCancelPurchase}
+                disabled={cancelling}
+                className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {cancelling ? "กำลังยกเลิก..." : "ยืนยันการยกเลิก"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <div className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
@@ -272,6 +357,16 @@ export default function SellerSendDocumentsPage() {
                   <CheckCircle2 className="h-4 w-4" />
                   คุณได้ยืนยันการตรวจสอบเอกสารแล้ว
                 </div>
+              )}
+              {buyerUid && isUnderPurchase && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCancelDialogOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-full border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50"
+                >
+                  ยกเลิกรายการซื้อ
+                </Button>
               )}
             </div>
             <div className="flex flex-col items-start gap-2 rounded-2xl bg-violet-50 px-4 py-3 text-sm text-violet-700">
