@@ -363,7 +363,7 @@ export default function SellerSendDocumentsPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setCancelDialogOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
                 >
                   ยกเลิกรายการซื้อ
                 </Button>
