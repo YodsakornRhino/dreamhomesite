@@ -190,6 +190,31 @@ const safeFormatDateTime = (value: string) => {
   }
 }
 
+const extractDateInput = (value: string | null) => {
+  if (!value) return ""
+  const [datePart] = value.split("T")
+  return datePart ?? ""
+}
+
+const extractTimeInput = (value: string | null) => {
+  if (!value) return ""
+  const [, timePart] = value.split("T")
+  if (!timePart) return ""
+  return timePart.slice(0, 5)
+}
+
+const combineDateAndTime = (dateValue: string, timeValue: string) => {
+  const trimmedDate = dateValue.trim()
+  if (!trimmedDate) {
+    return null
+  }
+
+  const trimmedTime = timeValue.trim()
+  const validTime = /^\d{2}:\d{2}$/.test(trimmedTime) ? trimmedTime : "09:00"
+
+  return `${trimmedDate}T${validTime}:00`
+}
+
 export default function BuyerHomeInspectionPage() {
   const searchParams = useSearchParams()
   const propertyId = searchParams.get("propertyId")
@@ -208,6 +233,7 @@ export default function BuyerHomeInspectionPage() {
 
   const [activeTab, setActiveTab] = useState<string>("overview")
   const [handoverDateInput, setHandoverDateInput] = useState("")
+  const [handoverTimeInput, setHandoverTimeInput] = useState("")
   const [handoverNoteInput, setHandoverNoteInput] = useState("")
   const [savingSchedule, setSavingSchedule] = useState(false)
 
@@ -510,9 +536,8 @@ export default function BuyerHomeInspectionPage() {
 
   useEffect(() => {
     if (stateLoading) return
-    setHandoverDateInput(
-      inspectionState.handoverDate ? inspectionState.handoverDate.slice(0, 10) : "",
-    )
+    setHandoverDateInput(extractDateInput(inspectionState.handoverDate))
+    setHandoverTimeInput(extractTimeInput(inspectionState.handoverDate))
     setHandoverNoteInput(inspectionState.handoverNote ?? "")
   }, [inspectionState.handoverDate, inspectionState.handoverNote, stateLoading])
 
@@ -525,7 +550,7 @@ export default function BuyerHomeInspectionPage() {
 
   const scheduleLabel = useMemo(() => {
     if (!inspectionState.handoverDate) return "ยังไม่ได้เลือกวันนัดหมาย"
-    return safeFormatDate(inspectionState.handoverDate)
+    return safeFormatDateTime(inspectionState.handoverDate)
   }, [inspectionState.handoverDate])
 
   const scheduleUpdatedAtLabel = useMemo(() => {
@@ -627,7 +652,7 @@ export default function BuyerHomeInspectionPage() {
     setSavingSchedule(true)
     try {
       await updateInspectionState(propertyId, {
-        handoverDate: handoverDateInput ? `${handoverDateInput}T09:00:00` : null,
+        handoverDate: combineDateAndTime(handoverDateInput, handoverTimeInput),
         handoverNote: handoverNoteInput,
         lastUpdatedBy: "buyer",
       })
@@ -1120,17 +1145,26 @@ export default function BuyerHomeInspectionPage() {
                     className="mt-2 min-h-[72px] border-none bg-transparent text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="preferred-date" className="text-xs text-slate-300">
-                    ปรับวันที่สะดวก
+                    ปรับวันและเวลาส่งมอบ
                   </Label>
-                  <Input
-                    id="preferred-date"
-                    type="date"
-                    value={handoverDateInput}
-                    onChange={(event) => setHandoverDateInput(event.target.value)}
-                    className="border-none bg-slate-800 text-slate-100"
-                  />
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Input
+                      id="preferred-date"
+                      type="date"
+                      value={handoverDateInput}
+                      onChange={(event) => setHandoverDateInput(event.target.value)}
+                      className="border-none bg-slate-800 text-slate-100"
+                    />
+                    <Input
+                      id="preferred-time"
+                      type="time"
+                      value={handoverTimeInput}
+                      onChange={(event) => setHandoverTimeInput(event.target.value)}
+                      className="border-none bg-slate-800 text-slate-100"
+                    />
+                  </div>
                   {scheduleUpdatedAtLabel && (
                     <p className="text-xs text-slate-400">อัปเดตล่าสุด {scheduleUpdatedAtLabel}</p>
                   )}

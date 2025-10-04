@@ -1661,6 +1661,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       return
     }
 
+    const hasExistingPreview = messages.some((message) => {
+      const previewId = message.propertyPreview?.propertyId
+      return previewId && queuedPropertyPreview.propertyId
+        ? previewId === queuedPropertyPreview.propertyId
+        : false
+    })
+
+    if (hasExistingPreview) {
+      setQueuedPropertyPreview(null)
+      return
+    }
+
     setSending(true)
 
     void (async () => {
@@ -1684,6 +1696,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     })()
   }, [
     activeParticipantId,
+    messages,
     queuedPropertyPreview,
     sending,
     sendMessageToChat,

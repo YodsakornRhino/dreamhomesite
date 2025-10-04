@@ -54,6 +54,8 @@ import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import ChatPanel from "./chat-panel"
 import useNotificationSound from "@/hooks/use-notification-sound"
+import { useBuyerProperties } from "@/hooks/use-buyer-properties"
+import { useSellerHandoverProperties } from "@/hooks/use-seller-handover-properties"
 import type {
   ChatOpenEventDetail,
   PropertyPreviewOpenEventDetail,
@@ -103,6 +105,28 @@ const formatNotificationDateTime = (value: string) => {
   }
 }
 
+interface HandoverReminder {
+  key: string
+  propertyId: string
+  propertyTitle: string
+  dueAt: number
+  dueAtIso: string
+  role: "buyer" | "seller"
+  href: string
+  location: string
+}
+
+const buildScheduleLocation = (
+  address?: string | null,
+  city?: string | null,
+  province?: string | null,
+): string => {
+  return [address, city, province]
+    .map((segment) => (segment ?? "").trim())
+    .filter((segment) => segment.length > 0)
+    .join(", ")
+}
+
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
@@ -128,9 +152,24 @@ const Navigation: React.FC = () => {
   const notificationIdsRef = useRef<Set<string>>(new Set())
   const notificationInitializedRef = useRef(false)
   const playNotificationSound = useNotificationSound()
+  const { properties: buyerHandoverProperties } = useBuyerProperties(user?.uid ?? null)
+  const { properties: sellerHandoverProperties } = useSellerHandoverProperties(user?.uid ?? null)
+  const [activeHandoverReminder, setActiveHandoverReminder] = useState<HandoverReminder | null>(null)
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+  const dismissedHandoverRemindersRef = useRef<Set<string>>(new Set())
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 15000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [])
 
   // ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -163,10 +202,79 @@ const Navigation: React.FC = () => {
     [router, setIsChatOpen, setIsNotificationDialogOpen, setRequestedParticipantId],
   )
 
+  const handleDismissHandoverReminder = useCallback(() => {
+    if (!activeHandoverReminder) return
+    dismissedHandoverRemindersRef.current.add(activeHandoverReminder.key)
+    setActiveHandoverReminder(null)
+  }, [activeHandoverReminder])
+
+  const handleOpenHandoverReminder = useCallback(() => {
+    if (!activeHandoverReminder) return
+    dismissedHandoverRemindersRef.current.add(activeHandoverReminder.key)
+    const targetHref = activeHandoverReminder.href
+    setActiveHandoverReminder(null)
+    router.push(targetHref)
+  }, [activeHandoverReminder, router])
+
   const unreadNotifications = useMemo(
     () => userNotifications.filter((notification) => !notification.read),
     [userNotifications],
   )
+
+  const handoverReminderCandidates = useMemo(() => {
+    const candidates: HandoverReminder[] = []
+
+    buyerHandoverProperties.forEach((property) => {
+      if (!property.handoverDate) return
+      if (!property.isUnderPurchase) return
+      const dueAt = Date.parse(property.handoverDate)
+      if (Number.isNaN(dueAt)) return
+
+      candidates.push({
+        key: `buyer:${property.propertyId}:${property.handoverDate}`,
+        propertyId: property.propertyId,
+        propertyTitle:
+          property.title && property.title.trim().length > 0
+            ? property.title
+            : "ทรัพย์ของฉัน",
+        dueAt,
+        dueAtIso: property.handoverDate,
+        role: "buyer",
+        href: `/buy/home-inspection?propertyId=${property.propertyId}`,
+        location: buildScheduleLocation(property.address, property.city, property.province),
+      })
+    })
+
+    sellerHandoverProperties.forEach((property) => {
+      if (!property.handoverDate) return
+      if (!property.isUnderPurchase) return
+      if (!property.confirmedBuyerId) return
+      const dueAt = Date.parse(property.handoverDate)
+      if (Number.isNaN(dueAt)) return
+
+      candidates.push({
+        key: `seller:${property.id}:${property.handoverDate}`,
+        propertyId: property.id,
+        propertyTitle:
+          property.title && property.title.trim().length > 0
+            ? property.title
+            : `ประกาศ ${property.id}`,
+        dueAt,
+        dueAtIso: property.handoverDate,
+        role: "seller",
+        href: `/sell/home-inspection?propertyId=${property.id}`,
+        location: buildScheduleLocation(property.address, property.city, property.province),
+      })
+    })
+
+    return candidates
+  }, [buyerHandoverProperties, sellerHandoverProperties])
+
+  const dueHandoverReminders = useMemo(() => {
+    return handoverReminderCandidates
+      .filter((candidate) => candidate.dueAt <= currentTime)
+      .sort((a, b) => a.dueAt - b.dueAt)
+  }, [handoverReminderCandidates, currentTime])
 
   useEffect(() => {
     if (!user) {
@@ -178,8 +286,29 @@ const Navigation: React.FC = () => {
       setIsNotificationDialogOpen(false)
       notificationIdsRef.current = new Set()
       notificationInitializedRef.current = false
+      setActiveHandoverReminder(null)
+      dismissedHandoverRemindersRef.current = new Set()
     }
   }, [user])
+
+  useEffect(() => {
+    const dismissedKeys = dismissedHandoverRemindersRef.current
+    const nextReminder = dueHandoverReminders.find(
+      (candidate) => !dismissedKeys.has(candidate.key),
+    )
+
+    if (!nextReminder) {
+      if (activeHandoverReminder) {
+        setActiveHandoverReminder(null)
+      }
+      return
+    }
+
+    if (!activeHandoverReminder || activeHandoverReminder.key !== nextReminder.key) {
+      setActiveHandoverReminder(nextReminder)
+      void playNotificationSound()
+    }
+  }, [activeHandoverReminder, dueHandoverReminders, playNotificationSound])
 
   useEffect(() => {
     if (!user?.uid) {
@@ -454,6 +583,24 @@ const Navigation: React.FC = () => {
     setIsSignUpOpen(false)
     setIsSignInOpen(true)
   }
+
+  const reminderTitle = activeHandoverReminder
+    ? activeHandoverReminder.role === "seller"
+      ? "ถึงเวลาส่งบ้านให้ผู้ซื้อแล้ว"
+      : "ถึงเวลารับบ้านจากผู้ขายแล้ว"
+    : "แจ้งเตือนการส่งมอบ"
+
+  const reminderDescription = activeHandoverReminder
+    ? activeHandoverReminder.role === "seller"
+      ? "ตรวจสอบสถานะการส่งมอบและอัปเดตผู้ซื้อได้ทันที"
+      : "เข้าหน้าการตรวจเพื่อยืนยันการรับบ้านตามกำหนด"
+    : ""
+
+  const reminderActionLabel = activeHandoverReminder
+    ? activeHandoverReminder.role === "seller"
+      ? "เปิดหน้าส่งมอบ"
+      : "เปิดหน้าตรวจบ้าน"
+    : "ดูรายละเอียด"
 
   return (
     <>
@@ -766,6 +913,60 @@ const Navigation: React.FC = () => {
               </div>
             )}
           </div>
+      </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(activeHandoverReminder)}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleDismissHandoverReminder()
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{reminderTitle}</DialogTitle>
+            {reminderDescription && (
+              <DialogDescription>{reminderDescription}</DialogDescription>
+            )}
+          </DialogHeader>
+          {activeHandoverReminder && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-2xl bg-indigo-50 p-4 text-indigo-700">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">
+                    {activeHandoverReminder.propertyTitle}
+                  </p>
+                  <p className="text-sm">
+                    {formatNotificationDateTime(activeHandoverReminder.dueAtIso)}
+                  </p>
+                  {activeHandoverReminder.location && (
+                    <p className="text-xs text-indigo-600/80">
+                      {activeHandoverReminder.location}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={handleDismissHandoverReminder}
+                >
+                  รับทราบ
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleOpenHandoverReminder}
+                  className="bg-indigo-600 text-white hover:bg-indigo-700"
+                >
+                  {reminderActionLabel}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

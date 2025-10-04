@@ -170,6 +170,31 @@ const safeFormatDateTime = (value: string) => {
   }
 }
 
+const extractDateInput = (value: string | null) => {
+  if (!value) return ""
+  const [datePart] = value.split("T")
+  return datePart ?? ""
+}
+
+const extractTimeInput = (value: string | null) => {
+  if (!value) return ""
+  const [, timePart] = value.split("T")
+  if (!timePart) return ""
+  return timePart.slice(0, 5)
+}
+
+const combineDateAndTime = (dateValue: string, timeValue: string) => {
+  const trimmedDate = dateValue.trim()
+  if (!trimmedDate) {
+    return null
+  }
+
+  const trimmedTime = timeValue.trim()
+  const validTime = /^\d{2}:\d{2}$/.test(trimmedTime) ? trimmedTime : "09:00"
+
+  return `${trimmedDate}T${validTime}:00`
+}
+
 const defaultState: HomeInspectionState = {
   handoverDate: null,
   handoverNote: "",
@@ -195,6 +220,7 @@ export default function SellerHomeInspectionPage() {
 
   const [activeTab, setActiveTab] = useState("schedule")
   const [handoverDateInput, setHandoverDateInput] = useState("")
+  const [handoverTimeInput, setHandoverTimeInput] = useState("")
   const [handoverNoteInput, setHandoverNoteInput] = useState("")
   const [savingSchedule, setSavingSchedule] = useState(false)
 
@@ -480,9 +506,8 @@ export default function SellerHomeInspectionPage() {
 
   useEffect(() => {
     if (stateLoading) return
-    setHandoverDateInput(
-      inspectionState.handoverDate ? inspectionState.handoverDate.slice(0, 10) : "",
-    )
+    setHandoverDateInput(extractDateInput(inspectionState.handoverDate))
+    setHandoverTimeInput(extractTimeInput(inspectionState.handoverDate))
     setHandoverNoteInput(inspectionState.handoverNote ?? "")
   }, [inspectionState.handoverDate, inspectionState.handoverNote, stateLoading])
 
@@ -495,7 +520,7 @@ export default function SellerHomeInspectionPage() {
 
   const scheduleLabel = useMemo(() => {
     if (!inspectionState.handoverDate) return "ยังไม่มีการนัดหมาย"
-    return safeFormatDate(inspectionState.handoverDate)
+    return safeFormatDateTime(inspectionState.handoverDate)
   }, [inspectionState.handoverDate])
 
   const scheduleUpdatedAtLabel = useMemo(() => {
@@ -604,7 +629,7 @@ export default function SellerHomeInspectionPage() {
     setSavingSchedule(true)
     try {
       await updateInspectionState(propertyId, {
-        handoverDate: `${handoverDateInput}T09:00:00`,
+        handoverDate: combineDateAndTime(handoverDateInput, handoverTimeInput),
         handoverNote: handoverNoteInput,
         lastUpdatedBy: "seller",
       })
@@ -1238,17 +1263,26 @@ export default function SellerHomeInspectionPage() {
                     className="mt-2 min-h-[72px] border-none bg-slate-800 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="handover-date" className="text-xs text-slate-300">
-                    กำหนดวันส่งมอบ
+                    กำหนดวันและเวลาส่งมอบ
                   </Label>
-                  <Input
-                    id="handover-date"
-                    type="date"
-                    value={handoverDateInput}
-                    onChange={(event) => setHandoverDateInput(event.target.value)}
-                    className="border-none bg-slate-800 text-slate-100"
-                  />
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Input
+                      id="handover-date"
+                      type="date"
+                      value={handoverDateInput}
+                      onChange={(event) => setHandoverDateInput(event.target.value)}
+                      className="border-none bg-slate-800 text-slate-100"
+                    />
+                    <Input
+                      id="handover-time"
+                      type="time"
+                      value={handoverTimeInput}
+                      onChange={(event) => setHandoverTimeInput(event.target.value)}
+                      className="border-none bg-slate-800 text-slate-100"
+                    />
+                  </div>
                   {scheduleUpdatedAtLabel && (
                     <p className="text-xs text-slate-400">อัปเดตล่าสุด {scheduleUpdatedAtLabel}</p>
                   )}

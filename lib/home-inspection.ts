@@ -418,7 +418,24 @@ export const updateInspectionState = async (
     lastUpdatedAt: new Date().toISOString(),
   })
 
-  await setDocument(`property/${propertyId}/inspection`, "state", payload)
+  const propertySyncPayload: Record<string, unknown> = {
+    handoverUpdatedAt: payload.lastUpdatedAt,
+    handoverUpdatedBy: updates.lastUpdatedBy,
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "handoverDate")) {
+    propertySyncPayload.handoverDate = updates.handoverDate ?? null
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "handoverNote")) {
+    propertySyncPayload.handoverNote =
+      typeof updates.handoverNote === "string" ? updates.handoverNote : ""
+  }
+
+  await Promise.all([
+    setDocument(`property/${propertyId}/inspection`, "state", payload),
+    setDocument("property", propertyId, propertySyncPayload),
+  ])
 
   const changes: string[] = []
   if (Object.prototype.hasOwnProperty.call(updates, "handoverDate")) {

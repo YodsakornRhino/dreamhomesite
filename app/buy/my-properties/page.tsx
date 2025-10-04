@@ -183,7 +183,7 @@ export default function BuyerPropertiesPage() {
               const locationLabel = buildLocationLabel(property);
               const priceLabel = resolvePriceLabel(property);
               const confirmedAtLabel = safeFormatDateTime(property.confirmedAt);
-              const handoverDateLabel = safeFormatDate(property.handoverDate);
+              const handoverDateLabel = safeFormatDateTime(property.handoverDate);
 
               const transactionLabel = property.transactionType
                 ? TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
