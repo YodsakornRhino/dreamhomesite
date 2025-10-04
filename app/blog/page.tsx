@@ -172,7 +172,7 @@ export default function BlogPage() {
                 </div>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="outline" size="sm">
+                    <Badge variant="outline">
                       {post.category}
                     </Badge>
                     <span className="text-xs text-gray-500">{post.readTime}</span>

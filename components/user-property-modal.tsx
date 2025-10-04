@@ -101,7 +101,7 @@ export function UserPropertyModal({
   const mediaItems = useMemo(() => {
     if (!property) return [];
 
-    const items = (property.photos ?? [])
+    const items: { id: string; type: "image" | "video"; url: string }[] = (property.photos ?? [])
       .filter(
         (photo): photo is string =>
           typeof photo === "string" && photo.trim().length > 0,

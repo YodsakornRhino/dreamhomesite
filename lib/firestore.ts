@@ -5,6 +5,7 @@ import type {
   Query,
   QueryConstraint,
   Firestore,
+  CollectionReference,
 } from "firebase/firestore"
 import { getFirebaseApp } from "./firebase"
 
@@ -24,15 +25,49 @@ const getFirestoreInstance = async (): Promise<Firestore> => {
   return firestoreInstance
 }
 
+const splitPathSegments = (path: string): string[] =>
+  path
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+
+const buildCollectionReference = async (
+  collectionPath: string,
+): Promise<CollectionReference<DocumentData>> => {
+  const { collection } = await import("firebase/firestore")
+  const db = await getFirestoreInstance()
+  const segments = splitPathSegments(collectionPath)
+
+  if (segments.length === 0) {
+    throw new Error("Invalid collection path")
+  }
+
+  return collection(db, segments[0], ...segments.slice(1)) as CollectionReference<DocumentData>
+}
+
+const buildDocumentReference = async (
+  collectionPath: string,
+  docId: string,
+): Promise<DocumentReference<DocumentData>> => {
+  const { doc } = await import("firebase/firestore")
+  const db = await getFirestoreInstance()
+  const segments = splitPathSegments(collectionPath)
+
+  if (segments.length === 0) {
+    throw new Error("Invalid collection path")
+  }
+
+  return doc(db, segments[0], ...segments.slice(1), docId)
+}
+
 // Add a document to a collection
 export const addDocument = async (
   collectionPath: string,
   data: DocumentData,
 ): Promise<DocumentReference<DocumentData>> => {
   try {
-    const { collection, addDoc } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const collectionRef = collection(db, ...collectionPath.split("/"))
+    const { addDoc } = await import("firebase/firestore")
+    const collectionRef = await buildCollectionReference(collectionPath)
     const docRef = await addDoc(collectionRef, data)
     return docRef
   } catch (error) {
@@ -49,9 +84,8 @@ export const setDocument = async (
   data: DocumentData,
 ): Promise<void> => {
   try {
-    const { doc, setDoc } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const docRef = doc(db, ...collectionPath.split("/"), docId)
+    const { setDoc } = await import("firebase/firestore")
+    const docRef = await buildDocumentReference(collectionPath, docId)
     // ✅ ใช้ merge: true เพื่อให้เพิ่มฟิลด์ภายหลังได้โดยไม่ทับทั้ง doc
     await setDoc(docRef, data, { merge: true })
   } catch (error) {
@@ -67,9 +101,8 @@ export const getDocument = async (
   docId: string,
 ): Promise<QueryDocumentSnapshot<DocumentData> | null> => {
   try {
-    const { doc, getDoc } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const docRef = doc(db, ...collectionPath.split("/"), docId)
+    const { getDoc } = await import("firebase/firestore")
+    const docRef = await buildDocumentReference(collectionPath, docId)
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
@@ -89,9 +122,8 @@ export const getDocuments = async (
   ...queryConstraints: QueryConstraint[]
 ): Promise<QueryDocumentSnapshot<DocumentData>[]> => {
   try {
-    const { collection, query, getDocs } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const collectionRef = collection(db, ...collectionPath.split("/"))
+    const { query, getDocs } = await import("firebase/firestore")
+    const collectionRef = await buildCollectionReference(collectionPath)
 
     let q: Query<DocumentData>
     if (queryConstraints.length > 0) {
@@ -115,9 +147,8 @@ export const updateDocument = async (
   data: Partial<DocumentData>,
 ): Promise<void> => {
   try {
-    const { doc, updateDoc } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const docRef = doc(db, ...collectionPath.split("/"), docId)
+    const { updateDoc } = await import("firebase/firestore")
+    const docRef = await buildDocumentReference(collectionPath, docId)
     await updateDoc(docRef, data)
   } catch (error) {
     console.error("Error updating document:", error)
@@ -128,9 +159,8 @@ export const updateDocument = async (
 // Delete a document
 export const deleteDocument = async (collectionPath: string, docId: string): Promise<void> => {
   try {
-    const { doc, deleteDoc } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const docRef = doc(db, ...collectionPath.split("/"), docId)
+    const { deleteDoc } = await import("firebase/firestore")
+    const docRef = await buildDocumentReference(collectionPath, docId)
     await deleteDoc(docRef)
   } catch (error) {
     console.error("Error deleting document:", error)
@@ -145,9 +175,8 @@ export const subscribeToDocument = async (
   callback: (doc: QueryDocumentSnapshot<DocumentData> | null) => void,
 ): Promise<() => void> => {
   try {
-    const { doc, onSnapshot } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const docRef = doc(db, ...collectionPath.split("/"), docId)
+    const { onSnapshot } = await import("firebase/firestore")
+    const docRef = await buildDocumentReference(collectionPath, docId)
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -171,9 +200,8 @@ export const subscribeToCollection = async (
   ...queryConstraints: QueryConstraint[]
 ): Promise<() => void> => {
   try {
-    const { collection, query, onSnapshot } = await import("firebase/firestore")
-    const db = await getFirestoreInstance()
-    const collectionRef = collection(db, ...collectionPath.split("/"))
+    const { query, onSnapshot } = await import("firebase/firestore")
+    const collectionRef = await buildCollectionReference(collectionPath)
 
     let q: Query<DocumentData>
     if (queryConstraints.length > 0) {

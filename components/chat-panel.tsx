@@ -41,13 +41,16 @@ import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { usePresenceStatus } from "@/hooks/use-presence-status"
 import { useToast } from "@/hooks/use-toast"
+import useNotificationSound from "@/hooks/use-notification-sound"
 import type {
   ChatOpenEventDetail,
   PropertyPreviewOpenEventDetail,
   PropertyPreviewPayload,
 } from "@/types/chat"
+import type { PropertyPurchaseStatus } from "@/types/property-purchase-status"
 import {
   addDocument,
+  getDocument,
   setDocument,
   subscribeToCollection,
   subscribeToDocument,
@@ -56,6 +59,12 @@ import {
 import { getDownloadURL, uploadFile } from "@/lib/storage"
 import { cn } from "@/lib/utils"
 import { formatPropertyPrice, TRANSACTION_LABELS } from "@/lib/property"
+import { createUserNotification } from "@/lib/notifications"
+import { saveBuyerPropertyFromListing } from "@/lib/buyer-properties"
+import {
+  buildPreviewFromPropertyRecord,
+  sanitizePropertyPreview,
+} from "@/lib/property-preview"
 
 interface ChatPanelProps {
   isOpen: boolean
@@ -108,13 +117,6 @@ interface UserProfileSummary {
   email?: string
   photoURL?: string
   status?: UserPresenceSummary | null
-}
-
-interface PropertyPurchaseStatus {
-  isUnderPurchase: boolean
-  confirmedBuyerId: string | null
-  buyerConfirmed: boolean
-  sellerDocumentsConfirmed: boolean
 }
 
 const presenceDotClass = (isOnline: boolean) =>
@@ -245,98 +247,6 @@ interface SendMessageOptions {
   propertyPreview?: PropertyPreviewPayload | null
 }
 
-const sanitizePropertyPreview = (preview: PropertyPreviewPayload) => {
-  return {
-    propertyId: preview.propertyId,
-    ownerUid: preview.ownerUid,
-    title: preview.title,
-    price: typeof preview.price === "number" ? preview.price : null,
-    transactionType:
-      typeof preview.transactionType === "string" ? preview.transactionType : null,
-    thumbnailUrl:
-      typeof preview.thumbnailUrl === "string" && preview.thumbnailUrl.trim().length > 0
-        ? preview.thumbnailUrl
-        : null,
-    address:
-      typeof preview.address === "string" && preview.address.trim().length > 0
-        ? preview.address
-        : null,
-    city:
-      typeof preview.city === "string" && preview.city.trim().length > 0
-        ? preview.city
-        : null,
-    province:
-      typeof preview.province === "string" && preview.province.trim().length > 0
-        ? preview.province
-        : null,
-  }
-}
-
-const buildPreviewFromPropertyRecord = (
-  propertyId: string,
-  record: Record<string, unknown>,
-): ChatMessagePropertyPreview | null => {
-  const ownerUid =
-    typeof record.userUid === "string" && record.userUid.trim().length > 0
-      ? record.userUid
-      : null
-
-  const title =
-    typeof record.title === "string" && record.title.trim().length > 0
-      ? record.title
-      : null
-
-  if (!ownerUid || !title) {
-    return null
-  }
-
-  let price: number | null = null
-  if (typeof record.price === "number" && Number.isFinite(record.price)) {
-    price = record.price
-  } else if (typeof record.price === "string") {
-    const parsed = Number(record.price)
-    price = Number.isFinite(parsed) ? parsed : null
-  }
-
-  const transactionType =
-    typeof record.transactionType === "string" && record.transactionType.trim().length > 0
-      ? record.transactionType
-      : null
-
-  const address =
-    typeof record.address === "string" && record.address.trim().length > 0
-      ? record.address
-      : null
-
-  const city =
-    typeof record.city === "string" && record.city.trim().length > 0 ? record.city : null
-
-  const province =
-    typeof record.province === "string" && record.province.trim().length > 0
-      ? record.province
-      : null
-
-  let thumbnailUrl: string | null = null
-  if (Array.isArray(record.photos)) {
-    const firstPhoto = record.photos.find(
-      (value): value is string => typeof value === "string" && value.trim().length > 0,
-    )
-    thumbnailUrl = firstPhoto ?? null
-  }
-
-  return sanitizePropertyPreview({
-    propertyId,
-    ownerUid,
-    title,
-    price,
-    transactionType,
-    thumbnailUrl,
-    address,
-    city,
-    province,
-  })
-}
-
 const formatPropertyPreviewSummary = (preview: PropertyPreviewPayload) => {
   const title = preview.title.trim()
   return title ? `สนใจประกาศ: ${title}` : "สนใจประกาศนี้"
@@ -371,7 +281,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([])
   const [attachmentPreviews, setAttachmentPreviews] = useState<
-    { id: string; url: string; kind: "image" | "video"; name: string }
+    { id: string; url: string; kind: "image" | "video"; name: string }[]
   >([])
   const [queuedPropertyPreview, setQueuedPropertyPreview] =
     useState<PropertyPreviewPayload | null>(null)
@@ -397,7 +307,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const messageEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
   const lastThreadTimestampsRef = useRef<Record<string, number>>({})
   const initialThreadSnapshotRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
@@ -482,7 +391,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       return
     }
 
-    const previews = pendingAttachments.map((file) => ({
+    const previews: { id: string; url: string; kind: "image" | "video"; name: string }[] = pendingAttachments.map((file) => ({
       id: `${file.name}-${file.lastModified}-${file.size}`,
       url: URL.createObjectURL(file),
       kind: file.type.startsWith("video/") ? "video" : "image",
@@ -783,6 +692,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           ),
         ])
 
+        try {
+          await createUserNotification(activeParticipantId, {
+            title: "ผู้ขายยืนยันการซื้อแล้ว",
+            message: preview.title
+              ? `ประกาศ ${preview.title}`
+              : "ประกาศของคุณพร้อมสำหรับขั้นตอนถัดไป",
+            category: "system",
+            relatedId: preview.propertyId,
+            actionType: "navigate",
+            actionHref: `/buy/send-documents?propertyId=${preview.propertyId}`,
+            context: "ตรวจสอบเอกสารและยืนยันการรับบ้าน",
+          })
+        } catch (error) {
+          console.error("Failed to create buyer confirmation notification", error)
+        }
+
         toast({
           title: "ยืนยันประกาศสำเร็จ",
           description: "ระบบได้แจ้งเตือนผู้ซื้อเรียบร้อยแล้ว",
@@ -849,18 +774,33 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       setBuyerConfirmingPropertyId(preview.propertyId)
 
       try {
-        await Promise.all([
+        const confirmedAtIso = new Date().toISOString()
+        const propertyDoc = await getDocument("property", preview.propertyId)
+        const listingData = propertyDoc?.data() as Record<string, unknown> | null
+
+        const operations: Promise<void>[] = [
           updateDocument("property", preview.propertyId, {
             buyerConfirmed: true,
+            confirmedBuyerId: status.confirmedBuyerId ?? user.uid,
           }),
-          updateDocument(
-            `users/${preview.ownerUid}/user_property`,
-            preview.propertyId,
-            {
+          saveBuyerPropertyFromListing({
+            buyerUid: user.uid,
+            propertyId: preview.propertyId,
+            listingData,
+            preview,
+            confirmedAt: confirmedAtIso,
+          }),
+        ]
+
+        if (preview.ownerUid) {
+          operations.push(
+            updateDocument(`users/${preview.ownerUid}/user_property`, preview.propertyId, {
               buyerConfirmed: true,
-            },
-          ),
-        ])
+            }),
+          )
+        }
+
+        await Promise.all(operations)
 
         toast({
           title: "ยืนยันการซื้อเรียบร้อย",
@@ -1034,45 +974,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [toast, user?.uid])
 
-  const playNotificationSound = useCallback(async () => {
-    try {
-      if (typeof window === "undefined") return
-
-      const AudioContextConstructor =
-        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!AudioContextConstructor) return
-
-      const audioContext = audioContextRef.current ?? new AudioContextConstructor()
-
-      if (audioContext.state === "suspended") {
-        await audioContext.resume()
-      }
-
-      const now = audioContext.currentTime
-      const oscillator = audioContext.createOscillator()
-      const gain = audioContext.createGain()
-
-      const peakGain = 0.7
-      const fadeOutTime = 0.6
-
-      oscillator.type = "sine"
-      oscillator.frequency.setValueAtTime(880, now)
-
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(peakGain, now + 0.05)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOutTime)
-
-      oscillator.connect(gain)
-      gain.connect(audioContext.destination)
-
-      oscillator.start(now)
-      oscillator.stop(now + fadeOutTime)
-
-      audioContextRef.current = audioContext
-    } catch (error) {
-      console.error("Failed to play notification sound", error)
-    }
-  }, [])
+  const playNotificationSound = useNotificationSound()
 
   useEffect(() => {
     if (!user?.uid) return
@@ -1240,31 +1142,41 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             const mapped = docs.map((doc) => {
               const data = doc.data() as Record<string, any>
               const attachments = Array.isArray(data.attachments)
-                ? data.attachments
-                    .map((raw) => {
-                      if (!raw || typeof raw !== "object") return null
+                ? data.attachments.reduce<ChatMessageAttachment[]>((acc, raw) => {
+                    if (!raw || typeof raw !== "object") {
+                      return acc
+                    }
 
-                      const url = typeof raw.url === "string" ? raw.url : ""
-                      if (!url) return null
+                    const record = raw as Record<string, unknown>
+                    const url = typeof record.url === "string" ? record.url : ""
+                    if (!url) {
+                      return acc
+                    }
 
-                      const storagePath = typeof raw.storagePath === "string" ? raw.storagePath : ""
-                      const contentType = typeof raw.contentType === "string" ? raw.contentType : null
-                      const typeValue = typeof raw.type === "string" ? raw.type : undefined
-                      const resolvedType =
-                        typeValue === "image" || typeValue === "video" || typeValue === "file"
-                          ? typeValue
-                          : resolveAttachmentKind(contentType)
+                    const storagePath =
+                      typeof record.storagePath === "string" ? record.storagePath : ""
+                    const contentType =
+                      typeof record.contentType === "string" ? record.contentType : undefined
+                    const name = typeof record.name === "string" ? record.name : undefined
+                    const size = typeof record.size === "number" ? record.size : undefined
+                    const typeValue = typeof record.type === "string" ? record.type : undefined
+                    const resolvedType: AttachmentKind =
+                      typeValue === "image" || typeValue === "video" || typeValue === "file"
+                        ? typeValue
+                        : resolveAttachmentKind(contentType)
 
-                      return {
-                        url,
-                        storagePath,
-                        contentType: contentType ?? undefined,
-                        name: typeof raw.name === "string" ? raw.name : undefined,
-                        size: typeof raw.size === "number" ? raw.size : undefined,
-                        type: resolvedType,
-                      } satisfies ChatMessageAttachment
-                    })
-                    .filter((value): value is ChatMessageAttachment => Boolean(value))
+                    const attachment: ChatMessageAttachment = {
+                      url,
+                      storagePath,
+                      type: resolvedType,
+                      ...(contentType ? { contentType } : {}),
+                      ...(name ? { name } : {}),
+                      ...(typeof size === "number" ? { size } : {}),
+                    }
+
+                    acc.push(attachment)
+                    return acc
+                  }, [])
                 : []
 
               let propertyPreview: ChatMessagePropertyPreview | undefined
@@ -1632,6 +1544,34 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           updatedAt: serverTimestamp(),
         }),
       ])
+
+      try {
+        const senderEmail = user.email ?? ""
+        const senderName =
+          (user.displayName && user.displayName.trim().length > 0
+            ? user.displayName.trim()
+            : null) ||
+          (senderEmail && senderEmail.trim().length > 0
+            ? senderEmail.split("@")[0] ?? senderEmail
+            : null) ||
+          "ผู้ใช้ DreamHome"
+
+        const previewMessage =
+          messagePreview && messagePreview.trim().length > 0
+            ? messagePreview
+            : "ส่งข้อความใหม่"
+
+        await createUserNotification(targetUid, {
+          title: `ข้อความใหม่จาก ${senderName}`,
+          message: previewMessage,
+          category: "message",
+          relatedId: chatId,
+          actionType: "open-chat",
+          actionTarget: user.uid,
+        })
+      } catch (error) {
+        console.error("Failed to create chat notification", error)
+      }
     },
     [user?.uid],
   )
@@ -1721,6 +1661,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       return
     }
 
+    const hasExistingPreview = messages.some((message) => {
+      const previewId = message.propertyPreview?.propertyId
+      return previewId && queuedPropertyPreview.propertyId
+        ? previewId === queuedPropertyPreview.propertyId
+        : false
+    })
+
+    if (hasExistingPreview) {
+      setQueuedPropertyPreview(null)
+      return
+    }
+
     setSending(true)
 
     void (async () => {
@@ -1744,6 +1696,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     })()
   }, [
     activeParticipantId,
+    messages,
     queuedPropertyPreview,
     sending,
     sendMessageToChat,

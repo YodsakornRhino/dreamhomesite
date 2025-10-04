@@ -1,11 +1,19 @@
 "use client"
 
 import type React from "react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Tooltip,
   TooltipTrigger,
@@ -14,6 +22,7 @@ import {
 } from "@/components/ui/tooltip"
 import ProfileModal from "./profile-modal"
 import { UserPropertyModal } from "./user-property-modal"
+import BuyerConfirmationPrompt from "./buyer-confirmation-prompt"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,8 +42,10 @@ import {
   LogOut,
   User,
   Mail,
+  Bell,
   AlertCircle,
   Loader2,
+  KeyRound,
 } from "lucide-react"
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
@@ -42,6 +53,9 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import ChatPanel from "./chat-panel"
+import useNotificationSound from "@/hooks/use-notification-sound"
+import { useBuyerProperties } from "@/hooks/use-buyer-properties"
+import { useSellerHandoverProperties } from "@/hooks/use-seller-handover-properties"
 import type {
   ChatOpenEventDetail,
   PropertyPreviewOpenEventDetail,
@@ -50,11 +64,74 @@ import type {
 import type { UserProperty } from "@/types/user-property"
 import { getDocument } from "@/lib/firestore"
 import { mapDocumentToUserProperty } from "@/lib/user-property-mapper"
+import { subscribeToUserNotifications, markUserNotificationsRead } from "@/lib/notifications"
+import type { UserNotification } from "@/types/notifications"
+import { cn } from "@/lib/utils"
+
+const notificationCategoryMeta: Record<
+  UserNotification["category"],
+  { label: string; tone: string }
+> = {
+  inspection: {
+    label: "การตรวจบ้าน",
+    tone: "bg-blue-100 text-blue-700 border-blue-200",
+  },
+  message: {
+    label: "ข้อความ",
+    tone: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  },
+  system: {
+    label: "ระบบ",
+    tone: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+}
+
+const formatNotificationDateTime = (value: string) => {
+  if (!value) return ""
+
+  try {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return ""
+    }
+
+    return new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date)
+  } catch (error) {
+    console.error("Failed to format notification time", error)
+    return value
+  }
+}
+
+interface HandoverReminder {
+  key: string
+  propertyId: string
+  propertyTitle: string
+  dueAt: number
+  dueAtIso: string
+  role: "buyer" | "seller"
+  href: string
+  location: string
+}
+
+const buildScheduleLocation = (
+  address?: string | null,
+  city?: string | null,
+  province?: string | null,
+): string => {
+  return [address, city, province]
+    .map((segment) => (segment ?? "").trim())
+    .filter((segment) => segment.length > 0)
+    .join(", ")
+}
 
 const Navigation: React.FC = () => {
   const { user, loading, signOut } = useAuthContext()
   const { toast } = useToast()
   const pathname = usePathname()
+  const router = useRouter()
 
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isSignUpOpen, setIsSignUpOpen] = useState(false)
@@ -68,9 +145,31 @@ const Navigation: React.FC = () => {
   const [propertyModalLoading, setPropertyModalLoading] = useState(false)
   const [propertyModalProperty, setPropertyModalProperty] = useState<UserProperty | null>(null)
   const activePropertyRequestIdRef = useRef<string | null>(null)
+  const [userNotifications, setUserNotifications] = useState<UserNotification[]>([])
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const notificationIdsRef = useRef<Set<string>>(new Set())
+  const notificationInitializedRef = useRef(false)
+  const playNotificationSound = useNotificationSound()
+  const { properties: buyerHandoverProperties } = useBuyerProperties(user?.uid ?? null)
+  const { properties: sellerHandoverProperties } = useSellerHandoverProperties(user?.uid ?? null)
+  const [activeHandoverReminder, setActiveHandoverReminder] = useState<HandoverReminder | null>(null)
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+  const dismissedHandoverRemindersRef = useRef<Set<string>>(new Set())
 
   // คุมเมนูมือถือ (Sheet)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 15000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [])
 
   // ปิดเมนูมือถืออัตโนมัติเมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -81,12 +180,197 @@ const Navigation: React.FC = () => {
     setIsMobileOpen(false)
   }
 
+  const handleOpenNotifications = useCallback(() => {
+    if (!user) return
+    setIsNotificationDialogOpen(true)
+  }, [user])
+
+  const handleNotificationClick = useCallback(
+    (notification: UserNotification) => {
+      if (notification.actionType === "open-chat" && notification.actionTarget) {
+        setRequestedParticipantId(notification.actionTarget)
+        setIsChatOpen(true)
+        setIsNotificationDialogOpen(false)
+        return
+      }
+
+      if (notification.actionType === "navigate" && notification.actionHref) {
+        setIsNotificationDialogOpen(false)
+        router.push(notification.actionHref)
+      }
+    },
+    [router, setIsChatOpen, setIsNotificationDialogOpen, setRequestedParticipantId],
+  )
+
+  const handleDismissHandoverReminder = useCallback(() => {
+    if (!activeHandoverReminder) return
+    dismissedHandoverRemindersRef.current.add(activeHandoverReminder.key)
+    setActiveHandoverReminder(null)
+  }, [activeHandoverReminder])
+
+  const handleOpenHandoverReminder = useCallback(() => {
+    if (!activeHandoverReminder) return
+    dismissedHandoverRemindersRef.current.add(activeHandoverReminder.key)
+    const targetHref = activeHandoverReminder.href
+    setActiveHandoverReminder(null)
+    router.push(targetHref)
+  }, [activeHandoverReminder, router])
+
+  const unreadNotifications = useMemo(
+    () => userNotifications.filter((notification) => !notification.read),
+    [userNotifications],
+  )
+
+  const handoverReminderCandidates = useMemo(() => {
+    const candidates: HandoverReminder[] = []
+
+    buyerHandoverProperties.forEach((property) => {
+      if (!property.handoverDate) return
+      if (!property.isUnderPurchase) return
+      const dueAt = Date.parse(property.handoverDate)
+      if (Number.isNaN(dueAt)) return
+
+      candidates.push({
+        key: `buyer:${property.propertyId}:${property.handoverDate}`,
+        propertyId: property.propertyId,
+        propertyTitle:
+          property.title && property.title.trim().length > 0
+            ? property.title
+            : "ทรัพย์ของฉัน",
+        dueAt,
+        dueAtIso: property.handoverDate,
+        role: "buyer",
+        href: `/buy/home-inspection?propertyId=${property.propertyId}`,
+        location: buildScheduleLocation(property.address, property.city, property.province),
+      })
+    })
+
+    sellerHandoverProperties.forEach((property) => {
+      if (!property.handoverDate) return
+      if (!property.isUnderPurchase) return
+      if (!property.confirmedBuyerId) return
+      const dueAt = Date.parse(property.handoverDate)
+      if (Number.isNaN(dueAt)) return
+
+      candidates.push({
+        key: `seller:${property.id}:${property.handoverDate}`,
+        propertyId: property.id,
+        propertyTitle:
+          property.title && property.title.trim().length > 0
+            ? property.title
+            : `ประกาศ ${property.id}`,
+        dueAt,
+        dueAtIso: property.handoverDate,
+        role: "seller",
+        href: `/sell/home-inspection?propertyId=${property.id}`,
+        location: buildScheduleLocation(property.address, property.city, property.province),
+      })
+    })
+
+    return candidates
+  }, [buyerHandoverProperties, sellerHandoverProperties])
+
+  const dueHandoverReminders = useMemo(() => {
+    return handoverReminderCandidates
+      .filter((candidate) => candidate.dueAt <= currentTime)
+      .sort((a, b) => a.dueAt - b.dueAt)
+  }, [handoverReminderCandidates, currentTime])
+
   useEffect(() => {
     if (!user) {
       setIsChatOpen(false)
       setRequestedParticipantId(null)
+      setUserNotifications([])
+      setUnreadNotificationCount(0)
+      setNotificationsLoading(false)
+      setIsNotificationDialogOpen(false)
+      notificationIdsRef.current = new Set()
+      notificationInitializedRef.current = false
+      setActiveHandoverReminder(null)
+      dismissedHandoverRemindersRef.current = new Set()
     }
   }, [user])
+
+  useEffect(() => {
+    const dismissedKeys = dismissedHandoverRemindersRef.current
+    const nextReminder = dueHandoverReminders.find(
+      (candidate) => !dismissedKeys.has(candidate.key),
+    )
+
+    if (!nextReminder) {
+      if (activeHandoverReminder) {
+        setActiveHandoverReminder(null)
+      }
+      return
+    }
+
+    if (!activeHandoverReminder || activeHandoverReminder.key !== nextReminder.key) {
+      setActiveHandoverReminder(nextReminder)
+      void playNotificationSound()
+    }
+  }, [activeHandoverReminder, dueHandoverReminders, playNotificationSound])
+
+  useEffect(() => {
+    if (!user?.uid) {
+      return undefined
+    }
+
+    let unsubNotifications: (() => void) | undefined
+    let cancelled = false
+
+    setNotificationsLoading(true)
+    notificationIdsRef.current = new Set()
+    notificationInitializedRef.current = false
+
+    ;(async () => {
+      try {
+        unsubNotifications = await subscribeToUserNotifications(user.uid, (items) => {
+          if (cancelled) return
+
+          const previousIds = notificationIdsRef.current
+          const currentIds = new Set(items.map((item) => item.id))
+          const hasNewUnread =
+            notificationInitializedRef.current &&
+            items.some((item) => !item.read && !previousIds.has(item.id))
+
+          setUserNotifications(items)
+          setUnreadNotificationCount(items.filter((item) => !item.read).length)
+          setNotificationsLoading(false)
+
+          if (hasNewUnread) {
+            void playNotificationSound()
+          }
+
+          notificationIdsRef.current = currentIds
+          notificationInitializedRef.current = true
+        })
+      } catch (error) {
+        console.error("Failed to subscribe user notifications", error)
+        if (cancelled) return
+        setNotificationsLoading(false)
+        toast({
+          variant: "destructive",
+          title: "โหลดการแจ้งเตือนไม่สำเร็จ",
+          description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+        })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      unsubNotifications?.()
+    }
+  }, [playNotificationSound, toast, user?.uid])
+
+  useEffect(() => {
+    if (!isNotificationDialogOpen || !user?.uid) return
+    if (unreadNotifications.length === 0) return
+
+    void markUserNotificationsRead(
+      user.uid,
+      unreadNotifications.map((notification) => notification.id),
+    )
+  }, [isNotificationDialogOpen, unreadNotifications, user?.uid])
 
   const buildPlaceholderProperty = useCallback(
     (preview: PropertyPreviewPayload, fallbackOwner?: string | null): UserProperty => {
@@ -124,6 +408,10 @@ const Navigation: React.FC = () => {
             : [],
         video: null,
         createdAt: new Date().toISOString(),
+        isUnderPurchase: false,
+        confirmedBuyerId: null,
+        buyerConfirmed: false,
+        sellerDocumentsConfirmed: false,
       }
     },
     [],
@@ -197,6 +485,12 @@ const Navigation: React.FC = () => {
     },
     [buildPlaceholderProperty, loadPropertyById, propertyModalProperty],
   )
+
+  const handleOpenInspectionNotifications = useCallback(() => {
+    if (typeof window === "undefined") return
+
+    window.dispatchEvent(new CustomEvent("dreamhome:open-inspection-notifications"))
+  }, [])
 
   useEffect(() => {
     const handleOpenChat = (event: Event) => {
@@ -290,6 +584,24 @@ const Navigation: React.FC = () => {
     setIsSignInOpen(true)
   }
 
+  const reminderTitle = activeHandoverReminder
+    ? activeHandoverReminder.role === "seller"
+      ? "ถึงเวลาส่งบ้านให้ผู้ซื้อแล้ว"
+      : "ถึงเวลารับบ้านจากผู้ขายแล้ว"
+    : "แจ้งเตือนการส่งมอบ"
+
+  const reminderDescription = activeHandoverReminder
+    ? activeHandoverReminder.role === "seller"
+      ? "ตรวจสอบสถานะการส่งมอบและอัปเดตผู้ซื้อได้ทันที"
+      : "เข้าหน้าการตรวจเพื่อยืนยันการรับบ้านตามกำหนด"
+    : ""
+
+  const reminderActionLabel = activeHandoverReminder
+    ? activeHandoverReminder.role === "seller"
+      ? "เปิดหน้าส่งมอบ"
+      : "เปิดหน้าตรวจบ้าน"
+    : "ดูรายละเอียด"
+
   return (
     <>
       <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
@@ -359,6 +671,21 @@ const Navigation: React.FC = () => {
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <Button
                     variant="ghost"
+                    className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0"
+                    onClick={handleOpenNotifications}
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span className="sr-only">เปิดการแจ้งเตือน</span>
+                    {unreadNotificationCount > 0 && (
+                      <span className="absolute right-0 top-0 inline-flex h-4 min-w-[16px] translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
+                        {unreadNotificationCount > 99
+                          ? "99+"
+                          : unreadNotificationCount}
+                      </span>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
                     className="h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0"
                     onClick={() => setIsChatOpen(true)}
                   >
@@ -399,6 +726,16 @@ const Navigation: React.FC = () => {
                       <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/buy/my-properties" className="flex items-center">
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          <span>อสังหาที่ซื้อของฉัน</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleOpenNotifications}>
+                        <Bell className="mr-2 h-4 w-4" />
+                        <span>การแจ้งเตือน</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setIsChatOpen(true)}>
                         <Mail className="mr-2 h-4 w-4" />
@@ -497,6 +834,142 @@ const Navigation: React.FC = () => {
         </div>
       </nav>
 
+      <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>การแจ้งเตือนทั้งหมด</DialogTitle>
+            <DialogDescription>
+              ติดตามความเคลื่อนไหวล่าสุดจากการตรวจบ้านและการสนทนาของคุณ
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {notificationsLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={`notification-skeleton-${index}`}
+                    className="h-20 w-full animate-pulse rounded-2xl bg-slate-100"
+                  />
+                ))}
+              </div>
+            ) : userNotifications.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-500">
+                ยังไม่มีการแจ้งเตือนใหม่ในขณะนี้
+              </p>
+            ) : (
+              <div className="max-h-[60vh] overflow-y-auto pr-3">
+                <div className="space-y-3 pb-1">
+                  {userNotifications.map((notification) => {
+                    const categoryMeta = notificationCategoryMeta[notification.category]
+                    const timeLabel = formatNotificationDateTime(notification.createdAt)
+
+                    return (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => handleNotificationClick(notification)}
+                        className={cn(
+                          "w-full rounded-2xl border p-4 text-left transition-colors",
+                          notification.read
+                            ? "border-slate-200 bg-white hover:bg-slate-50"
+                            : "border-blue-200 bg-blue-50/60 hover:bg-blue-100/70",
+                          notification.actionType ? "cursor-pointer" : "cursor-default",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                              categoryMeta.tone,
+                            )}
+                          >
+                            {categoryMeta.label}
+                          </Badge>
+                          {timeLabel && (
+                            <span className="text-xs text-slate-500">{timeLabel}</span>
+                          )}
+                        </div>
+                        <div className="mt-3 space-y-1">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {notification.title}
+                          </p>
+                          <p className="text-sm text-slate-600">{notification.message}</p>
+                          {notification.context && (
+                            <p className="text-xs text-slate-500">{notification.context}</p>
+                          )}
+                        </div>
+                        {notification.actionType && (
+                          <span className="mt-3 inline-flex items-center text-xs font-medium text-blue-600">
+                            {notification.actionType === "open-chat"
+                              ? "เปิดบทสนทนา"
+                              : "ดูรายละเอียด"}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+      </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(activeHandoverReminder)}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleDismissHandoverReminder()
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{reminderTitle}</DialogTitle>
+            {reminderDescription && (
+              <DialogDescription>{reminderDescription}</DialogDescription>
+            )}
+          </DialogHeader>
+          {activeHandoverReminder && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-2xl bg-indigo-50 p-4 text-indigo-700">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">
+                    {activeHandoverReminder.propertyTitle}
+                  </p>
+                  <p className="text-sm">
+                    {formatNotificationDateTime(activeHandoverReminder.dueAtIso)}
+                  </p>
+                  {activeHandoverReminder.location && (
+                    <p className="text-xs text-indigo-600/80">
+                      {activeHandoverReminder.location}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={handleDismissHandoverReminder}
+                >
+                  รับทราบ
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleOpenHandoverReminder}
+                  className="bg-indigo-600 text-white hover:bg-indigo-700"
+                >
+                  {reminderActionLabel}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Modals */}
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} onSwitchToSignUp={switchToSignUp} />
       <SignUpModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} onSwitchToSignIn={switchToSignIn} />
@@ -521,6 +994,7 @@ const Navigation: React.FC = () => {
           }
         }}
       />
+      <BuyerConfirmationPrompt isChatOpen={isChatOpen} />
     </>
   )
 }
