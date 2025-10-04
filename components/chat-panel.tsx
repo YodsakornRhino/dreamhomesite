@@ -281,7 +281,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([])
   const [attachmentPreviews, setAttachmentPreviews] = useState<
-    { id: string; url: string; kind: "image" | "video"; name: string }
+    { id: string; url: string; kind: "image" | "video"; name: string }[]
   >([])
   const [queuedPropertyPreview, setQueuedPropertyPreview] =
     useState<PropertyPreviewPayload | null>(null)
@@ -391,7 +391,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       return
     }
 
-    const previews = pendingAttachments.map((file) => ({
+    const previews: { id: string; url: string; kind: "image" | "video"; name: string }[] = pendingAttachments.map((file) => ({
       id: `${file.name}-${file.lastModified}-${file.size}`,
       url: URL.createObjectURL(file),
       kind: file.type.startsWith("video/") ? "video" : "image",
@@ -1142,31 +1142,41 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             const mapped = docs.map((doc) => {
               const data = doc.data() as Record<string, any>
               const attachments = Array.isArray(data.attachments)
-                ? data.attachments
-                    .map((raw) => {
-                      if (!raw || typeof raw !== "object") return null
+                ? data.attachments.reduce<ChatMessageAttachment[]>((acc, raw) => {
+                    if (!raw || typeof raw !== "object") {
+                      return acc
+                    }
 
-                      const url = typeof raw.url === "string" ? raw.url : ""
-                      if (!url) return null
+                    const record = raw as Record<string, unknown>
+                    const url = typeof record.url === "string" ? record.url : ""
+                    if (!url) {
+                      return acc
+                    }
 
-                      const storagePath = typeof raw.storagePath === "string" ? raw.storagePath : ""
-                      const contentType = typeof raw.contentType === "string" ? raw.contentType : null
-                      const typeValue = typeof raw.type === "string" ? raw.type : undefined
-                      const resolvedType =
-                        typeValue === "image" || typeValue === "video" || typeValue === "file"
-                          ? typeValue
-                          : resolveAttachmentKind(contentType)
+                    const storagePath =
+                      typeof record.storagePath === "string" ? record.storagePath : ""
+                    const contentType =
+                      typeof record.contentType === "string" ? record.contentType : undefined
+                    const name = typeof record.name === "string" ? record.name : undefined
+                    const size = typeof record.size === "number" ? record.size : undefined
+                    const typeValue = typeof record.type === "string" ? record.type : undefined
+                    const resolvedType: AttachmentKind =
+                      typeValue === "image" || typeValue === "video" || typeValue === "file"
+                        ? typeValue
+                        : resolveAttachmentKind(contentType)
 
-                      return {
-                        url,
-                        storagePath,
-                        contentType: contentType ?? undefined,
-                        name: typeof raw.name === "string" ? raw.name : undefined,
-                        size: typeof raw.size === "number" ? raw.size : undefined,
-                        type: resolvedType,
-                      } satisfies ChatMessageAttachment
-                    })
-                    .filter((value): value is ChatMessageAttachment => Boolean(value))
+                    const attachment: ChatMessageAttachment = {
+                      url,
+                      storagePath,
+                      type: resolvedType,
+                      ...(contentType ? { contentType } : {}),
+                      ...(name ? { name } : {}),
+                      ...(typeof size === "number" ? { size } : {}),
+                    }
+
+                    acc.push(attachment)
+                    return acc
+                  }, [])
                 : []
 
               let propertyPreview: ChatMessagePropertyPreview | undefined

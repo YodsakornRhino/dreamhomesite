@@ -1703,236 +1703,235 @@ export default function SellerHomeInspectionPage() {
           </TabsContent>
         </Tabs>
       </div>
+    </div>
 
-      <Dialog open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-              <Bell className="h-5 w-5 text-amber-500" />
-              การแจ้งเตือนทั้งหมด
-            </DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[60vh] space-y-3 overflow-y-auto py-2">
-            {notificationsLoading ? (
-              <div className="flex items-center justify-center py-8 text-sm text-slate-500">
-                กำลังโหลดการแจ้งเตือน...
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">
-                ยังไม่มีการแจ้งเตือนจากระบบ
-              </div>
-            ) : (
-              notifications.map((notification) => {
-                const categoryMeta = notificationCategoryMeta[notification.category]
-                return (
-                  <div
-                    key={notification.id}
-                    className={`rounded-2xl border p-4 shadow-sm transition ${
-                      notification.read
-                        ? "border-slate-200 bg-white"
-                        : "border-amber-200 bg-amber-50/70"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
-                        <p className="text-sm text-slate-600">{notification.message}</p>
-                        <p className="text-xs text-slate-400">
-                          {safeFormatDateTime(notification.createdAt)} • {" "}
-                          {notification.triggeredBy === "buyer" ? "ผู้ซื้อ" : "ผู้ขาย"}
-                        </p>
-                      </div>
-                      <Badge
-                        className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${categoryMeta.tone}`}
-                      >
-                        {categoryMeta.label}
-                      </Badge>
+    <Dialog open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <Bell className="h-5 w-5 text-amber-500" />
+            การแจ้งเตือนทั้งหมด
+          </DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto py-2">
+          {notificationsLoading ? (
+            <div className="flex items-center justify-center py-8 text-sm text-slate-500">
+              กำลังโหลดการแจ้งเตือน...
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">
+              ยังไม่มีการแจ้งเตือนจากระบบ
+            </div>
+          ) : (
+            notifications.map((notification) => {
+              const categoryMeta = notificationCategoryMeta[notification.category]
+              return (
+                <div
+                  key={notification.id}
+                  className={`rounded-2xl border p-4 shadow-sm transition ${
+                    notification.read
+                      ? "border-slate-200 bg-white"
+                      : "border-amber-200 bg-amber-50/70"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                      <p className="text-sm text-slate-600">{notification.message}</p>
+                      <p className="text-xs text-slate-400">
+                        {safeFormatDateTime(notification.createdAt)} • {" "}
+                        {notification.triggeredBy === "buyer" ? "ผู้ซื้อ" : "ผู้ขาย"}
+                      </p>
                     </div>
+                    <Badge
+                      className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${categoryMeta.tone}`}
+                    >
+                      {categoryMeta.label}
+                    </Badge>
                   </div>
-                )
-              })
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
 
-      <Dialog
-        open={Boolean(checklistItemToDelete)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setChecklistItemToDelete(null)
-          }
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-              <Trash2 className="h-5 w-5 text-red-500" />
-              ลบรายการตรวจ
-            </DialogTitle>
-            <DialogDescription className="text-sm text-slate-600">
-              {checklistItemToDelete
-                ? `ต้องการลบ "${checklistItemToDelete.title}" ออกจากเช็คลิสต์หรือไม่?`
-                : "ต้องการลบรายการนี้ออกจากเช็คลิสต์หรือไม่"}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex justify-end gap-2">
+    <Dialog
+      open={Boolean(checklistItemToDelete)}
+      onOpenChange={(open) => {
+        if (!open) {
+          setChecklistItemToDelete(null)
+        }
+      }}
+    >
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <Trash2 className="h-5 w-5 text-red-500" />
+            ลบรายการตรวจ
+          </DialogTitle>
+          <DialogDescription className="text-sm text-slate-600">
+            {checklistItemToDelete
+              ? `ต้องการลบ "${checklistItemToDelete.title}" ออกจากเช็คลิสต์หรือไม่?`
+              : "ต้องการลบรายการนี้ออกจากเช็คลิสต์หรือไม่"}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setChecklistItemToDelete(null)}
+            className="border-slate-200 text-slate-600 hover:bg-slate-100"
+            disabled={deletingChecklist}
+          >
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={handleConfirmDeleteChecklist}
+            disabled={deletingChecklist}
+            className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            ลบรายการ
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+      <DialogContent className="w-[min(95vw,38rem)] max-h-[calc(100vh-4rem)] overflow-y-auto max-w-2xl sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <AlertCircle className="h-5 w-5 text-purple-600" />
+            สร้างรายการ Defect ใหม่
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="defect-title" className="text-xs font-semibold text-slate-700">
+              หัวข้อปัญหา
+            </Label>
+            <Input
+              id="defect-title"
+              value={reportTitle}
+              onChange={(event) => setReportTitle(event.target.value)}
+              placeholder="เช่น เก็บซิลิโคนรอบอ่างใหม่"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="defect-location" className="text-xs font-semibold text-slate-700">
+              ตำแหน่งที่พบ
+            </Label>
+            <Input
+              id="defect-location"
+              value={reportLocation}
+              onChange={(event) => setReportLocation(event.target.value)}
+              placeholder="เช่น ห้องน้ำชั้น 2"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="defect-description" className="text-xs font-semibold text-slate-700">
+              รายละเอียดเพิ่มเติม (ไม่บังคับ)
+            </Label>
+            <Textarea
+              id="defect-description"
+              value={reportDescription}
+              onChange={(event) => setReportDescription(event.target.value)}
+              placeholder="บรรยายสิ่งที่ต้องแก้ไขหรือวัสดุที่ต้องใช้"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-slate-700">
+              แนบรูปก่อนแก้ไข (ไม่บังคับ)
+            </Label>
+            <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 p-4">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Upload className="h-4 w-4 text-slate-400" /> เพิ่มรูปเพื่อให้ทีมเห็นปัญหาเดิม
+              </div>
+              <Input
+                ref={reportBeforeInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleReportBeforePhotoChange}
+                disabled={creatingIssue}
+              />
+              {reportBeforePhotos.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  เลือกรูปสภาพก่อนแก้ไขเพื่อใช้เปรียบเทียบกับงานที่ปรับแล้ว
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {reportBeforePhotos.map((entry) => (
+                    <div
+                      key={entry.preview}
+                      className="relative h-20 w-28 overflow-hidden rounded-lg border border-slate-200"
+                    >
+                      <img
+                        src={entry.preview}
+                        alt="ก่อนแก้ไข"
+                        className="h-full w-full object-cover"
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="absolute right-1 top-1 h-6 w-6 rounded-full bg-white/80 text-red-500 hover:bg-white"
+                        onClick={() => handleRemoveBeforePhoto(entry.preview)}
+                        disabled={creatingIssue}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="sr-only">ลบรูปนี้</span>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="defect-date" className="text-xs font-semibold text-slate-700">
+                กำหนดเสร็จ (ไม่บังคับ)
+              </Label>
+              <Input
+                id="defect-date"
+                type="date"
+                value={reportExpectedDate}
+                onChange={(event) => setReportExpectedDate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="defect-owner" className="text-xs font-semibold text-slate-700">
+                ผู้รับผิดชอบ (ไม่บังคับ)
+              </Label>
+              <Input
+                id="defect-owner"
+                value={reportOwner}
+                onChange={(event) => setReportOwner(event.target.value)}
+                placeholder="เช่น ทีมช่างคุณเอ็ม"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"
-              onClick={() => setChecklistItemToDelete(null)}
-              className="border-slate-200 text-slate-600 hover:bg-slate-100"
-              disabled={deletingChecklist}
+              onClick={() => setReportDialogOpen(false)}
+              className="border-slate-200 text-slate-700 hover:bg-slate-100"
+              disabled={creatingIssue}
             >
               ยกเลิก
             </Button>
             <Button
-              onClick={handleConfirmDeleteChecklist}
-              disabled={deletingChecklist}
-              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              onClick={handleCreateIssue}
+              disabled={creatingIssue}
+              className="bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60"
             >
-              ลบรายการ
+              บันทึกรายการ
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-        <DialogContent className="w-[min(95vw,38rem)] max-h-[calc(100vh-4rem)] overflow-y-auto max-w-2xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-              <AlertCircle className="h-5 w-5 text-purple-600" />
-              สร้างรายการ Defect ใหม่
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="defect-title" className="text-xs font-semibold text-slate-700">
-                หัวข้อปัญหา
-              </Label>
-              <Input
-                id="defect-title"
-                value={reportTitle}
-                onChange={(event) => setReportTitle(event.target.value)}
-                placeholder="เช่น เก็บซิลิโคนรอบอ่างใหม่"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="defect-location" className="text-xs font-semibold text-slate-700">
-                ตำแหน่งที่พบ
-              </Label>
-              <Input
-                id="defect-location"
-                value={reportLocation}
-                onChange={(event) => setReportLocation(event.target.value)}
-                placeholder="เช่น ห้องน้ำชั้น 2"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="defect-description" className="text-xs font-semibold text-slate-700">
-                รายละเอียดเพิ่มเติม (ไม่บังคับ)
-              </Label>
-              <Textarea
-                id="defect-description"
-                value={reportDescription}
-                onChange={(event) => setReportDescription(event.target.value)}
-                placeholder="บรรยายสิ่งที่ต้องแก้ไขหรือวัสดุที่ต้องใช้"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-slate-700">
-                แนบรูปก่อนแก้ไข (ไม่บังคับ)
-              </Label>
-              <div className="space-y-3 rounded-2xl border border-dashed border-slate-200 p-4">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Upload className="h-4 w-4 text-slate-400" /> เพิ่มรูปเพื่อให้ทีมเห็นปัญหาเดิม
-                </div>
-                <Input
-                  ref={reportBeforeInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleReportBeforePhotoChange}
-                  disabled={creatingIssue}
-                />
-                {reportBeforePhotos.length === 0 ? (
-                  <p className="text-xs text-slate-500">
-                    เลือกรูปสภาพก่อนแก้ไขเพื่อใช้เปรียบเทียบกับงานที่ปรับแล้ว
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {reportBeforePhotos.map((entry) => (
-                      <div
-                        key={entry.preview}
-                        className="relative h-20 w-28 overflow-hidden rounded-lg border border-slate-200"
-                      >
-                        <img
-                          src={entry.preview}
-                          alt="ก่อนแก้ไข"
-                          className="h-full w-full object-cover"
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="absolute right-1 top-1 h-6 w-6 rounded-full bg-white/80 text-red-500 hover:bg-white"
-                          onClick={() => handleRemoveBeforePhoto(entry.preview)}
-                          disabled={creatingIssue}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span className="sr-only">ลบรูปนี้</span>
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="defect-date" className="text-xs font-semibold text-slate-700">
-                  กำหนดเสร็จ (ไม่บังคับ)
-                </Label>
-                <Input
-                  id="defect-date"
-                  type="date"
-                  value={reportExpectedDate}
-                  onChange={(event) => setReportExpectedDate(event.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="defect-owner" className="text-xs font-semibold text-slate-700">
-                  ผู้รับผิดชอบ (ไม่บังคับ)
-                </Label>
-                <Input
-                  id="defect-owner"
-                  value={reportOwner}
-                  onChange={(event) => setReportOwner(event.target.value)}
-                  placeholder="เช่น ทีมช่างคุณเอ็ม"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setReportDialogOpen(false)}
-                className="border-slate-200 text-slate-700 hover:bg-slate-100"
-                disabled={creatingIssue}
-              >
-                ยกเลิก
-              </Button>
-              <Button
-                onClick={handleCreateIssue}
-                disabled={creatingIssue}
-                className="bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60"
-              >
-                บันทึกรายการ
-              </Button>
-            </div>
           </div>
-        </DialogContent>
-      </Dialog>
         </div>
-      </div>
+      </DialogContent>
+    </Dialog>
     </>
   )
 }

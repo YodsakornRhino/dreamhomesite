@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
 
@@ -94,11 +93,7 @@ const SheetContent = React.forwardRef<
         {...props}
       >
         {/* ถ้าไม่มี Title ให้เติม Title แบบซ่อนไว้เพื่อ a11y */}
-        {!hasTitle && (
-          <VisuallyHidden asChild>
-            <SheetTitle>{titleText}</SheetTitle>
-          </VisuallyHidden>
-        )}
+        {!hasTitle && <SheetTitle className="sr-only">{titleText}</SheetTitle>}
 
         {children}
 

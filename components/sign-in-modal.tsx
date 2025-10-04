@@ -143,7 +143,7 @@ export default function SignInModal({ isOpen, onClose, onSwitchToSignUp }: SignI
 
     setIsSendingVerification(true)
     try {
-      await sendVerificationEmail(user)
+      await sendVerificationEmail()
       toast({
         title: "ส่งอีเมลยืนยันแล้ว",
         description: "กรุณาตรวจสอบอีเมลของคุณเพื่อยืนยันบัญชี",

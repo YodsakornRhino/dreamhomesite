@@ -279,6 +279,10 @@ const Navigation: React.FC = () => {
             : [],
         video: null,
         createdAt: new Date().toISOString(),
+        isUnderPurchase: false,
+        confirmedBuyerId: null,
+        buyerConfirmed: false,
+        sellerDocumentsConfirmed: false,
       }
     },
     [],

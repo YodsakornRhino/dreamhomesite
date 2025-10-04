@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import type { User } from "firebase/auth"
-import { onAuthStateChange } from "@/lib/auth"
+import { onAuthStateChanged } from "@/lib/auth"
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null)
@@ -21,9 +21,9 @@ export const useAuth = () => {
       try {
         console.log("Initializing auth state listener...")
 
-        unsubscribe = onAuthStateChange((user) => {
-          console.log("Auth state changed:", user ? `User: ${user.email}` : "No user")
-          setUser(user)
+        unsubscribe = onAuthStateChanged((authUser: User | null) => {
+          console.log("Auth state changed:", authUser ? `User: ${authUser.email}` : "No user")
+          setUser(authUser)
           setLoading(false)
           setError(null)
         })
