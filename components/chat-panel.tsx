@@ -48,6 +48,7 @@ import type {
 } from "@/types/chat"
 import {
   addDocument,
+  getDocument,
   setDocument,
   subscribeToCollection,
   subscribeToDocument,
@@ -57,6 +58,7 @@ import { getDownloadURL, uploadFile } from "@/lib/storage"
 import { cn } from "@/lib/utils"
 import { formatPropertyPrice, TRANSACTION_LABELS } from "@/lib/property"
 import { createUserNotification } from "@/lib/notifications"
+import { saveBuyerPropertyFromListing } from "@/lib/buyer-properties"
 
 interface ChatPanelProps {
   isOpen: boolean
@@ -850,18 +852,33 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       setBuyerConfirmingPropertyId(preview.propertyId)
 
       try {
-        await Promise.all([
+        const confirmedAtIso = new Date().toISOString()
+        const propertyDoc = await getDocument("property", preview.propertyId)
+        const listingData = propertyDoc?.data() as Record<string, unknown> | null
+
+        const operations: Promise<void>[] = [
           updateDocument("property", preview.propertyId, {
             buyerConfirmed: true,
+            confirmedBuyerId: status.confirmedBuyerId ?? user.uid,
           }),
-          updateDocument(
-            `users/${preview.ownerUid}/user_property`,
-            preview.propertyId,
-            {
+          saveBuyerPropertyFromListing({
+            buyerUid: user.uid,
+            propertyId: preview.propertyId,
+            listingData,
+            preview,
+            confirmedAt: confirmedAtIso,
+          }),
+        ]
+
+        if (preview.ownerUid) {
+          operations.push(
+            updateDocument(`users/${preview.ownerUid}/user_property`, preview.propertyId, {
               buyerConfirmed: true,
-            },
-          ),
-        ])
+            }),
+          )
+        }
+
+        await Promise.all(operations)
 
         toast({
           title: "ยืนยันการซื้อเรียบร้อย",

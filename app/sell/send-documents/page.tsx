@@ -72,6 +72,7 @@ export default function SellerSendDocumentsPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [remoteConfirmed, setRemoteConfirmed] = useState(false)
+  const [buyerUid, setBuyerUid] = useState<string | null>(null)
 
   const requiredCompletedCount = useMemo(
     () => REQUIRED_DOCUMENTS.filter((doc) => checkedState[doc.id]).length,
@@ -101,6 +102,11 @@ export default function SellerSendDocumentsPage() {
           if (!isMounted) return
           const data = (doc?.data() as Record<string, unknown> | null) ?? null
           const confirmed = Boolean(data?.sellerDocumentsConfirmed)
+          const buyerId =
+            typeof data?.confirmedBuyerId === "string" && data.confirmedBuyerId.trim().length > 0
+              ? (data.confirmedBuyerId as string)
+              : null
+          setBuyerUid(buyerId)
           setRemoteConfirmed((previous) => {
             if (confirmed && !previous) {
               setCheckedState((current) => {
@@ -179,14 +185,24 @@ export default function SellerSendDocumentsPage() {
 
     setIsSubmitting(true)
     try {
-      await Promise.all([
+      const updates: Promise<void>[] = [
         updateDocument("property", propertyId, {
           sellerDocumentsConfirmed: true,
         }),
         updateDocument(`users/${user.uid}/user_property`, propertyId, {
           sellerDocumentsConfirmed: true,
         }),
-      ])
+      ]
+
+      if (buyerUid) {
+        updates.push(
+          updateDocument(`users/${buyerUid}/buyer_properties`, propertyId, {
+            sellerDocumentsConfirmed: true,
+          }),
+        )
+      }
+
+      await Promise.all(updates)
 
       setRemoteConfirmed(true)
       toast({

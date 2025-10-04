@@ -44,6 +44,7 @@ import {
   Bell,
   AlertCircle,
   Loader2,
+  KeyRound,
 } from "lucide-react"
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
@@ -552,6 +553,12 @@ const Navigation: React.FC = () => {
                       <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/buy/my-properties" className="flex items-center">
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          <span>อสังหาที่ซื้อของฉัน</span>
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={handleOpenNotifications}>
                         <Bell className="mr-2 h-4 w-4" />

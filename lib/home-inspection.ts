@@ -9,6 +9,7 @@ import {
   updateDocument,
 } from "@/lib/firestore"
 import { createUserNotification } from "@/lib/notifications"
+import { updateBuyerPropertyInspectionStateRecord } from "@/lib/buyer-properties"
 import type {
   HomeInspectionChecklistItem,
   HomeInspectionIssue,
@@ -399,6 +400,35 @@ export const updateInspectionState = async (
     category: "schedule",
     triggeredBy: updates.lastUpdatedBy,
   })
+
+  try {
+    const context = await fetchPropertyNotificationContext(propertyId)
+    if (context.buyerUid) {
+      const buyerUpdates: {
+        handoverDate?: string | null
+        handoverNote?: string
+      } = {}
+
+      if (Object.prototype.hasOwnProperty.call(updates, "handoverDate")) {
+        buyerUpdates.handoverDate = updates.handoverDate ?? null
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, "handoverNote")) {
+        buyerUpdates.handoverNote = updates.handoverNote ?? ""
+      }
+
+      if (Object.keys(buyerUpdates).length > 0) {
+        await updateBuyerPropertyInspectionStateRecord({
+          buyerUid: context.buyerUid,
+          propertyId,
+          ...buyerUpdates,
+          lastInspectionUpdatedBy: updates.lastUpdatedBy,
+        })
+      }
+    }
+  } catch (error) {
+    console.error("Failed to sync buyer inspection state", error)
+  }
 }
 
 export const subscribeToInspectionChecklist = async (
