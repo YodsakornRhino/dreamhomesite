@@ -46,6 +46,8 @@ import {
   AlertCircle,
   Loader2,
   KeyRound,
+  FileText,
+  PlusCircle,
 } from "lucide-react"
 import SignInModal from "./sign-in-modal"
 import SignUpModal from "./sign-up-modal"
@@ -726,6 +728,18 @@ const Navigation: React.FC = () => {
                       <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                         <User className="mr-2 h-4 w-4" />
                         <span>โปรไฟล์</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/blog/my" className="flex items-center">
+                          <FileText className="mr-2 h-4 w-4" />
+                          <span>บล็อกของฉัน</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/blog/create" className="flex items-center">
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          <span>สร้างบล็อก</span>
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/buy/my-properties" className="flex items-center">
