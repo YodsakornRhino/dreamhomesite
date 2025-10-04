@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/tooltip"
 import ProfileModal from "./profile-modal"
 import { UserPropertyModal } from "./user-property-modal"
+import BuyerConfirmationPrompt from "./buyer-confirmation-prompt"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -767,6 +768,7 @@ const Navigation: React.FC = () => {
           }
         }}
       />
+      <BuyerConfirmationPrompt isChatOpen={isChatOpen} />
     </>
   )
 }
