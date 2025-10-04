@@ -1681,7 +1681,7 @@ export default function SellerHomeInspectionPage() {
       </Dialog>
 
       <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-        <DialogContent className="w-[min(95vw,38rem)] max-w-2xl sm:max-w-xl">
+        <DialogContent className="w-[min(95vw,38rem)] max-h-[calc(100vh-4rem)] overflow-y-auto max-w-2xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
               <AlertCircle className="h-5 w-5 text-purple-600" />
