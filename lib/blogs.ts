@@ -14,10 +14,12 @@ import { mapDocumentToBlogPost } from "./blog-mapper"
 
 const BLOG_COLLECTION = "blogs"
 
+const AVERAGE_CHARACTERS_PER_MINUTE = 1000
+
 export const estimateReadTimeMinutes = (content: string): number => {
-  const words = content.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return 1
-  return Math.max(1, Math.round(words.length / 200))
+  const characters = Array.from(content.trim())
+  if (characters.length === 0) return 1
+  return Math.max(1, Math.round(characters.length / AVERAGE_CHARACTERS_PER_MINUTE))
 }
 
 export const BLOG_CATEGORIES: BlogCategory[] = [
