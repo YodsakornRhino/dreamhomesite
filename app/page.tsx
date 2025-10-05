@@ -136,8 +136,8 @@ export default function Home() {
             <p className="text-gray-600 max-w-2xl mx-auto">เราให้บริการครบวงจรด้วยเทคโนโลยีที่ทันสมัยและทีมงานมืออาชีพ</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="shadow-sm hover:shadow-md transition h-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+            <Card className="shadow-sm hover:shadow-md transition h-full lg:col-span-4">
               <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Search className="h-5 w-5" />
@@ -149,7 +149,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm hover:shadow-md transition h-full">
+            <Card className="shadow-sm hover:shadow-md transition h-full lg:col-span-4">
               <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Shield className="h-5 w-5" />
@@ -161,7 +161,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm hover:shadow-md transition h-full">
+            <Card className="shadow-sm hover:shadow-md transition h-full lg:col-span-4">
               <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <MessageSquare className="h-5 w-5" />
@@ -173,7 +173,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm hover:shadow-md transition h-full lg:col-start-2">
+            <Card className="shadow-sm hover:shadow-md transition h-full lg:col-span-4 lg:col-start-3">
               <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Gauge className="h-5 w-5" />
@@ -185,7 +185,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm hover:shadow-md transition h-full">
+            <Card className="shadow-sm hover:shadow-md transition h-full lg:col-span-4 lg:col-start-7">
               <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Award className="h-5 w-5" />
