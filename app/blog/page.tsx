@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Inter } from "next/font/google"
-import { Calendar, User, ArrowRight, Search, Loader2, Tag } from "lucide-react"
+import { Calendar, User, ArrowRight, Search, Loader2, Clock3 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -241,7 +241,7 @@ export default function BlogPage() {
                         </div>
                       </div>
                       <CardContent className="p-6 flex flex-col h-full">
-                        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
                           <div className="flex items-center">
                             <User size={16} className="mr-2" />
                             <Link
@@ -256,14 +256,14 @@ export default function BlogPage() {
                             {formatDate(post.createdAt)}
                           </div>
                           <div className="flex items-center">
-                            <Tag size={16} className="mr-2" />
+                            <Clock3 size={16} className="mr-2" />
                             {post.readTimeMinutes} นาทีในการอ่าน
                           </div>
                         </div>
-                        <h3 className="text-2xl font-bold mb-3 text-gray-900 line-clamp-2">
+                        <h3 className="text-2xl font-bold mb-3 text-gray-900 line-clamp-2 break-words">
                           {post.title}
                         </h3>
-                        <p className="text-gray-600 mb-6 line-clamp-3 flex-1">{post.excerpt}</p>
+                        <p className="text-gray-600 mb-6 line-clamp-3 flex-1 break-words">{post.excerpt}</p>
                         <Button asChild variant="outline" className="self-start">
                           <Link href={`/blog/${post.id}`}>
                             อ่านเพิ่มเติม
@@ -308,11 +308,11 @@ export default function BlogPage() {
                           </div>
                         </div>
                         <CardContent className="p-5 flex flex-col flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 break-words">
                             {post.title}
                           </h3>
-                          <p className="text-sm text-gray-600 mb-4 line-clamp-3 flex-1">{post.excerpt}</p>
-                          <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                          <p className="text-sm text-gray-600 mb-4 line-clamp-3 flex-1 break-words">{post.excerpt}</p>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 mb-3">
                             <div className="flex items-center">
                               <User size={14} className="mr-2" />
                               <Link
@@ -325,6 +325,10 @@ export default function BlogPage() {
                             <div className="flex items-center">
                               <Calendar size={14} className="mr-2" />
                               {formatDate(post.createdAt)}
+                            </div>
+                            <div className="flex items-center">
+                              <Clock3 size={14} className="mr-2" />
+                              {post.readTimeMinutes} นาทีในการอ่าน
                             </div>
                           </div>
                           <Button asChild variant="ghost" size="sm" className="justify-between">

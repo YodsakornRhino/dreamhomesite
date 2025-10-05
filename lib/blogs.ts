@@ -61,6 +61,60 @@ export const subscribeToBlog = async (
   })
 }
 
+type BlogVisibilityMeta = {
+  reason?: "not-found" | "unpublished"
+}
+
+export const subscribeToBlogForViewer = async (
+  blogId: string,
+  viewerId: string | null,
+  callback: (post: BlogPost | null, meta?: BlogVisibilityMeta) => void,
+): Promise<() => void> => {
+  const { where, documentId, limit } = await import("firebase/firestore")
+
+  const publicUnsubscribe = await subscribeToCollection(
+    BLOG_COLLECTION,
+    (docs) => {
+      const doc = docs[0]
+      if (!doc) {
+        callback(null, { reason: "not-found" })
+        return
+      }
+      callback(mapDocumentToBlogPost(doc))
+    },
+    where("published", "==", true),
+    where(documentId(), "==", blogId),
+    limit(1),
+  )
+
+  let privateUnsubscribe: (() => void) | undefined
+
+  if (viewerId) {
+    try {
+      privateUnsubscribe = await subscribeToBlog(blogId, (post) => {
+        if (!post) {
+          callback(null, { reason: "not-found" })
+          return
+        }
+
+        if (!post.published && post.authorId !== viewerId) {
+          callback(null, { reason: "unpublished" })
+          return
+        }
+
+        callback(post)
+      })
+    } catch (error) {
+      console.error("Failed to subscribe to author-only blog view", error)
+    }
+  }
+
+  return () => {
+    publicUnsubscribe?.()
+    privateUnsubscribe?.()
+  }
+}
+
 interface BlogAuthor {
   uid: string
   displayName: string | null

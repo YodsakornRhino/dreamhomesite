@@ -10,8 +10,9 @@ import { ArrowLeft, Calendar, Clock3, Loader2, Tag, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { subscribeToBlog } from "@/lib/blogs"
+import { subscribeToBlogForViewer } from "@/lib/blogs"
 import type { BlogPost } from "@/types/blog"
+import { useAuthContext } from "@/contexts/AuthContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -36,6 +37,8 @@ export default function BlogDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const blogId = params?.id
+  const { user } = useAuthContext()
+  const viewerId = user?.uid ?? null
 
   const [post, setPost] = useState<BlogPost | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,12 +56,16 @@ export default function BlogDetailPage() {
 
     const init = async () => {
       try {
-        unsubscribe = await subscribeToBlog(blogId, (blog) => {
+        unsubscribe = await subscribeToBlogForViewer(blogId, viewerId, (blog, meta) => {
           if (cancelled) return
           setPost(blog)
           setLoading(false)
           if (!blog) {
-            setError("ไม่พบบทความที่ต้องการ")
+            setError(
+              meta?.reason === "unpublished"
+                ? "บทความนี้ยังไม่เผยแพร่หรืออาจถูกจำกัดการเข้าถึง"
+                : "ไม่พบบทความที่ต้องการ",
+            )
           } else {
             setError(null)
           }
@@ -78,7 +85,7 @@ export default function BlogDetailPage() {
       cancelled = true
       unsubscribe?.()
     }
-  }, [blogId])
+  }, [blogId, viewerId])
 
   return (
     <div className={`${inter.className} bg-slate-50 min-h-screen`}> 
@@ -145,18 +152,18 @@ export default function BlogDetailPage() {
                 </div>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6 leading-tight">
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6 leading-tight break-words">
                 {post.title}
               </h1>
 
               {post.excerpt && (
-                <p className="text-lg text-slate-600 italic border-l-4 border-teal-500 pl-4 mb-8">
+                <p className="text-lg text-slate-600 italic border-l-4 border-teal-500 pl-4 mb-8 break-words">
                   {post.excerpt}
                 </p>
               )}
 
-              <div className="prose prose-lg max-w-none text-slate-700 leading-8">
-                <p className="whitespace-pre-line">{post.content}</p>
+              <div className="prose prose-lg max-w-none text-slate-700 leading-8 break-words">
+                <p className="whitespace-pre-line break-words">{post.content}</p>
               </div>
 
               {post.tags.length > 0 && (

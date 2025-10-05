@@ -149,7 +149,7 @@ export default function MyBlogsPage() {
                 <Card key={post.id} className="border border-slate-200 shadow-sm">
                   <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2">
                     <div>
-                      <CardTitle className="text-xl text-slate-900">{post.title}</CardTitle>
+                      <CardTitle className="text-xl text-slate-900 break-words">{post.title}</CardTitle>
                       <p className="text-sm text-slate-500 mt-1">เผยแพร่เมื่อ {formatDate(post.createdAt)}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -162,7 +162,9 @@ export default function MyBlogsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <p className="text-slate-600 line-clamp-3">{post.excerpt || post.content.slice(0, 160)}</p>
+                    <p className="text-slate-600 line-clamp-3 break-words">
+                      {post.excerpt || post.content.slice(0, 160)}
+                    </p>
                     {post.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 text-sm text-slate-500">
                         <Tag className="h-4 w-4 text-teal-600" />
