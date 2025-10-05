@@ -1,8 +1,24 @@
-import type { BlogPost, CreateBlogPostInput, BlogCategory } from "@/types/blog"
-import { addDocument, subscribeToCollection, subscribeToDocument } from "@/lib/firestore"
+import type {
+  BlogPost,
+  CreateBlogPostInput,
+  BlogCategory,
+  UpdateBlogPostInput,
+} from "@/types/blog"
+import {
+  addDocument,
+  subscribeToCollection,
+  subscribeToDocument,
+  updateDocument,
+} from "@/lib/firestore"
 import { mapDocumentToBlogPost } from "./blog-mapper"
 
 const BLOG_COLLECTION = "blogs"
+
+export const estimateReadTimeMinutes = (content: string): number => {
+  const words = content.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 1
+  return Math.max(1, Math.round(words.length / 200))
+}
 
 export const BLOG_CATEGORIES: BlogCategory[] = [
   "เคล็ดลับการซื้อ",
@@ -145,4 +161,29 @@ export const createBlogPost = async (
   })
 
   return docRef.id
+}
+
+export const updateBlogPost = async (
+  blogId: string,
+  input: UpdateBlogPostInput,
+): Promise<void> => {
+  const { serverTimestamp } = await import("firebase/firestore")
+
+  const payload: Record<string, unknown> = {
+    title: input.title,
+    excerpt: input.excerpt,
+    content: input.content,
+    category: input.category,
+    tags: input.tags,
+    coverImageUrl: input.coverImageUrl,
+    coverImagePath: input.coverImagePath,
+    readTimeMinutes: input.readTimeMinutes,
+    updatedAt: serverTimestamp(),
+  }
+
+  if (typeof input.published === "boolean") {
+    payload.published = input.published
+  }
+
+  await updateDocument(BLOG_COLLECTION, blogId, payload)
 }

@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useParams, useRouter } from "next/navigation"
 import { Inter } from "next/font/google"
-import { ArrowLeft, Calendar, Clock3, Loader2, Tag, User } from "lucide-react"
+import { ArrowLeft, Calendar, Clock3, Loader2, PenSquare, Tag, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -90,16 +90,26 @@ export default function BlogDetailPage() {
   return (
     <div className={`${inter.className} bg-slate-50 min-h-screen`}> 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <Button variant="ghost" size="sm" asChild className="gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+          <Button variant="ghost" size="sm" asChild className="gap-2 w-fit">
             <Link href="/blog">
               <ArrowLeft className="h-4 w-4" />
               กลับสู่บล็อก
             </Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => router.refresh()}>
-            รีเฟรช
-          </Button>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {post && user?.uid === post.authorId && (
+              <Button asChild size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
+                <Link href={`/blog/${post.id}/edit`}>
+                  <PenSquare className="h-4 w-4" />
+                  แก้ไขบทความ
+                </Link>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => router.refresh()}>
+              รีเฟรช
+            </Button>
+          </div>
         </div>
 
         {loading ? (

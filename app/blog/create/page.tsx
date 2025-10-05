@@ -22,19 +22,13 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
-import { BLOG_CATEGORIES, createBlogPost } from "@/lib/blogs"
+import { BLOG_CATEGORIES, createBlogPost, estimateReadTimeMinutes } from "@/lib/blogs"
 import { getDownloadURL, uploadFile } from "@/lib/storage"
 import type { BlogCategory } from "@/types/blog"
 
 const inter = Inter({ subsets: ["latin"] })
 
 const DEFAULT_CATEGORY: BlogCategory = BLOG_CATEGORIES[0]
-
-const calculateReadTime = (content: string): number => {
-  const words = content.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return 1
-  return Math.max(1, Math.round(words.length / 200))
-}
 
 const normalizeFileName = (fileName: string) =>
   fileName
@@ -153,7 +147,7 @@ export default function CreateBlogPage() {
           tags,
           coverImageUrl: coverUrl,
           coverImagePath: coverPath,
-          readTimeMinutes: calculateReadTime(content),
+          readTimeMinutes: estimateReadTimeMinutes(content),
         },
       )
 

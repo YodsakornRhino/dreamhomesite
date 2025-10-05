@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Inter } from "next/font/google"
-import { Calendar, Clock3, Loader2, PenSquare, PlusCircle, Tag } from "lucide-react"
+import { ArrowRight, Clock3, Loader2, PenSquare, PlusCircle, Tag } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -179,17 +179,17 @@ export default function MyBlogsPage() {
                       <div className="text-xs text-slate-400">
                         อัปเดตล่าสุด {formatDate(post.updatedAt ?? post.createdAt)}
                       </div>
-                      <div className="flex gap-2">
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/blog/${post.id}`} className="flex items-center gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button asChild variant="outline" size="sm" className="gap-2">
+                          <Link href={`/blog/${post.id}`}>
                             อ่านบทความ
-                            <Calendar className="h-3 w-3" />
+                            <ArrowRight className="h-3 w-3" />
                           </Link>
                         </Button>
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href="/blog/create" className="flex items-center gap-2">
+                        <Button asChild size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
+                          <Link href={`/blog/${post.id}/edit`}>
                             <PenSquare className="h-3 w-3" />
-                            สร้างบทความใหม่
+                            แก้ไขบทความ
                           </Link>
                         </Button>
                       </div>
