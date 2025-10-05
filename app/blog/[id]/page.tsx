@@ -131,7 +131,9 @@ export default function BlogDetailPage() {
                 </Badge>
                 <div className="flex items-center text-sm text-slate-500">
                   <User className="h-4 w-4 mr-1" />
-                  {post.authorName}
+                  <Link href={`/blog/authors/${post.authorId}`} className="hover:underline">
+                    {post.authorName}
+                  </Link>
                 </div>
                 <div className="flex items-center text-sm text-slate-500">
                   <Calendar className="h-4 w-4 mr-1" />
@@ -167,6 +169,15 @@ export default function BlogDetailPage() {
                   ))}
                 </div>
               )}
+
+              <div className="mt-10">
+                <Button asChild variant="ghost">
+                  <Link href={`/blog/authors/${post.authorId}`} className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    อ่านบทความอื่นจาก {post.authorName}
+                  </Link>
+                </Button>
+              </div>
             </div>
           </article>
         ) : null}

@@ -244,7 +244,12 @@ export default function BlogPage() {
                         <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                           <div className="flex items-center">
                             <User size={16} className="mr-2" />
-                            {post.authorName}
+                            <Link
+                              href={`/blog/authors/${post.authorId}`}
+                              className="hover:underline"
+                            >
+                              {post.authorName}
+                            </Link>
                           </div>
                           <div className="flex items-center">
                             <Calendar size={16} className="mr-2" />
@@ -310,7 +315,12 @@ export default function BlogPage() {
                           <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
                             <div className="flex items-center">
                               <User size={14} className="mr-2" />
-                              {post.authorName}
+                              <Link
+                                href={`/blog/authors/${post.authorId}`}
+                                className="hover:underline"
+                              >
+                                {post.authorName}
+                              </Link>
                             </div>
                             <div className="flex items-center">
                               <Calendar size={14} className="mr-2" />
