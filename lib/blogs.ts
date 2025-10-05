@@ -1,8 +1,26 @@
-import type { BlogPost, CreateBlogPostInput, BlogCategory } from "@/types/blog"
-import { addDocument, subscribeToCollection, subscribeToDocument } from "@/lib/firestore"
+import type {
+  BlogPost,
+  CreateBlogPostInput,
+  BlogCategory,
+  UpdateBlogPostInput,
+} from "@/types/blog"
+import {
+  addDocument,
+  subscribeToCollection,
+  subscribeToDocument,
+  updateDocument,
+} from "@/lib/firestore"
 import { mapDocumentToBlogPost } from "./blog-mapper"
 
 const BLOG_COLLECTION = "blogs"
+
+const AVERAGE_CHARACTERS_PER_MINUTE = 1000
+
+export const estimateReadTimeMinutes = (content: string): number => {
+  const characters = Array.from(content.trim())
+  if (characters.length === 0) return 1
+  return Math.max(1, Math.round(characters.length / AVERAGE_CHARACTERS_PER_MINUTE))
+}
 
 export const BLOG_CATEGORIES: BlogCategory[] = [
   "เคล็ดลับการซื้อ",
@@ -61,6 +79,60 @@ export const subscribeToBlog = async (
   })
 }
 
+type BlogVisibilityMeta = {
+  reason?: "not-found" | "unpublished"
+}
+
+export const subscribeToBlogForViewer = async (
+  blogId: string,
+  viewerId: string | null,
+  callback: (post: BlogPost | null, meta?: BlogVisibilityMeta) => void,
+): Promise<() => void> => {
+  const { where, documentId, limit } = await import("firebase/firestore")
+
+  const publicUnsubscribe = await subscribeToCollection(
+    BLOG_COLLECTION,
+    (docs) => {
+      const doc = docs[0]
+      if (!doc) {
+        callback(null, { reason: "not-found" })
+        return
+      }
+      callback(mapDocumentToBlogPost(doc))
+    },
+    where("published", "==", true),
+    where(documentId(), "==", blogId),
+    limit(1),
+  )
+
+  let privateUnsubscribe: (() => void) | undefined
+
+  if (viewerId) {
+    try {
+      privateUnsubscribe = await subscribeToBlog(blogId, (post) => {
+        if (!post) {
+          callback(null, { reason: "not-found" })
+          return
+        }
+
+        if (!post.published && post.authorId !== viewerId) {
+          callback(null, { reason: "unpublished" })
+          return
+        }
+
+        callback(post)
+      })
+    } catch (error) {
+      console.error("Failed to subscribe to author-only blog view", error)
+    }
+  }
+
+  return () => {
+    publicUnsubscribe?.()
+    privateUnsubscribe?.()
+  }
+}
+
 interface BlogAuthor {
   uid: string
   displayName: string | null
@@ -91,4 +163,29 @@ export const createBlogPost = async (
   })
 
   return docRef.id
+}
+
+export const updateBlogPost = async (
+  blogId: string,
+  input: UpdateBlogPostInput,
+): Promise<void> => {
+  const { serverTimestamp } = await import("firebase/firestore")
+
+  const payload: Record<string, unknown> = {
+    title: input.title,
+    excerpt: input.excerpt,
+    content: input.content,
+    category: input.category,
+    tags: input.tags,
+    coverImageUrl: input.coverImageUrl,
+    coverImagePath: input.coverImagePath,
+    readTimeMinutes: input.readTimeMinutes,
+    updatedAt: serverTimestamp(),
+  }
+
+  if (typeof input.published === "boolean") {
+    payload.published = input.published
+  }
+
+  await updateDocument(BLOG_COLLECTION, blogId, payload)
 }

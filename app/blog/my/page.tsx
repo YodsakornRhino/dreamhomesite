@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Inter } from "next/font/google"
-import { Calendar, Clock3, Loader2, PenSquare, PlusCircle, Tag } from "lucide-react"
+import { ArrowRight, Clock3, Loader2, PenSquare, PlusCircle, Tag } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -149,7 +149,7 @@ export default function MyBlogsPage() {
                 <Card key={post.id} className="border border-slate-200 shadow-sm">
                   <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2">
                     <div>
-                      <CardTitle className="text-xl text-slate-900">{post.title}</CardTitle>
+                      <CardTitle className="text-xl text-slate-900 break-words">{post.title}</CardTitle>
                       <p className="text-sm text-slate-500 mt-1">เผยแพร่เมื่อ {formatDate(post.createdAt)}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -162,7 +162,9 @@ export default function MyBlogsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <p className="text-slate-600 line-clamp-3">{post.excerpt || post.content.slice(0, 160)}</p>
+                    <p className="text-slate-600 line-clamp-3 break-words">
+                      {post.excerpt || post.content.slice(0, 160)}
+                    </p>
                     {post.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 text-sm text-slate-500">
                         <Tag className="h-4 w-4 text-teal-600" />
@@ -177,17 +179,17 @@ export default function MyBlogsPage() {
                       <div className="text-xs text-slate-400">
                         อัปเดตล่าสุด {formatDate(post.updatedAt ?? post.createdAt)}
                       </div>
-                      <div className="flex gap-2">
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/blog/${post.id}`} className="flex items-center gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button asChild variant="outline" size="sm" className="gap-2">
+                          <Link href={`/blog/${post.id}`}>
                             อ่านบทความ
-                            <Calendar className="h-3 w-3" />
+                            <ArrowRight className="h-3 w-3" />
                           </Link>
                         </Button>
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href="/blog/create" className="flex items-center gap-2">
+                        <Button asChild size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
+                          <Link href={`/blog/${post.id}/edit`}>
                             <PenSquare className="h-3 w-3" />
-                            สร้างบทความใหม่
+                            แก้ไขบทความ
                           </Link>
                         </Button>
                       </div>

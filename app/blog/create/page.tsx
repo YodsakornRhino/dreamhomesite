@@ -22,19 +22,13 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
-import { BLOG_CATEGORIES, createBlogPost } from "@/lib/blogs"
+import { BLOG_CATEGORIES, createBlogPost, estimateReadTimeMinutes } from "@/lib/blogs"
 import { getDownloadURL, uploadFile } from "@/lib/storage"
 import type { BlogCategory } from "@/types/blog"
 
 const inter = Inter({ subsets: ["latin"] })
 
 const DEFAULT_CATEGORY: BlogCategory = BLOG_CATEGORIES[0]
-
-const calculateReadTime = (content: string): number => {
-  const words = content.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return 1
-  return Math.max(1, Math.round(words.length / 200))
-}
 
 const normalizeFileName = (fileName: string) =>
   fileName
@@ -62,6 +56,9 @@ export default function CreateBlogPage() {
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0)
   }, [tagsInput])
+
+  const estimatedReadTime = useMemo(() => estimateReadTimeMinutes(content), [content])
+  const characterCount = useMemo(() => Array.from(content.trim()).length, [content])
 
   const handleCoverChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -153,7 +150,7 @@ export default function CreateBlogPage() {
           tags,
           coverImageUrl: coverUrl,
           coverImagePath: coverPath,
-          readTimeMinutes: calculateReadTime(content),
+          readTimeMinutes: estimateReadTimeMinutes(content),
         },
       )
 
@@ -348,8 +345,8 @@ export default function CreateBlogPage() {
                   required
                 />
                 <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
-                  <span>ความยาวประมาณ {content.trim().split(/\s+/).filter(Boolean).length} คำ</span>
-                  <span>เวลาที่ใช้ในการอ่าน {calculateReadTime(content)} นาที</span>
+                  <span>ความยาวประมาณ {characterCount} ตัวอักษร</span>
+                  <span>เวลาที่ใช้ในการอ่าน {estimatedReadTime} นาที</span>
                 </div>
               </CardContent>
             </Card>

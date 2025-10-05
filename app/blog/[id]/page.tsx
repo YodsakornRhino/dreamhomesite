@@ -5,13 +5,14 @@ import Link from "next/link"
 import Image from "next/image"
 import { useParams, useRouter } from "next/navigation"
 import { Inter } from "next/font/google"
-import { ArrowLeft, Calendar, Clock3, Loader2, Tag, User } from "lucide-react"
+import { ArrowLeft, Calendar, Clock3, Loader2, PenSquare, Tag, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { subscribeToBlog } from "@/lib/blogs"
+import { subscribeToBlogForViewer } from "@/lib/blogs"
 import type { BlogPost } from "@/types/blog"
+import { useAuthContext } from "@/contexts/AuthContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -36,6 +37,8 @@ export default function BlogDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const blogId = params?.id
+  const { user } = useAuthContext()
+  const viewerId = user?.uid ?? null
 
   const [post, setPost] = useState<BlogPost | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,12 +56,16 @@ export default function BlogDetailPage() {
 
     const init = async () => {
       try {
-        unsubscribe = await subscribeToBlog(blogId, (blog) => {
+        unsubscribe = await subscribeToBlogForViewer(blogId, viewerId, (blog, meta) => {
           if (cancelled) return
           setPost(blog)
           setLoading(false)
           if (!blog) {
-            setError("ไม่พบบทความที่ต้องการ")
+            setError(
+              meta?.reason === "unpublished"
+                ? "บทความนี้ยังไม่เผยแพร่หรืออาจถูกจำกัดการเข้าถึง"
+                : "ไม่พบบทความที่ต้องการ",
+            )
           } else {
             setError(null)
           }
@@ -78,21 +85,31 @@ export default function BlogDetailPage() {
       cancelled = true
       unsubscribe?.()
     }
-  }, [blogId])
+  }, [blogId, viewerId])
 
   return (
     <div className={`${inter.className} bg-slate-50 min-h-screen`}> 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <Button variant="ghost" size="sm" asChild className="gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+          <Button variant="ghost" size="sm" asChild className="gap-2 w-fit">
             <Link href="/blog">
               <ArrowLeft className="h-4 w-4" />
               กลับสู่บล็อก
             </Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => router.refresh()}>
-            รีเฟรช
-          </Button>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {post && user?.uid === post.authorId && (
+              <Button asChild size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
+                <Link href={`/blog/${post.id}/edit`}>
+                  <PenSquare className="h-4 w-4" />
+                  แก้ไขบทความ
+                </Link>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => router.refresh()}>
+              รีเฟรช
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -131,7 +148,9 @@ export default function BlogDetailPage() {
                 </Badge>
                 <div className="flex items-center text-sm text-slate-500">
                   <User className="h-4 w-4 mr-1" />
-                  {post.authorName}
+                  <Link href={`/blog/authors/${post.authorId}`} className="hover:underline">
+                    {post.authorName}
+                  </Link>
                 </div>
                 <div className="flex items-center text-sm text-slate-500">
                   <Calendar className="h-4 w-4 mr-1" />
@@ -143,18 +162,18 @@ export default function BlogDetailPage() {
                 </div>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6 leading-tight">
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6 leading-tight break-words">
                 {post.title}
               </h1>
 
               {post.excerpt && (
-                <p className="text-lg text-slate-600 italic border-l-4 border-teal-500 pl-4 mb-8">
+                <p className="text-lg text-slate-600 italic border-l-4 border-teal-500 pl-4 mb-8 break-words">
                   {post.excerpt}
                 </p>
               )}
 
-              <div className="prose prose-lg max-w-none text-slate-700 leading-8">
-                <p className="whitespace-pre-line">{post.content}</p>
+              <div className="prose prose-lg max-w-none text-slate-700 leading-8 break-words">
+                <p className="whitespace-pre-line break-words">{post.content}</p>
               </div>
 
               {post.tags.length > 0 && (
@@ -167,6 +186,15 @@ export default function BlogDetailPage() {
                   ))}
                 </div>
               )}
+
+              <div className="mt-10">
+                <Button asChild variant="ghost">
+                  <Link href={`/blog/authors/${post.authorId}`} className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    อ่านบทความอื่นจาก {post.authorName}
+                  </Link>
+                </Button>
+              </div>
             </div>
           </article>
         ) : null}

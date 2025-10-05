@@ -39,3 +39,15 @@ export interface CreateBlogPostInput {
   readTimeMinutes: number
   published?: boolean
 }
+
+export interface UpdateBlogPostInput {
+  title: string
+  excerpt: string
+  content: string
+  category: BlogCategory
+  tags: string[]
+  coverImageUrl: string | null
+  coverImagePath: string | null
+  readTimeMinutes: number
+  published?: boolean
+}
