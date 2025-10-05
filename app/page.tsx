@@ -138,55 +138,63 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card className="shadow-sm hover:shadow-md transition h-full">
-              <CardHeader>
+              <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Search className="h-5 w-5" />
                 </div>
                 <CardTitle>ค้นหาทรงพลัง</CardTitle>
               </CardHeader>
-              <CardContent className="text-gray-600">
+              <CardContent className="text-gray-600 text-center">
                 ค้นหาบ้านที่ตรงใจได้รวดเร็วด้วยตัวกรองที่ละเอียดและเครื่องมือค้นหาที่ใช้งานง่าย
               </CardContent>
             </Card>
 
             <Card className="shadow-sm hover:shadow-md transition h-full">
-              <CardHeader>
+              <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Shield className="h-5 w-5" />
                 </div>
-                <CardTitle>ปลอดภัยสูง</CardTitle>
+                <CardTitle>ปลอดภัยรอบด้าน</CardTitle>
               </CardHeader>
-              <CardContent className="text-gray-600">ระบบรักษาความปลอดภัยระดับธนาคาร พร้อมการยืนยันตัวตนที่เข้มงวด</CardContent>
+              <CardContent className="text-gray-600 text-center">
+                ระบบปกป้องข้อมูลหลายชั้น พร้อมการยืนยันตัวตนและตรวจสอบรายการอย่างเข้มงวดในทุกขั้นตอน
+              </CardContent>
             </Card>
 
             <Card className="shadow-sm hover:shadow-md transition h-full">
-              <CardHeader>
+              <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <MessageSquare className="h-5 w-5" />
                 </div>
                 <CardTitle>แชทสดทันที</CardTitle>
               </CardHeader>
-              <CardContent className="text-gray-600">ติดต่อกับเจ้าของบ้านหรือนายหน้าได้ทันทีผ่านระบบแชทในแอป</CardContent>
+              <CardContent className="text-gray-600 text-center">
+                ติดต่อกับเจ้าของบ้านหรือนายหน้าได้ทันทีผ่านระบบแชทในแอป
+              </CardContent>
             </Card>
 
             <Card className="shadow-sm hover:shadow-md transition h-full">
-              <CardHeader>
+              <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Gauge className="h-5 w-5" />
                 </div>
                 <CardTitle>รวดเร็วทันใจ</CardTitle>
               </CardHeader>
-              <CardContent className="text-gray-600">เว็บไซต์โหลดเร็ว ใช้งานง่าย ทั้งบนมือถือและคอมพิวเตอร์</CardContent>
+              <CardContent className="text-gray-600 text-center">
+                เว็บไซต์โหลดเร็ว ใช้งานง่าย ทั้งบนมือถือและคอมพิวเตอร์
+              </CardContent>
             </Card>
 
             <Card className="shadow-sm hover:shadow-md transition h-full">
-              <CardHeader>
+              <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Award className="h-5 w-5" />
                 </div>
                 <CardTitle>บริการมืออาชีพ</CardTitle>
               </CardHeader>
-              <CardContent className="text-gray-600">ทีมงานมืออาชีพพร้อมให้คำปรึกษาและช่วยเหลือตลอด 24 ชั่วโมง</CardContent>
+              <CardContent className="text-gray-600 text-center">
+                ทีมงานมืออาชีพพร้อมให้คำปรึกษาและช่วยเหลือตลอด 24 ชั่วโมง
+              </CardContent>
             </Card>
           </div>
         </div>
