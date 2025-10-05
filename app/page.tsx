@@ -173,7 +173,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm hover:shadow-md transition h-full">
+            <Card className="shadow-sm hover:shadow-md transition h-full lg:col-start-2">
               <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Gauge className="h-5 w-5" />
