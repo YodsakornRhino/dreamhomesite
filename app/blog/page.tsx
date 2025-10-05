@@ -1,10 +1,17 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Inter } from "next/font/google"
 import { Calendar, User, ArrowRight, Search, Loader2, Clock3 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,6 +58,31 @@ export default function BlogPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY)
   const [searchTerm, setSearchTerm] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  const isInteractiveElement = (element: EventTarget | null): boolean => {
+    if (!(element instanceof HTMLElement)) {
+      return false
+    }
+    return Boolean(element.closest("a, button"))
+  }
+
+  const handleCardClick = (postId: string) => (event: MouseEvent<HTMLDivElement>) => {
+    if (isInteractiveElement(event.target)) {
+      return
+    }
+    router.push(`/blog/${postId}`)
+  }
+
+  const handleCardKeyDown = (postId: string) => (event: KeyboardEvent<HTMLDivElement>) => {
+    if (isInteractiveElement(event.target)) {
+      return
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      router.push(`/blog/${postId}`)
+    }
+  }
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
@@ -218,7 +250,14 @@ export default function BlogPage() {
               {featuredPosts.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
                   {featuredPosts.map((post) => (
-                    <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                    <Card
+                      key={post.id}
+                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer focus-visible:ring-2 focus-visible:ring-teal-500"
+                      role="link"
+                      tabIndex={0}
+                      onClick={handleCardClick(post.id)}
+                      onKeyDown={handleCardKeyDown(post.id)}
+                    >
                       <div className="relative h-56 bg-gradient-to-r from-teal-400 to-blue-500">
                         {post.coverImageUrl ? (
                           <Image
@@ -266,7 +305,7 @@ export default function BlogPage() {
                         <p className="text-gray-600 mb-6 line-clamp-3 flex-1 break-words">{post.excerpt}</p>
                         <Button asChild variant="outline" className="self-start">
                           <Link href={`/blog/${post.id}`}>
-                            อ่านเพิ่มเติม
+                            อ่านบทความ
                             <ArrowRight size={16} className="ml-2" />
                           </Link>
                         </Button>
@@ -286,7 +325,15 @@ export default function BlogPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {otherPosts.map((post) => (
-                      <Card key={post.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                      <Card
+                        key={post.id}
+                        className="overflow-hidden hover:shadow-md transition-shadow flex flex-col cursor-pointer focus-visible:ring-2 focus-visible:ring-teal-500"
+                        role="link"
+                        tabIndex={0}
+                        onClick={handleCardClick(post.id)}
+                        onKeyDown={handleCardKeyDown(post.id)}
+                        aria-label={`อ่านบทความ ${post.title}`}
+                      >
                         <div className="relative h-44 bg-gradient-to-r from-cyan-400 to-teal-500">
                           {post.coverImageUrl ? (
                             <Image
