@@ -58,6 +58,7 @@ export default function CreateBlogPage() {
   }, [tagsInput])
 
   const estimatedReadTime = useMemo(() => estimateReadTimeMinutes(content), [content])
+  const characterCount = useMemo(() => Array.from(content.trim()).length, [content])
 
   const handleCoverChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -344,7 +345,7 @@ export default function CreateBlogPage() {
                   required
                 />
                 <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
-                  <span>ความยาวประมาณ {content.trim().split(/\s+/).filter(Boolean).length} คำ</span>
+                  <span>ความยาวประมาณ {characterCount} ตัวอักษร</span>
                   <span>เวลาที่ใช้ในการอ่าน {estimatedReadTime} นาที</span>
                 </div>
               </CardContent>
