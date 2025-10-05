@@ -2,9 +2,9 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useMemo, useState, type KeyboardEvent, type MouseEvent } from "react"
+import { useMemo, type KeyboardEvent, type MouseEvent } from "react"
 import { useRouter } from "next/navigation"
-import { Bath, Bed, Heart, MapPin, Square, Trash2 } from "lucide-react"
+import { Bath, Bed, MapPin, Square, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { formatPropertyPrice, PROPERTY_TYPE_LABELS, TRANSACTION_LABELS } from "@/lib/property"
@@ -37,10 +37,8 @@ export function UserPropertyCard({
   showInteractiveElements = true,
   className,
 }: UserPropertyCardProps) {
-  const [isFavorited, setIsFavorited] = useState(false)
   const router = useRouter()
   const { user } = useAuthContext()
-
   const mainPhoto = property.photos?.[0]
   const transactionLabel = TRANSACTION_LABELS[property.transactionType] ?? property.transactionType
   const typeLabel = PROPERTY_TYPE_LABELS[property.propertyType] ?? property.propertyType
@@ -172,22 +170,9 @@ export function UserPropertyCard({
           </button>
         )}
 
-        {showInteractiveElements && (
-          <button
-            type="button"
-            onClick={(event) => {
-              stopPropagation(event)
-              setIsFavorited((prev) => !prev)
-            }}
-            className="absolute right-4 top-4 rounded-full bg-white p-2 text-gray-500 shadow transition hover:bg-gray-100"
-            aria-label={isFavorited ? "นำออกจากรายการโปรด" : "เพิ่มในรายการโปรด"}
-          >
-            <Heart className={cn("h-4 w-4", isFavorited ? "fill-red-500 text-red-500" : "text-gray-400")} />
-          </button>
-        )}
       </div>
 
-        <div className="flex flex-1 flex-col gap-4 p-6">
+      <div className="flex flex-1 flex-col gap-4 p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-wide text-blue-600">{typeLabel}</p>
