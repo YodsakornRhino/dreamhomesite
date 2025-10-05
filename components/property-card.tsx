@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { MapPin, Bed, Bath, Square, Heart } from "lucide-react"
+import { MapPin, Bed, Bath, Square } from "lucide-react"
 
 interface PropertyCardProps {
-  id: number
+  id: number | string
   title: string
   price: string
   location: string
@@ -28,12 +27,6 @@ export default function PropertyCard({
   gradient,
   onViewDetails,
 }: PropertyCardProps) {
-  const [isFavorited, setIsFavorited] = useState(false)
-
-  const toggleFavorite = () => {
-    setIsFavorited(!isFavorited)
-  }
-
   return (
     <div className="property-card bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-xl">
       <div className="relative">
@@ -49,15 +42,6 @@ export default function PropertyCard({
         >
           {type === "sale" ? "ขาย" : "ให้เช่า"}
         </div>
-        <button
-          onClick={toggleFavorite}
-          className="absolute top-4 right-4 bg-white rounded-full p-2 cursor-pointer hover:bg-gray-100 transition-colors"
-        >
-          <Heart
-            className={`${isFavorited ? "text-red-500 fill-current" : "text-gray-400"} transition-colors`}
-            size={16}
-          />
-        </button>
       </div>
       <div className="p-6">
         <div className="flex justify-between items-start mb-2">
