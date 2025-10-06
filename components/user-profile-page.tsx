@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft, BookOpen, MessageCircle } from "lucide-react";
 
 import { UserPropertyCard } from "@/components/user-property-card";
 import { UserPropertyModal } from "@/components/user-property-modal";
@@ -193,6 +193,14 @@ export function UserProfilePage({ uid, initialPropertyId }: UserProfilePageProps
                 >
                   <MessageCircle className="h-4 w-4" />
                   แชทกับผู้ขาย
+                </Button>
+              )}
+              {profile?.uid && (
+                <Button asChild variant="outline" className="gap-2">
+                  <Link href={`/blog/authors/${profile.uid}`} aria-label="ดูบทความทั้งหมดของผู้ใช้รายนี้">
+                    <BookOpen className="h-4 w-4" />
+                    ดูบทความทั้งหมด
+                  </Link>
                 </Button>
               )}
               {profile?.email && (
