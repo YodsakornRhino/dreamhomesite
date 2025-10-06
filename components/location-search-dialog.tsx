@@ -82,29 +82,24 @@ export default function LocationSearchDialog({
   const geocoderRef = useRef<google.maps.Geocoder | null>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
   const autocompleteInputRef = useRef<HTMLInputElement | null>(null)
+  const ignoreAutocompleteCloseRef = useRef(false)
+  const autocompleteCloseResetTimerRef = useRef<number | null>(null)
 
   const isAutocompleteElement = useCallback((target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false
     return Boolean(target.closest(".pac-container"))
   }, [])
 
-  type DialogOutsideEvent = Event & {
-    target: EventTarget | null
-    detail?: {
-      originalEvent?: Event & { target: EventTarget | null }
-    }
-  }
-
-  const handleDialogOutsideInteraction = useCallback(
-    (event: DialogOutsideEvent) => {
-      const target = event.target
-      const originalEventTarget = event.detail?.originalEvent?.target ?? null
-
-      if (isAutocompleteElement(target) || isAutocompleteElement(originalEventTarget)) {
-        event.preventDefault()
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && ignoreAutocompleteCloseRef.current) {
+        ignoreAutocompleteCloseRef.current = false
+        return
       }
+
+      onOpenChange(nextOpen)
     },
-    [isAutocompleteElement],
+    [onOpenChange],
   )
 
   useEffect(() => {
@@ -424,13 +419,71 @@ export default function LocationSearchDialog({
     }
   }, [open, mapsReady, selectedLocation, initialValue])
 
+  useEffect(() => {
+    if (!open) return
+
+    const markAutocompleteInteraction = (event: Event) => {
+      const target = event.target as EventTarget | null
+
+      if (isAutocompleteElement(target)) {
+        ignoreAutocompleteCloseRef.current = true
+
+        if (autocompleteCloseResetTimerRef.current) {
+          window.clearTimeout(autocompleteCloseResetTimerRef.current)
+        }
+
+        autocompleteCloseResetTimerRef.current = window.setTimeout(() => {
+          ignoreAutocompleteCloseRef.current = false
+          autocompleteCloseResetTimerRef.current = null
+        }, 400)
+        return
+      }
+
+      ignoreAutocompleteCloseRef.current = false
+    }
+
+    document.addEventListener("pointerdown", markAutocompleteInteraction, true)
+    document.addEventListener("touchstart", markAutocompleteInteraction, true)
+
+    return () => {
+      document.removeEventListener("pointerdown", markAutocompleteInteraction, true)
+      document.removeEventListener("touchstart", markAutocompleteInteraction, true)
+
+      if (autocompleteCloseResetTimerRef.current) {
+        window.clearTimeout(autocompleteCloseResetTimerRef.current)
+        autocompleteCloseResetTimerRef.current = null
+      }
+      ignoreAutocompleteCloseRef.current = false
+    }
+  }, [open, isAutocompleteElement])
+
+  useEffect(() => {
+    if (!open) return
+
+    const applyAutocompleteStyles = () => {
+      const containers = document.querySelectorAll<HTMLElement>(".pac-container")
+      containers.forEach((container) => {
+        container.style.zIndex = "2147483647"
+        container.style.pointerEvents = "auto"
+      })
+    }
+
+    applyAutocompleteStyles()
+
+    const observer = new MutationObserver(() => {
+      applyAutocompleteStyles()
+    })
+
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [open])
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="flex w-[95vw] max-w-3xl flex-col overflow-hidden p-0 sm:w-[90vw] max-h-[90vh]"
-        onPointerDownOutside={handleDialogOutsideInteraction}
-        onInteractOutside={handleDialogOutsideInteraction}
-      >
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent className="flex w-[95vw] max-w-3xl flex-col overflow-hidden p-0 sm:w-[90vw] max-h-[90vh]">
         <DialogHeader className="shrink-0 space-y-1 border-b border-gray-200 bg-white px-6 py-5">
           <DialogTitle className="text-lg font-semibold text-gray-900 sm:text-xl">เลือกพื้นที่การค้นหา</DialogTitle>
           <DialogDescription className="text-sm text-gray-500">
