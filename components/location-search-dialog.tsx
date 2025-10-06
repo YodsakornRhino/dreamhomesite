@@ -83,6 +83,30 @@ export default function LocationSearchDialog({
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
   const autocompleteInputRef = useRef<HTMLInputElement | null>(null)
 
+  const isAutocompleteElement = useCallback((target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false
+    return Boolean(target.closest(".pac-container"))
+  }, [])
+
+  type DialogOutsideEvent = Event & {
+    target: EventTarget | null
+    detail?: {
+      originalEvent?: Event & { target: EventTarget | null }
+    }
+  }
+
+  const handleDialogOutsideInteraction = useCallback(
+    (event: DialogOutsideEvent) => {
+      const target = event.target
+      const originalEventTarget = event.detail?.originalEvent?.target ?? null
+
+      if (isAutocompleteElement(target) || isAutocompleteElement(originalEventTarget)) {
+        event.preventDefault()
+      }
+    },
+    [isAutocompleteElement],
+  )
+
   useEffect(() => {
     if (!open) return
 
@@ -402,7 +426,11 @@ export default function LocationSearchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex w-[95vw] max-w-3xl flex-col overflow-hidden p-0 sm:w-[90vw] max-h-[90vh]">
+      <DialogContent
+        className="flex w-[95vw] max-w-3xl flex-col overflow-hidden p-0 sm:w-[90vw] max-h-[90vh]"
+        onPointerDownOutside={handleDialogOutsideInteraction}
+        onInteractOutside={handleDialogOutsideInteraction}
+      >
         <DialogHeader className="shrink-0 space-y-1 border-b border-gray-200 bg-white px-6 py-5">
           <DialogTitle className="text-lg font-semibold text-gray-900 sm:text-xl">เลือกพื้นที่การค้นหา</DialogTitle>
           <DialogDescription className="text-sm text-gray-500">
