@@ -9,6 +9,31 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+picture,
+video,
+canvas,
+svg,
+iframe {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+:where(section, article, aside, main) {
+  width: 100%;
+}
+
+:where(.flex, .grid) > * {
+  min-width: 0;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

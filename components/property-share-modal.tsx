@@ -23,8 +23,8 @@ export function PropertyShareModal({
 }: PropertyShareModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl sm:w-full p-4 sm:p-6">
+        <DialogHeader className="space-y-2 text-left">
           <DialogTitle>แชร์ประกาศของคุณ</DialogTitle>
           <DialogDescription>
             ส่งประกาศนี้ไปยังโซเชียลมีเดียเพื่อให้ผู้ซื้อเห็นมากยิ่งขึ้น
