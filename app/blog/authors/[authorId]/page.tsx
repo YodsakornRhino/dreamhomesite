@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Inter } from "next/font/google"
-import { Calendar, Clock3, Loader2, PenSquare, Tag } from "lucide-react"
+import { Calendar, Clock3, Loader2, PenSquare, Search, Tag } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { subscribeToUserBlogs } from "@/lib/blogs"
@@ -46,6 +47,7 @@ export default function AuthorBlogPage({ params }: AuthorBlogPageProps) {
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
     if (!authorId) {
@@ -85,6 +87,17 @@ export default function AuthorBlogPage({ params }: AuthorBlogPageProps) {
     if (isViewingOwnProfile) return posts
     return posts.filter((post) => post.published)
   }, [isViewingOwnProfile, posts])
+
+  const filteredPosts = useMemo(() => {
+    const normalizedQuery = searchTerm.trim().toLowerCase()
+    if (!normalizedQuery) return visiblePosts
+
+    return visiblePosts.filter((post) =>
+      [post.title, post.excerpt, post.content, post.tags.join(" ")]
+        .map((value) => value.toLowerCase())
+        .some((value) => value.includes(normalizedQuery)),
+    )
+  }, [searchTerm, visiblePosts])
 
   const totalReadTime = useMemo(
     () => visiblePosts.reduce((acc, post) => acc + (post.readTimeMinutes || 0), 0),
@@ -201,14 +214,50 @@ export default function AuthorBlogPage({ params }: AuthorBlogPageProps) {
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 gap-6">
-              {visiblePosts.map((post) => (
-                <Card key={post.id} className="border border-slate-200 shadow-sm">
-                  <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2">
-                    <div>
-                      <CardTitle className="text-xl text-slate-900 break-words">{post.title}</CardTitle>
-                      <p className="text-sm text-slate-500 mt-1">
-                        เผยแพร่เมื่อ {formatDate(post.createdAt)}
+            <Card className="border border-slate-200 shadow-sm">
+              <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative w-full sm:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="ค้นหาบทความของผู้เขียนนี้..."
+                    className="pl-9 text-slate-900 placeholder:text-slate-500"
+                    aria-label="ค้นหาบทความของผู้เขียนนี้"
+                  />
+                </div>
+                <div className="text-sm text-slate-500">
+                  {filteredPosts.length === visiblePosts.length && searchTerm.trim().length === 0
+                    ? `พบทั้งหมด ${visiblePosts.length} บทความ`
+                    : `พบ ${filteredPosts.length} บทความที่ตรงกับการค้นหา`}
+                </div>
+              </CardContent>
+            </Card>
+
+            {filteredPosts.length === 0 ? (
+              <Card className="border-dashed border-2 border-slate-200">
+                <CardContent className="py-12 text-center space-y-3">
+                  <PenSquare className="h-10 w-10 mx-auto text-slate-400" />
+                  <h2 className="text-xl font-semibold text-slate-700">ไม่พบบทความที่ตรงกับการค้นหา</h2>
+                  <p className="text-slate-500">ลองเปลี่ยนคำค้นหา หรือเคลียร์คำค้นเพื่อดูบทความทั้งหมด</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSearchTerm("")}
+                    className="mx-auto w-fit"
+                  >
+                    ล้างการค้นหา
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {filteredPosts.map((post) => (
+                  <Card key={post.id} className="border border-slate-200 shadow-sm">
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2">
+                      <div>
+                        <CardTitle className="text-xl text-slate-900 break-words">{post.title}</CardTitle>
+                        <p className="text-sm text-slate-500 mt-1">
+                          เผยแพร่เมื่อ {formatDate(post.createdAt)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -254,11 +303,12 @@ export default function AuthorBlogPage({ params }: AuthorBlogPageProps) {
                           </Button>
                         )}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

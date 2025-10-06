@@ -175,7 +175,7 @@ export default function BlogPage() {
                 <Search className="absolute left-3 top-3 text-gray-400" size={20} />
                 <Input
                   placeholder="ค้นหาบทความ..."
-                  className="pl-10"
+                  className="pl-10 text-slate-900 placeholder:text-slate-500"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />

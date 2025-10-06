@@ -240,7 +240,7 @@ export function PropertySharePanel({
   return (
     <div
       className={cn(
-        "space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm",
+        "w-full max-w-full space-y-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:space-y-6 sm:p-6",
         className,
       )}
     >
@@ -272,7 +272,7 @@ export function PropertySharePanel({
             คัดลอกข้อความ
           </Button>
         </div>
-        <div className="whitespace-pre-line rounded-xl border border-dashed border-purple-200 bg-purple-50/70 p-4 text-sm text-gray-700">
+        <div className="max-h-[40vh] overflow-y-auto whitespace-pre-line break-words rounded-xl border border-dashed border-purple-200 bg-purple-50/70 p-4 text-sm text-gray-700">
           {shareMessage}
         </div>
       </div>
@@ -287,7 +287,7 @@ export function PropertySharePanel({
               void option.onClick()
             }}
             className={cn(
-              "flex items-center justify-center gap-2 py-3 text-sm font-semibold shadow-sm",
+              "flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold shadow-sm",
               option.className,
             )}
           >
