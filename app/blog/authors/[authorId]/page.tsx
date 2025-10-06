@@ -222,7 +222,7 @@ export default function AuthorBlogPage({ params }: AuthorBlogPageProps) {
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="ค้นหาบทความของผู้เขียนนี้..."
-                    className="pl-9"
+                    className="pl-9 text-slate-900 placeholder:text-slate-500"
                     aria-label="ค้นหาบทความของผู้เขียนนี้"
                   />
                 </div>
