@@ -436,7 +436,7 @@ export default function SearchPage() {
 
   const handleUseCurrentLocation = useCallback(() => {
     if (typeof window === "undefined" || !("geolocation" in navigator)) {
-      setLocationError("อุปกรณ์ของคุณไม่รองรับการระบุตำแหน่งผ่าน GPS")
+      setLocationError("เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่งอัตโนมัติ กรุณาเลือกตำแหน่งจากแผนที่")
       return
     }
 

@@ -72,7 +72,7 @@ export default function MobileFilterDrawer({
       {/* Mobile Filter Button */}
       <button
         onClick={toggleDrawer}
-        className="lg:hidden fixed bottom-32 left-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-40"
+        className="lg:hidden fixed bottom-6 left-4 z-40 rounded-full bg-blue-600 p-3 text-white shadow-lg transition-colors hover:bg-blue-700"
       >
         <Filter size={20} />
       </button>
@@ -174,9 +174,7 @@ export default function MobileFilterDrawer({
                   </button>
                 </div>
               )}
-              {locationError ? (
-                <p className="mt-2 text-xs text-red-600">{locationError}</p>
-              ) : null}
+              {/* Location error messaging intentionally hidden on request */}
             </div>
 
             {/* Price Range */}
