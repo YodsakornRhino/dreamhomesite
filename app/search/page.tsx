@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation"
 import { Inter } from "next/font/google"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Compass, Filter, Home } from "lucide-react"
 
 import HeroSection from "@/components/hero-section"
 import PropertyListings from "@/components/property-listings"
 import CallToAction from "@/components/call-to-action"
 import LocationSearchDialog from "@/components/location-search-dialog"
+import { PROPERTY_TYPE_LABELS } from "@/lib/property"
 import type { LocationFilterValue, LocationFilterSource } from "@/types/location-filter"
 import {
   CURRENT_LOCATION_LABEL,
@@ -130,6 +131,9 @@ export default function SearchPage() {
   const [isLocatingCurrentLocation, setIsLocatingCurrentLocation] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
 
+  const minPriceValue = useMemo(() => parseNumericInput(minPrice), [minPrice])
+  const maxPriceValue = useMemo(() => parseNumericInput(maxPrice), [maxPrice])
+
   useEffect(() => {
     const paramSearch = searchParams.get("search") ?? ""
     if (paramSearch !== searchTerm) {
@@ -184,10 +188,116 @@ export default function SearchPage() {
 
   const heroPriceRange = useMemo(
     () => ({
-      min: parseNumericInput(minPrice),
-      max: parseNumericInput(maxPrice),
+      min: minPriceValue,
+      max: maxPriceValue,
     }),
-    [minPrice, maxPrice],
+    [minPriceValue, maxPriceValue],
+  )
+
+  const activeFilterBadges = useMemo(() => {
+    const items: { label: string; value: string }[] = []
+    const formatter = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 })
+
+    if (selectedPropertyType) {
+      const label = PROPERTY_TYPE_LABELS[selectedPropertyType] ?? selectedPropertyType
+      items.push({ label: "ประเภท", value: label })
+    }
+
+    if (selectedBedrooms) {
+      items.push({ label: "ห้องนอน", value: `${selectedBedrooms} ขึ้นไป` })
+    }
+
+    if (minPriceValue != null || maxPriceValue != null) {
+      const parts = [] as string[]
+      if (minPriceValue != null) {
+        parts.push(`ต่ำสุด ${formatter.format(minPriceValue)} ฿`)
+      }
+      if (maxPriceValue != null) {
+        parts.push(`สูงสุด ${formatter.format(maxPriceValue)} ฿`)
+      }
+      items.push({ label: "ช่วงราคา", value: parts.join(" • ") })
+    }
+
+    if (locationFilter) {
+      const locationLabel =
+        locationFilter.source === "current"
+          ? CURRENT_LOCATION_LABEL
+          : locationFilter.label ?? "ปักหมุดบนแผนที่"
+      items.push({
+        label: "พื้นที่",
+        value: `${locationLabel} • ${locationFilter.radiusKm.toLocaleString()} กม.`,
+      })
+    }
+
+    if (!items.length) {
+      items.push({ label: "ตัวกรอง", value: "กำลังค้นหาทั่วประเทศ" })
+    }
+
+    return items
+  }, [locationFilter, maxPriceValue, minPriceValue, selectedBedrooms, selectedPropertyType])
+
+  const activeFilterCount = useMemo(
+    () => activeFilterBadges.filter((badge) => badge.label !== "ตัวกรอง").length,
+    [activeFilterBadges],
+  )
+
+  const locationSummary = useMemo(() => {
+    if (!locationFilter) {
+      return "ทั่วประเทศ"
+    }
+
+    if (locationFilter.source === "current") {
+      return "ใกล้ตำแหน่งของคุณ"
+    }
+
+    return locationFilter.label ?? "ปักหมุดในแผนที่"
+  }, [locationFilter])
+
+  const propertyTypeSummary = useMemo(() => {
+    if (!selectedPropertyType) return "ทุกประเภท"
+    return PROPERTY_TYPE_LABELS[selectedPropertyType] ?? selectedPropertyType
+  }, [selectedPropertyType])
+
+  const bedroomSummary = useMemo(() => {
+    if (!selectedBedrooms) return "ทุกจำนวนห้องนอน"
+    return `${selectedBedrooms} ห้องนอนขึ้นไป`
+  }, [selectedBedrooms])
+
+  const priceSummary = useMemo(() => {
+    if (minPriceValue == null && maxPriceValue == null) {
+      return "ทุกราคา"
+    }
+
+    const formatter = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 })
+    const parts: string[] = []
+
+    if (minPriceValue != null) {
+      parts.push(`${formatter.format(minPriceValue)} ฿ ขึ้นไป`)
+    }
+
+    if (maxPriceValue != null) {
+      parts.push(`ไม่เกิน ${formatter.format(maxPriceValue)} ฿`)
+    }
+
+    return parts.join(" • ")
+  }, [maxPriceValue, minPriceValue])
+
+  const quickBudgets = useMemo(
+    () => [
+      { label: "ไม่เกิน 3 ล้าน", min: 0, max: 3_000_000 },
+      { label: "3-5 ล้าน", min: 3_000_000, max: 5_000_000 },
+      { label: "5-10 ล้าน", min: 5_000_000, max: 10_000_000 },
+      { label: "10 ล้านขึ้นไป", min: 10_000_000, max: null },
+    ],
+    [],
+  )
+
+  const quickPropertyTypes = useMemo(
+    () =>
+      Object.entries(PROPERTY_TYPE_LABELS)
+        .slice(0, 4)
+        .map(([value, label]) => ({ value, label })),
+    [],
   )
 
   const updateQuery = useCallback(
@@ -418,10 +528,22 @@ export default function SearchPage() {
         return
       }
 
-      updateQuery({ location: normalizedValue, page: 1 })
+    updateQuery({ location: normalizedValue, page: 1 })
       setLocationError(null)
     },
     [locationFilter, searchTerm, updateQuery],
+  )
+
+  const applyQuickBudget = useCallback(
+    (min: number | null, max: number | null) => {
+      const minString = min != null ? String(min) : ""
+      const maxString = max != null ? String(max) : ""
+      setMinPrice(minString)
+      setMaxPrice(maxString)
+      setCurrentPage(1)
+      updateQuery({ minPrice: minString, maxPrice: maxString, page: 1 })
+    },
+    [updateQuery],
   )
 
   const handleOpenLocationPicker = useCallback(() => {
@@ -470,17 +592,23 @@ export default function SearchPage() {
 
   return (
     <div className={`${inter.className} bg-gray-50`}>
-      <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
-          <ArrowLeft className="h-4 w-4 text-blue-600" />
+      <header className="border-b border-blue-100/60 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <Link
             href="/buy"
-            className="text-sm font-medium text-blue-600 transition hover:text-blue-700"
+            className="inline-flex items-center gap-3 rounded-full border border-blue-100 bg-blue-50/60 px-4 py-2 text-sm font-medium text-blue-700 transition hover:border-blue-200 hover:bg-blue-100"
           >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
+              <ArrowLeft size={16} />
+            </span>
             กลับสู่หน้าซื้ออสังหาริมทรัพย์
           </Link>
+          <div className="hidden items-center gap-3 text-sm text-gray-500 sm:flex">
+            <Compass size={16} className="text-blue-500" />
+            <span>สำรวจทรัพย์กว่า 1,500 รายการที่อัปเดตใหม่ทุกสัปดาห์</span>
+          </div>
         </div>
-      </div>
+      </header>
       <HeroSection
         searchTerm={searchTerm}
         selectedPropertyType={selectedPropertyType}
@@ -493,28 +621,145 @@ export default function SearchPage() {
         isLocatingCurrentLocation={isLocatingCurrentLocation}
         locationError={locationError}
       />
-      <PropertyListings
-        searchTerm={searchTerm}
-        onSearchTermChange={handleSearchTermChange}
-        selectedPropertyType={selectedPropertyType}
-        onPropertyTypeChange={handlePropertyTypeChange}
-        minPrice={minPrice}
-        maxPrice={maxPrice}
-        onPriceRangeChange={handlePriceRangeChange}
-        selectedBedrooms={selectedBedrooms}
-        onBedroomFilter={handleBedroomFilter}
-        onClearFilters={handleClearFilters}
-        onFiltersApplied={handleFiltersApplied}
-        currentPage={currentPage}
-        onPageChange={handlePageChange}
-        locationFilter={locationFilter}
-        onOpenLocationPicker={handleOpenLocationPicker}
-        onClearLocation={handleClearLocation}
-        onUseCurrentLocation={handleUseCurrentLocation}
-        isLocatingCurrentLocation={isLocatingCurrentLocation}
-        locationError={locationError}
-      />
-      <CallToAction />
+      <main className="space-y-20 pb-24">
+        <section className="-mt-16 lg:-mt-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-black/5 sm:p-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <span className="text-sm font-semibold uppercase tracking-wide text-blue-600">
+                      ภาพรวมการค้นหา
+                    </span>
+                    <h2 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
+                      {searchTerm ? `ผลการค้นหา “${searchTerm}”` : "ผลการค้นหาอสังหาริมทรัพย์"}
+                    </h2>
+                  </div>
+                  <p className="text-sm text-gray-500 sm:max-w-xs">
+                    {activeFilterCount > 0
+                      ? `กำลังใช้ตัวกรอง ${activeFilterCount} รายการเพื่อให้คุณได้ตัวเลือกที่ตรงใจที่สุด`
+                      : "ยังไม่มีตัวกรองพิเศษ สามารถเลือกช่วงราคา ทำเล หรือประเภทเพื่อปรับผลลัพธ์ได้ทันที"}
+                  </p>
+                </div>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {activeFilterBadges.map((badge) => (
+                    <span
+                      key={`${badge.label}-${badge.value}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50/70 px-4 py-1.5 text-xs font-medium text-blue-700 sm:text-sm"
+                    >
+                      <Filter size={14} className="hidden sm:inline" />
+                      <span className="font-semibold">{badge.label}:</span>
+                      <span className="text-blue-600/90">{badge.value}</span>
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">ทำเลเป้าหมาย</p>
+                    <p className="mt-2 text-lg font-semibold text-blue-900">{locationSummary}</p>
+                    {locationFilter ? (
+                      <p className="text-sm text-blue-600/80">
+                        ในรัศมี {locationFilter.radiusKm.toLocaleString()} กม.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-blue-600/80">พร้อมสำรวจได้ทุกจังหวัด</p>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">ช่วงราคา</p>
+                    <p className="mt-2 text-lg font-semibold text-purple-900">{priceSummary}</p>
+                    <p className="text-sm text-purple-600/80">
+                      ปรับเพิ่ม/ลดเพื่อให้เข้ากับงบประมาณได้ทันที
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">สไตล์ที่ต้องการ</p>
+                    <p className="mt-2 text-lg font-semibold text-emerald-900">{propertyTypeSummary}</p>
+                    <p className="text-sm text-emerald-600/80">{bedroomSummary}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex h-full flex-col gap-4">
+                <div className="rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-6 text-white shadow-xl">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20 text-white">
+                      <Home size={20} />
+                    </span>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-semibold">ค้นหาเร็วขึ้นด้วยตัวช่วยอัจฉริยะ</h3>
+                      <p className="text-sm text-blue-50">
+                        ระบบจะแนะนำรายการที่คล้ายกับความต้องการของคุณ พร้อมแจ้งเตือนทันทีเมื่อมีทรัพย์ใหม่เข้ามาในเกณฑ์ที่เลือก
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      scrollToResults()
+                    }}
+                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/25"
+                  >
+                    ดูผลลัพธ์ล่าสุด
+                  </button>
+                </div>
+                <div className="rounded-3xl border border-blue-100 bg-white/70 p-6 shadow-sm backdrop-blur">
+                  <p className="text-sm font-semibold text-gray-900">เลือกตัวเลือกยอดนิยมทันที</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {quickPropertyTypes.map((type) => (
+                      <button
+                        key={type.value}
+                        onClick={() => handlePropertyTypeChange(type.value)}
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                          selectedPropertyType === type.value
+                            ? "bg-blue-600 text-white"
+                            : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                        }`}
+                      >
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {quickBudgets.map((budget) => (
+                      <button
+                        key={budget.label}
+                        onClick={() => applyQuickBudget(budget.min, budget.max)}
+                        className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-xs font-semibold text-gray-600 transition hover:border-blue-200 hover:text-blue-600 sm:text-sm"
+                      >
+                        {budget.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <PropertyListings
+          searchTerm={searchTerm}
+          onSearchTermChange={handleSearchTermChange}
+          selectedPropertyType={selectedPropertyType}
+          onPropertyTypeChange={handlePropertyTypeChange}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          onPriceRangeChange={handlePriceRangeChange}
+          selectedBedrooms={selectedBedrooms}
+          onBedroomFilter={handleBedroomFilter}
+          onClearFilters={handleClearFilters}
+          onFiltersApplied={handleFiltersApplied}
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+          locationFilter={locationFilter}
+          onOpenLocationPicker={handleOpenLocationPicker}
+          onClearLocation={handleClearLocation}
+          onUseCurrentLocation={handleUseCurrentLocation}
+          isLocatingCurrentLocation={isLocatingCurrentLocation}
+          locationError={locationError}
+        />
+
+        <CallToAction />
+      </main>
       <LocationSearchDialog
         open={isLocationPickerOpen}
         onOpenChange={setIsLocationPickerOpen}

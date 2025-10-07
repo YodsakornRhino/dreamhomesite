@@ -72,9 +72,11 @@ export default function MobileFilterDrawer({
       {/* Mobile Filter Button */}
       <button
         onClick={toggleDrawer}
-        className="lg:hidden fixed bottom-32 left-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-40"
+        className="lg:hidden fixed inset-x-0 bottom-6 z-40 mx-auto flex w-[min(92%,20rem)] items-center justify-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-blue-600/30 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-white/60 focus:ring-offset-2 focus:ring-offset-blue-600"
+        aria-label="เปิดตัวกรองเพิ่มเติม"
       >
-        <Filter size={20} />
+        <Filter size={18} />
+        ตัวกรองเพิ่มเติม
       </button>
 
       {/* Mobile Filter Drawer */}
