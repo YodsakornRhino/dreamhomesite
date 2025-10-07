@@ -8,7 +8,6 @@ import {
   Search,
   LocateFixed,
   Loader2,
-  AlertCircle,
 } from "lucide-react"
 
 import { PROPERTY_TYPE_LABELS } from "@/lib/property"
@@ -249,14 +248,7 @@ export default function HeroSection({
                 ปักหมุดหรือใช้ GPS เพื่อให้เราช่วยค้นหาอสังหาริมทรัพย์ใกล้คุณได้แม่นยำยิ่งขึ้น
               </p>
             )}
-            {locationError ? (
-              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-red-600">
-                <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                <p className="text-xs sm:text-sm" role="status" aria-live="polite">
-                  {locationError}
-                </p>
-              </div>
-            ) : null}
+            {/* Location errors are suppressed per latest UX request */}
           </div>
         </div>
       </div>

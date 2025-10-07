@@ -340,9 +340,7 @@ export default function PropertyListings({
                     </button>
                   </div>
                 )}
-                {locationError ? (
-                  <p className="mt-2 text-xs text-red-600">{locationError}</p>
-                ) : null}
+                {/* Location error messaging intentionally hidden */}
               </div>
 
               {/* Price Range */}

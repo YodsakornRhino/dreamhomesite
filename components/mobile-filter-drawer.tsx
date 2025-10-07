@@ -174,9 +174,7 @@ export default function MobileFilterDrawer({
                   </button>
                 </div>
               )}
-              {locationError ? (
-                <p className="mt-2 text-xs text-red-600">{locationError}</p>
-              ) : null}
+              {/* Location error messaging intentionally hidden on request */}
             </div>
 
             {/* Price Range */}
