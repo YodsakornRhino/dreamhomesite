@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation"
 import { Inter } from "next/font/google"
@@ -58,6 +58,40 @@ const parseLocationFromParams = (
     radiusKm: Math.max(0.1, radius),
     label,
     source,
+  }
+}
+
+const LOCAL_STORAGE_LOCATION_KEY = "dreamhome:lastLocationFilter"
+
+const parseLocationFromStorage = (value: string | null): LocationFilterValue | null => {
+  if (!value) return null
+
+  try {
+    const parsed = JSON.parse(value) as Partial<LocationFilterValue>
+
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof parsed.lat !== "number" ||
+      typeof parsed.lng !== "number" ||
+      typeof parsed.radiusKm !== "number"
+    ) {
+      return null
+    }
+
+    const normalizedRadius = Number.isFinite(parsed.radiusKm) ? Math.max(0.1, parsed.radiusKm) : null
+    if (normalizedRadius === null) return null
+
+    return {
+      lat: parsed.lat,
+      lng: parsed.lng,
+      radiusKm: normalizedRadius,
+      label: typeof parsed.label === "string" && parsed.label.trim() ? parsed.label : MAP_LOCATION_FALLBACK_LABEL,
+      source: isValidLocationSource(parsed.source ?? null) ? parsed.source : "pin",
+    }
+  } catch (error) {
+    console.error("Failed to parse stored location filter", error)
+    return null
   }
 }
 
@@ -129,6 +163,7 @@ export default function SearchPage() {
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false)
   const [isLocatingCurrentLocation, setIsLocatingCurrentLocation] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
+  const hasRestoredLocation = useRef(false)
 
   useEffect(() => {
     const paramSearch = searchParams.get("search") ?? ""
@@ -181,6 +216,22 @@ export default function SearchPage() {
     currentPage,
     locationFilter,
   ])
+
+  useEffect(() => {
+    if (hasRestoredLocation.current) return
+    if (typeof window === "undefined") return
+
+    const storedValue = window.localStorage.getItem(LOCAL_STORAGE_LOCATION_KEY)
+    const storedLocation = parseLocationFromStorage(storedValue)
+
+    hasRestoredLocation.current = true
+
+    if (!storedLocation || locationFilter) return
+
+    setLocationFilter(storedLocation)
+    setCurrentPage(1)
+    updateQuery({ location: storedLocation, page: 1 })
+  }, [locationFilter, updateQuery])
 
   const heroPriceRange = useMemo(
     () => ({
@@ -344,6 +395,9 @@ export default function SearchPage() {
     setLocationFilter(null)
     setCurrentPage(1)
     setLocationError(null)
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(LOCAL_STORAGE_LOCATION_KEY)
+    }
     updateQuery({
       searchTerm: "",
       propertyType: null,
@@ -396,6 +450,16 @@ export default function SearchPage() {
 
       setLocationFilter(normalizedValue)
       setCurrentPage(1)
+      if (typeof window !== "undefined") {
+        if (normalizedValue) {
+          window.localStorage.setItem(
+            LOCAL_STORAGE_LOCATION_KEY,
+            JSON.stringify({ ...normalizedValue, label: normalizedValue.label ?? MAP_LOCATION_FALLBACK_LABEL }),
+          )
+        } else {
+          window.localStorage.removeItem(LOCAL_STORAGE_LOCATION_KEY)
+        }
+      }
 
       if (normalizedValue) {
         const shouldClearSearchTerm =

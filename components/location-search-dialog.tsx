@@ -27,7 +27,7 @@ interface LocationSearchDialogProps {
 }
 
 const DEFAULT_CENTER: google.maps.LatLngLiteral = { lat: 13.7563, lng: 100.5018 }
-const RADIUS_OPTIONS = [1, 3, 5, 10, 15, 20, 30]
+const RADIUS_OPTIONS = [0.5, 1, 3, 5, 10, 15, 20, 30, 40, 50]
 
 interface SelectedLocation {
   lat: number
@@ -311,6 +311,17 @@ export default function LocationSearchDialog({
     setRadiusKm(Number(event.target.value))
   }
 
+  const describeLocationSource = (source: LocationFilterSource) => {
+    switch (source) {
+      case "current":
+        return "ตำแหน่งจาก GPS"
+      case "search":
+        return "ตำแหน่งจากการค้นหา"
+      default:
+        return "ปักหมุดบนแผนที่"
+    }
+  }
+
   const handleApply = () => {
     if (!selectedLocation) {
       onApply(null)
@@ -542,9 +553,9 @@ export default function LocationSearchDialog({
                 </div>
                 <input
                   type="range"
-                  min="1"
-                  max="30"
-                  step="1"
+                  min="0.5"
+                  max="50"
+                  step="0.5"
                   value={radiusKm}
                   onChange={handleRadiusInput}
                   className="w-full"
@@ -558,18 +569,40 @@ export default function LocationSearchDialog({
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                         radiusKm === option
                           ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-700 hover:bg-blue-50 border border-gray-200"
+                          : "border border-gray-200 bg-white text-gray-700 hover:bg-blue-50"
                       }`}
                     >
-                      {option} กม.
+                      {option.toLocaleString()} กม.
                     </button>
                   ))}
                 </div>
 
-                <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                  {selectedLocation
-                    ? `ค้นหาในรัศมี ${radiusKm.toLocaleString()} กม. รอบๆ ${selectedLocation.label}`
-                    : "ยังไม่ได้เลือกตำแหน่งบนแผนที่"}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-3 text-sm text-blue-700">
+                    {selectedLocation
+                      ? (
+                          <div className="space-y-1">
+                            <p className="font-semibold">
+                              {`ค้นหาในรัศมี ${radiusKm.toLocaleString()} กม.`}
+                            </p>
+                            <p className="truncate text-blue-800">{selectedLocation.label}</p>
+                            <div className="text-xs text-blue-600">
+                              <p>{`ละติจูด: ${selectedLocation.lat.toFixed(5)}`}</p>
+                              <p>{`ลองจิจูด: ${selectedLocation.lng.toFixed(5)}`}</p>
+                              <p>{describeLocationSource(selectedLocation.source)}</p>
+                            </div>
+                          </div>
+                        )
+                      : "ยังไม่ได้เลือกตำแหน่งบนแผนที่"}
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white/80 px-3 py-3 text-xs leading-relaxed text-gray-600">
+                    <p className="font-medium text-gray-700">เคล็ดลับ:</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4">
+                      <li>ใช้ปุ่ม "+" และ "-" บนแผนที่เพื่อซูมดูพื้นที่อย่างละเอียด</li>
+                      <li>ปักหมุดซ้ำอีกครั้งเพื่อปรับตำแหน่งให้แม่นยำ</li>
+                      <li>ปรับรัศมีเพื่อให้การค้นหาแคบหรือกว้างขึ้นตามต้องการ</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </>
