@@ -3,8 +3,8 @@ import { Search, Plus } from "lucide-react"
 
 export default function CallToAction() {
   return (
-    <section className="bg-blue-600 py-16 text-white">
-      <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-4 text-center sm:px-6 lg:px-8">
+    <section className="full-bleed rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 px-6 py-16 text-white shadow-2xl sm:px-10 sm:py-20">
+      <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 text-center">
         <Link
           href="/search"
           className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3 font-semibold text-blue-600 shadow-lg transition hover:bg-gray-100"
@@ -20,7 +20,7 @@ export default function CallToAction() {
         </div>
         <Link
           href="/sell"
-          className="inline-flex items-center justify-center rounded-lg border-2 border-white px-8 py-3 font-semibold text-white transition hover:bg-white hover:text-blue-600"
+          className="inline-flex items-center justify-center rounded-lg border-2 border-white/80 px-8 py-3 font-semibold text-white transition hover:bg-white hover:text-blue-600"
         >
           <Plus className="mr-2" size={20} />
           ลงประกาศของคุณ

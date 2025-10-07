@@ -253,27 +253,27 @@ export default function PropertyListings({
   }
 
   return (
-    <section id="property-listings" className="bg-white py-16">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-8 lg:flex-row">
+    <section id="property-listings" className="surface-card px-6 py-12 sm:py-16">
+      <div className="flex flex-col gap-10 lg:flex-row">
           {/* Filters Sidebar */}
           <div className="lg:w-1/4">
-            <div className="sticky top-24 rounded-lg bg-gray-50 p-4 sm:p-6">
-              <div className="mb-4 flex items-center justify-between sm:mb-6">
-                <h3 className="text-lg font-semibold text-gray-800 sm:text-xl">ตัวกรอง</h3>
-                <button
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                  onClick={onClearFilters}
-                >
-                  ล้างทั้งหมด
-                </button>
-              </div>
+            <div className="sticky top-28 space-y-6">
+              <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 shadow-sm sm:p-6">
+                <div className="mb-4 flex items-center justify-between sm:mb-6">
+                  <h3 className="text-lg font-semibold text-slate-800 sm:text-xl">ตัวกรอง</h3>
+                  <button
+                    className="text-sm font-medium text-blue-600 transition hover:text-blue-700"
+                    onClick={onClearFilters}
+                  >
+                    ล้างทั้งหมด
+                  </button>
+                </div>
 
               {/* Location Filter */}
               <div className="mb-4 sm:mb-6">
                 <label className="mb-2 block text-sm font-medium text-gray-700">พื้นที่การค้นหา</label>
                 {locationFilter ? (
-                  <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+                  <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/80 p-3 text-sm text-blue-700">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white sm:text-sm">
                         {`ในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
@@ -290,7 +290,7 @@ export default function PropertyListings({
                       <button
                         type="button"
                         onClick={onClearLocation}
-                        className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-700 sm:text-sm"
+                        className="inline-flex items-center rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-600 sm:text-sm"
                       >
                         ล้างตำแหน่ง
                       </button>
@@ -309,7 +309,7 @@ export default function PropertyListings({
                         disabled={isLocatingCurrentLocation}
                         className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
                           isLocatingCurrentLocation
-                            ? "bg-blue-100 text-blue-400"
+                            ? "bg-blue-100/80 text-blue-400"
                             : "border border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
                         }`}
                       >
@@ -332,7 +332,7 @@ export default function PropertyListings({
                       disabled={isLocatingCurrentLocation}
                       className={`w-full rounded-lg border px-4 py-3 text-sm font-medium transition ${
                         isLocatingCurrentLocation
-                          ? "border-blue-200 bg-blue-100 text-blue-400"
+                          ? "border-blue-200 bg-blue-100/80 text-blue-400"
                           : "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
                       }`}
                     >

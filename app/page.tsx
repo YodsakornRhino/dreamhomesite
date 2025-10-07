@@ -1,4 +1,3 @@
-import { Inter } from "next/font/google"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,16 +19,14 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-const inter = Inter({ subsets: ["latin"] })
-
 export default function Home() {
   return (
-    <div className={`${inter.className} bg-gray-50 text-gray-900`}>
+    <>
       {/* HERO SECTION */}
-      <section className="relative overflow-hidden">
+      <section className="full-bleed relative overflow-hidden rounded-3xl shadow-xl shadow-emerald-900/20">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24 text-white">
-          <div className="text-center">
+        <div className="relative px-6 py-16 text-white sm:px-10 sm:py-20 lg:px-16 lg:py-24">
+          <div className="mx-auto max-w-4xl text-center">
             <Badge className="bg-white/10 hover:bg-white/15 text-white border border-white/20 mb-6">
               เกี่ยวกับ DreamHome
             </Badge>
@@ -62,14 +59,13 @@ export default function Home() {
       </section>
 
       {/* MISSION & VISION */}
-      <section className="py-16 sm:py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">พันธกิจและวิสัยทัศน์</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">เราตั้งใจที่จะเปลี่ยนแปลงวิธีการซื้อขายอสังหาริมทรัพย์ให้ดีขึ้น</p>
-          </div>
+      <section className="surface-card px-6 py-12 sm:py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">พันธกิจและวิสัยทัศน์</h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">เราตั้งใจที่จะเปลี่ยนแปลงวิธีการซื้อขายอสังหาริมทรัพย์ให้ดีขึ้น</p>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <Card className="shadow-sm hover:shadow-md transition">
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4">
@@ -123,20 +119,18 @@ export default function Home() {
                 </ul>
               </CardContent>
             </Card>
-          </div>
         </div>
       </section>
 
       {/* FEATURES */}
-      <section className="py-16 sm:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 mb-4">คุณสมบัติเด่น</Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">ทำไมต้องเลือก DreamHome?</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">เราให้บริการครบวงจรด้วยเทคโนโลยีที่ทันสมัยและทีมงานมืออาชีพ</p>
-          </div>
+      <section className="surface-card px-6 py-12 sm:py-16">
+        <div className="text-center mb-12">
+          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 mb-4">คุณสมบัติเด่น</Badge>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">ทำไมต้องเลือก DreamHome?</h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">เราให้บริการครบวงจรด้วยเทคโนโลยีที่ทันสมัยและทีมงานมืออาชีพ</p>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
             <Card className="shadow-sm hover:shadow-md transition h-full lg:col-span-4">
               <CardHeader className="items-center text-center">
                 <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
@@ -196,19 +190,17 @@ export default function Home() {
                 ทีมงานมืออาชีพพร้อมให้คำปรึกษาและช่วยเหลือตลอด 24 ชั่วโมง
               </CardContent>
             </Card>
-          </div>
         </div>
       </section>
 
       {/* STATISTICS */}
-      <section className="py-16 sm:py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">ตัวเลขที่น่าประทับใจ</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">ความไว้วางใจจากลูกค้าหลายพันคนทั่วประเทศ</p>
-          </div>
+      <section className="surface-card px-6 py-12 sm:py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">ตัวเลขที่น่าประทับใจ</h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">ความไว้วางใจจากลูกค้าหลายพันคนทั่วประเทศ</p>
+        </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 gap-8 lg:grid-cols-4">
             <div className="text-center">
               <div className="h-16 w-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4">
                 <Building2 className="h-8 w-8" />
@@ -240,19 +232,17 @@ export default function Home() {
               <div className="text-3xl font-bold text-gray-900 mb-2">24/7</div>
               <div className="text-gray-600">บริการลูกค้า</div>
             </div>
-          </div>
         </div>
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="py-16 sm:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 mb-4">วิธีการใช้งาน</Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">ใช้งานง่ายเพียง 3 ขั้นตอน</h2>
-          </div>
+      <section className="surface-card px-6 py-12 sm:py-16">
+        <div className="text-center mb-12">
+          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 mb-4">วิธีการใช้งาน</Badge>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">ใช้งานง่ายเพียง 3 ขั้นตอน</h2>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             <div className="text-center">
               <div className="h-16 w-16 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
                 1
@@ -276,13 +266,12 @@ export default function Home() {
               <h3 className="text-xl font-semibold mb-4">ติดต่อและปิดดีล</h3>
               <p className="text-gray-600">แชทกับเจ้าของบ้านหรือผู้สนใจ นัดดูบ้าน และปิดการขายได้อย่างปลอดภัย</p>
             </div>
-          </div>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="py-16 sm:py-20 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="surface-card px-6 py-12 sm:py-16">
+        <div className="mx-auto max-w-3xl">
           <div className="text-center mb-12">
             <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 mb-4">คำถามที่พบบ่อย</Badge>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">FAQ</h2>
@@ -328,8 +317,8 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="py-16 sm:py-20 bg-emerald-600 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="full-bleed rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-6 py-16 text-white shadow-2xl sm:px-10 sm:py-20">
+        <div className="mx-auto max-w-4xl text-center">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">พร้อมเริ่มต้นแล้วหรือยัง?</h2>
           <p className="text-xl mb-8 opacity-90">เข้าร่วมกับผู้ใช้หลายพันคนที่เชื่อมั่นใน DreamHome</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -351,6 +340,6 @@ export default function Home() {
         </div>
       </section>
 
-    </div>
+    </>
   )
 }

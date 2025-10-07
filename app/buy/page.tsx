@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react"
 import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation"
-import { Inter } from "next/font/google"
 
 import HeroSection from "@/components/hero-section"
 import FeaturedProperties from "@/components/featured-properties"
@@ -14,8 +13,6 @@ import {
   DEFAULT_LOCATION_RADIUS_KM,
   MAP_LOCATION_FALLBACK_LABEL,
 } from "@/types/location-filter"
-
-const inter = Inter({ subsets: ["latin"] })
 
 type PriceRange = {
   min: number | null
@@ -239,7 +236,7 @@ export default function BuyPage() {
   }, [])
 
   return (
-    <div className={`${inter.className} bg-gray-50`}>
+    <>
       <HeroSection
         searchTerm={searchTerm}
         selectedPropertyType={selectedPropertyType}
@@ -260,6 +257,6 @@ export default function BuyPage() {
         initialValue={locationFilter}
         onApply={handleLocationApplied}
       />
-    </div>
+    </>
   )
 }

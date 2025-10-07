@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation"
-import { Inter } from "next/font/google"
 import { ArrowLeft } from "lucide-react"
 
 import HeroSection from "@/components/hero-section"
@@ -16,8 +15,6 @@ import {
   DEFAULT_LOCATION_RADIUS_KM,
   MAP_LOCATION_FALLBACK_LABEL,
 } from "@/types/location-filter"
-
-const inter = Inter({ subsets: ["latin"] })
 
 const parseNumericInput = (value: string): number | null => {
   if (!value) return null
@@ -469,18 +466,15 @@ export default function SearchPage() {
   }, [handleLocationApplied, locationFilter])
 
   return (
-    <div className={`${inter.className} bg-gray-50`}>
-      <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
-          <ArrowLeft className="h-4 w-4 text-blue-600" />
-          <Link
-            href="/buy"
-            className="text-sm font-medium text-blue-600 transition hover:text-blue-700"
-          >
+    <>
+      <section className="surface-card px-6 py-4">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-blue-700">
+          <ArrowLeft className="h-4 w-4" />
+          <Link href="/buy" className="font-semibold hover:text-blue-800">
             กลับสู่หน้าซื้ออสังหาริมทรัพย์
           </Link>
         </div>
-      </div>
+      </section>
       <HeroSection
         searchTerm={searchTerm}
         selectedPropertyType={selectedPropertyType}
@@ -521,6 +515,6 @@ export default function SearchPage() {
         initialValue={locationFilter}
         onApply={handleLocationApplied}
       />
-    </div>
+    </>
   )
 }

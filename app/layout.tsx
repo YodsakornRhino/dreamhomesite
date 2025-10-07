@@ -61,7 +61,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="th" suppressHydrationWarning>
       {/* เพิ่ม suppressHydrationWarning ที่ body ด้วยเพื่อกัน attribute mismatch บางกรณี */}
-      <body className={inter.className} suppressHydrationWarning>
+      <body
+        className={`${inter.className} bg-slate-100 text-slate-900 antialiased`}
+        suppressHydrationWarning
+      >
         <ClientOnly>
           <ThemeProvider
             attribute="class"
@@ -79,9 +82,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   aria-hidden="true"
                 />
 
-                <div className="min-h-screen flex flex-col">
+                <div className="flex min-h-screen flex-col">
                   <Navigation />
-                  <main className="flex-1">{children}</main>
+                  <main className="flex-1">
+                    <div className="mx-auto w-full max-w-7xl px-4 pb-20 pt-10 sm:px-6 lg:px-8">
+                      <div className="page-shell">{children}</div>
+                    </div>
+                  </main>
                   <Footer />
                 </div>
                 <Toaster />

@@ -101,8 +101,8 @@ export default function HeroSection({
     : locationFilter?.label
 
   return (
-    <section className="bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 text-white py-12 sm:py-16 lg:py-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <section className="full-bleed rounded-3xl bg-gradient-to-br from-blue-600 via-purple-600 to-purple-700 px-6 py-12 text-white shadow-2xl sm:px-10 sm:py-16 lg:px-16 lg:py-20">
+      <div className="mx-auto max-w-5xl text-center">
         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight">
           ค้นหาบ้านในฝันของคุณ
         </h1>
@@ -111,7 +111,7 @@ export default function HeroSection({
         </p>
 
         {/* Search Bar */}
-        <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white p-3 shadow-2xl sm:p-4 md:p-6">
+        <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white/95 p-3 shadow-2xl shadow-blue-900/20 backdrop-blur sm:p-4 md:p-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:gap-5 lg:[grid-template-columns:minmax(0,1.75fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
             {/* Location */}
             <div className="flex flex-col gap-2">

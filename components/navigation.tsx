@@ -606,9 +606,9 @@ const Navigation: React.FC = () => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="container mx-auto px-4">
-          <div className="flex h-14 sm:h-16 w-full items-center">
+      <nav className="sticky top-0 z-50 w-full border-b border-slate-200/70 bg-white/90 shadow-sm backdrop-blur-lg supports-[backdrop-filter]:bg-white/70">
+        <div className="mx-auto flex w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+          <div className="flex h-14 w-full items-center sm:h-16">
             {/* Logo */}
             <div className="flex flex-1 items-center">
               <Link href="/" className="flex items-center space-x-2">
