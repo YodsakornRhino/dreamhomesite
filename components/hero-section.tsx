@@ -86,12 +86,6 @@ export default function HeroSection({
   }, [searchTerm])
 
   useEffect(() => {
-    if (!searchTerm && locationFilter?.label) {
-      setLocation(locationFilter.label)
-    }
-  }, [locationFilter?.label, searchTerm])
-
-  useEffect(() => {
     setPropertyType(selectedPropertyType ?? "")
   }, [selectedPropertyType])
 
@@ -133,7 +127,7 @@ export default function HeroSection({
                 type="text"
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
-                placeholder={locationFilter?.label ?? "ทำเลหรือคำค้นหา"}
+                placeholder="ทำเลหรือคำค้นหา"
                 className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-lg shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
                 aria-label="ค้นหาทำเลหรือคำค้นหา"
               />
