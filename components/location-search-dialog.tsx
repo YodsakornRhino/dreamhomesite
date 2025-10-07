@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react"
-import { LocateFixed, Compass, MapPin, Loader2, AlertCircle } from "lucide-react"
+import { LocateFixed, Compass, MapPin, Loader2 } from "lucide-react"
 
 import {
   Dialog,
@@ -46,7 +46,6 @@ export default function LocationSearchDialog({
   const [mapsError, setMapsError] = useState<string | null>(null)
   const [isLoadingMaps, setIsLoadingMaps] = useState(false)
   const [isGeolocating, setIsGeolocating] = useState(false)
-  const [geolocationError, setGeolocationError] = useState<string | null>(null)
 
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
   const [radiusKm, setRadiusKm] = useState<number>(DEFAULT_LOCATION_RADIUS_KM)
@@ -156,7 +155,6 @@ export default function LocationSearchDialog({
       setSelectedLocation(null)
       setRadiusKm(DEFAULT_LOCATION_RADIUS_KM)
     }
-    setGeolocationError(null)
     setIsGeolocating(false)
   }, [open, initialValue])
 
@@ -339,27 +337,13 @@ export default function LocationSearchDialog({
     onOpenChange(false)
   }
 
-  const describeGeolocationError = (error: GeolocationPositionError) => {
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        return "กรุณาอนุญาตให้เข้าถึงตำแหน่งของคุณเพื่อใช้งาน GPS"
-      case error.POSITION_UNAVAILABLE:
-        return "ไม่พบตำแหน่งปัจจุบันของคุณ ลองใหม่อีกครั้ง"
-      case error.TIMEOUT:
-        return "ใช้เวลานานเกินไปในการระบุตำแหน่ง กรุณาลองใหม่"
-    default:
-      return "เกิดข้อผิดพลาดในการเข้าถึงตำแหน่ง กรุณาลองใหม่"
-    }
-  }
-
   const handleUseCurrentLocation = () => {
     if (typeof window === "undefined" || !("geolocation" in navigator)) {
-      setGeolocationError("อุปกรณ์ของคุณไม่รองรับการระบุตำแหน่งผ่าน GPS")
+      console.warn("Geolocation is not supported in this environment.")
       return
     }
 
     setIsGeolocating(true)
-    setGeolocationError(null)
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setIsGeolocating(false)
@@ -384,9 +368,8 @@ export default function LocationSearchDialog({
           }
         })
       },
-      (error) => {
+      () => {
         setIsGeolocating(false)
-        setGeolocationError(describeGeolocationError(error))
       },
       { enableHighAccuracy: true, timeout: 10000 },
     )
@@ -545,12 +528,6 @@ export default function LocationSearchDialog({
                     {isGeolocating ? <Loader2 size={16} className="animate-spin" /> : <LocateFixed size={16} />}
                     {isGeolocating ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
                   </button>
-                  {geolocationError ? (
-                    <span className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs text-red-600">
-                      <AlertCircle size={14} />
-                      {geolocationError}
-                    </span>
-                  ) : null}
                 </div>
               </div>
 
