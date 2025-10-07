@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   formatDetection: { email: false, address: false, telephone: false },
   metadataBase: new URL("https://dreamhome.com"),
   alternates: { canonical: "/" },
+  icons: {
+    icon: "/dreamhome-favicon.svg",
+    shortcut: "/dreamhome-favicon.svg",
+    apple: "/dreamhome-favicon.svg",
+  },
   openGraph: {
     title: "DreamHome - ค้นหาบ้านในฝันของคุณ",
     description: "แพลตฟอร์มอสังหาริมทรัพย์ออนไลน์ที่ดีที่สุดในประเทศไทย",
