@@ -948,7 +948,7 @@ export function SellPropertyForm({ mode, propertyId }: SellPropertyFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sell">ขาย</SelectItem>
-                  <SelectItem value="rent">เช่า</SelectItem>
+                  <SelectItem value="rent">เช่า(ยังไม่สามารถใช้ได้)</SelectItem>
                 </SelectContent>
               </Select>
               {showErr("transactionType") && (
