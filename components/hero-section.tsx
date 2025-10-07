@@ -128,93 +128,16 @@ export default function HeroSection({
         <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white p-3 shadow-2xl sm:p-4 md:p-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:gap-5 lg:[grid-template-columns:minmax(0,1.75fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
             {/* Location */}
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
-                <div className="relative flex-1">
-                  <MapPin className="absolute left-3 top-3 text-gray-400" size={16} />
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(event) => setLocation(event.target.value)}
-                    placeholder={locationFilter?.label ?? "ทำเลหรือคำค้นหา"}
-                    className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-lg shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                    aria-label="ค้นหาทำเลหรือคำค้นหา"
-                  />
-                </div>
-                <div className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-blue-700 shadow-sm sm:flex-row sm:items-stretch lg:w-64 lg:flex-col">
-                  <button
-                    type="button"
-                    onClick={onOpenLocationPicker}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-50 sm:text-[13px]"
-                  >
-                    <MapPin size={14} className="shrink-0" />
-                    เลือกพื้นที่บนแผนที่
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onUseCurrentLocation}
-                    disabled={isLocatingCurrentLocation}
-                    className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition sm:text-[13px] ${
-                      isLocatingCurrentLocation
-                        ? "border-blue-200 bg-blue-100 text-blue-400"
-                        : "border-blue-200 bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
-                  >
-                    {isLocatingCurrentLocation ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <LocateFixed size={14} className="shrink-0" />
-                    )}
-                    {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-2 text-xs sm:text-[13px]">
-                {locationFilter ? (
-                  <div className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-left text-blue-700">
-                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 font-semibold text-white">
-                        {`ค้นหาในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
-                      </span>
-                      {locationStatus ? (
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold ${
-                            isUsingCurrentLocation
-                              ? "bg-green-100 text-green-700"
-                              : "bg-white text-blue-700 shadow"
-                          }`}
-                        >
-                          {isUsingCurrentLocation ? (
-                            <LocateFixed size={14} />
-                          ) : (
-                            <MapPin size={14} />
-                          )}
-                          <span className="truncate">{locationStatus}</span>
-                        </span>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onClearLocation}
-                      className="inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow transition hover:bg-red-50 sm:text-sm"
-                    >
-                      ล้างตำแหน่งที่เลือก
-                    </button>
-                  </div>
-                ) : (
-                  <p className="w-full text-left text-gray-500">
-                    ปักหมุดหรือใช้ GPS เพื่อให้เราช่วยค้นหาอสังหาริมทรัพย์ใกล้คุณได้แม่นยำยิ่งขึ้น
-                  </p>
-                )}
-                {locationError ? (
-                  <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-left text-red-600">
-                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                    <p className="text-xs sm:text-sm" role="status" aria-live="polite">
-                      {locationError}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3 text-gray-400" size={16} />
+              <input
+                type="text"
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                placeholder={locationFilter?.label ?? "ทำเลหรือคำค้นหา"}
+                className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-white dark:bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-lg shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
+                aria-label="ค้นหาทำเลหรือคำค้นหา"
+              />
             </div>
 
             {/* Property Type */}
@@ -257,6 +180,83 @@ export default function HeroSection({
               <Search className="mr-2" size={16} />
               ค้นหา
             </button>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-4 flex w-full max-w-5xl flex-col gap-3 lg:flex-row lg:items-start">
+          <div className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-blue-700 shadow-sm sm:flex-row sm:items-stretch lg:w-auto lg:flex-col lg:min-w-[260px]">
+            <button
+              type="button"
+              onClick={onOpenLocationPicker}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-50 sm:text-[13px]"
+            >
+              <MapPin size={14} className="shrink-0" />
+              เลือกพื้นที่บนแผนที่
+            </button>
+            <button
+              type="button"
+              onClick={onUseCurrentLocation}
+              disabled={isLocatingCurrentLocation}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition sm:text-[13px] ${
+                isLocatingCurrentLocation
+                  ? "border-blue-200 bg-blue-100 text-blue-400"
+                  : "border-blue-200 bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              {isLocatingCurrentLocation ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <LocateFixed size={14} className="shrink-0" />
+              )}
+              {isLocatingCurrentLocation ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
+            </button>
+          </div>
+
+          <div className="flex-1 space-y-2 text-left text-xs sm:text-[13px]">
+            {locationFilter ? (
+              <div className="flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-blue-700">
+                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 font-semibold text-white">
+                    {`ค้นหาในรัศมี ${locationFilter.radiusKm.toLocaleString()} กม.`}
+                  </span>
+                  {locationStatus ? (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold ${
+                        isUsingCurrentLocation
+                          ? "bg-green-100 text-green-700"
+                          : "bg-white text-blue-700 shadow"
+                      }`}
+                    >
+                      {isUsingCurrentLocation ? (
+                        <LocateFixed size={14} />
+                      ) : (
+                        <MapPin size={14} />
+                      )}
+                      <span className="truncate">{locationStatus}</span>
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={onClearLocation}
+                  className="inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow transition hover:bg-red-50 sm:text-sm"
+                >
+                  ล้างตำแหน่งที่เลือก
+                </button>
+              </div>
+            ) : (
+              <p className="w-full text-gray-100/80 sm:text-sm">
+                ปักหมุดหรือใช้ GPS เพื่อให้เราช่วยค้นหาอสังหาริมทรัพย์ใกล้คุณได้แม่นยำยิ่งขึ้น
+              </p>
+            )}
+            {locationError ? (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-red-600">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <p className="text-xs sm:text-sm" role="status" aria-live="polite">
+                  {locationError}
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
