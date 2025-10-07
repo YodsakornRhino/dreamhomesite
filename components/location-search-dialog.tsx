@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react"
-import { LocateFixed } from "lucide-react"
+import { LocateFixed, Compass, MapPin, Loader2, AlertCircle } from "lucide-react"
 
 import {
   Dialog,
@@ -483,15 +483,35 @@ export default function LocationSearchDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="flex w-[95vw] max-w-3xl flex-col overflow-hidden p-0 sm:w-[90vw] max-h-[90vh]">
-        <DialogHeader className="shrink-0 space-y-1 border-b border-gray-200 bg-white px-6 py-5">
-          <DialogTitle className="text-lg font-semibold text-gray-900 sm:text-xl">เลือกพื้นที่การค้นหา</DialogTitle>
-          <DialogDescription className="text-sm text-gray-500">
-            ปักหมุดตำแหน่งบนแผนที่ แล้วเลือกระยะรอบๆ เพื่อค้นหาอสังหาริมทรัพย์ใกล้เคียง
+      <DialogContent className="flex w-[95vw] max-w-4xl flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white/95 p-0 backdrop-blur-sm sm:w-[90vw] max-h-[92vh]">
+        <DialogHeader className="shrink-0 space-y-1 border-b border-gray-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-6 py-6 text-white">
+          <DialogTitle className="text-lg font-semibold sm:text-xl">เลือกพื้นที่การค้นหา</DialogTitle>
+          <DialogDescription className="text-sm text-white/80">
+            ปักหมุดตำแหน่งบนแผนที่ แล้วเลือกระยะรอบๆ เพื่อค้นหาอสังหาริมทรัพย์ใกล้คุณแบบแม่นยำ
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-6">
+        <div className="flex-1 space-y-5 overflow-y-auto p-6">
+          <div className="grid gap-4 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-blue-900 sm:grid-cols-2">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-white/80 p-2 shadow">
+                <Compass className="h-5 w-5" />
+              </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold">ขั้นตอนที่ 1</p>
+                <p>พิมพ์สถานที่ที่ต้องการหรือขยับแผนที่แล้วคลิกเพื่อตั้งหมุด</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-white/80 p-2 shadow">
+                <MapPin className="h-5 w-5" />
+              </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold">ขั้นตอนที่ 2</p>
+                <p>ปรับรัศมีการค้นหา แล้วกด “ยืนยันตำแหน่ง” เพื่อใช้ตัวกรองนี้</p>
+              </div>
+            </div>
+          </div>
           {mapsError ? (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">
               {mapsError}
@@ -502,14 +522,16 @@ export default function LocationSearchDialog({
             </div>
           ) : (
             <>
-              <div key={mapResetCounter} className="relative">
-                <input
-                  ref={autocompleteInputRef}
-                  type="text"
-                  placeholder="ค้นหาตำแหน่ง (เช่น ชื่อสถานที่ ถนน หรือจังหวัด)"
-                  className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                />
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div key={mapResetCounter} className="space-y-3">
+                <div className="relative">
+                  <input
+                    ref={autocompleteInputRef}
+                    type="text"
+                    placeholder="ค้นหาตำแหน่ง (เช่น ชื่อสถานที่ ถนน หรือจังหวัด)"
+                    className="w-full rounded-lg border border-blue-100 bg-white px-4 py-2 text-sm shadow-sm transition focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={handleUseCurrentLocation}
@@ -520,11 +542,14 @@ export default function LocationSearchDialog({
                         : "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
                     }`}
                   >
-                    <LocateFixed size={16} />
+                    {isGeolocating ? <Loader2 size={16} className="animate-spin" /> : <LocateFixed size={16} />}
                     {isGeolocating ? "กำลังระบุตำแหน่ง..." : "ใช้ตำแหน่งปัจจุบัน"}
                   </button>
                   {geolocationError ? (
-                    <span className="text-xs text-red-600">{geolocationError}</span>
+                    <span className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs text-red-600">
+                      <AlertCircle size={14} />
+                      {geolocationError}
+                    </span>
                   ) : null}
                 </div>
               </div>
@@ -532,10 +557,10 @@ export default function LocationSearchDialog({
               <div
                 key={`map-${mapResetCounter}`}
                 ref={mapContainerRef}
-                className="h-[260px] w-full overflow-hidden rounded-xl border border-gray-200 sm:h-[320px] md:h-[360px] lg:h-[420px]"
+                className="h-[300px] w-full overflow-hidden rounded-2xl border border-gray-200 shadow-inner sm:h-[360px] md:h-[420px] lg:h-[480px]"
               />
 
-              <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm font-medium text-gray-700">รัศมีการค้นหา</span>
                   <span className="text-sm text-gray-600">{radiusKm.toLocaleString()} กม.</span>
@@ -547,7 +572,7 @@ export default function LocationSearchDialog({
                   step="1"
                   value={radiusKm}
                   onChange={handleRadiusInput}
-                  className="w-full"
+                  className="w-full accent-blue-600"
                 />
                 <div className="flex flex-wrap gap-2">
                   {RADIUS_OPTIONS.map((option) => (
@@ -557,8 +582,8 @@ export default function LocationSearchDialog({
                       onClick={() => setRadiusKm(option)}
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                         radiusKm === option
-                          ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-700 hover:bg-blue-50 border border-gray-200"
+                          ? "bg-blue-600 text-white shadow"
+                          : "border border-gray-200 bg-white text-gray-700 hover:bg-blue-50"
                       }`}
                     >
                       {option} กม.
@@ -566,17 +591,23 @@ export default function LocationSearchDialog({
                   ))}
                 </div>
 
-                <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                  {selectedLocation
-                    ? `ค้นหาในรัศมี ${radiusKm.toLocaleString()} กม. รอบๆ ${selectedLocation.label}`
-                    : "ยังไม่ได้เลือกตำแหน่งบนแผนที่"}
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-sm text-blue-700">
+                  {selectedLocation ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="font-semibold">ตำแหน่งที่เลือก</span>
+                      <span className="text-sm text-blue-800">{selectedLocation.label}</span>
+                      <span className="text-xs text-blue-600/80">ค้นหาในรัศมี {radiusKm.toLocaleString()} กม.</span>
+                    </div>
+                  ) : (
+                    "ยังไม่ได้เลือกตำแหน่งบนแผนที่"
+                  )}
                 </div>
               </div>
             </>
           )}
         </div>
 
-        <DialogFooter className="shrink-0 flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 sm:flex-row sm:justify-between">
+        <DialogFooter className="shrink-0 flex flex-col gap-3 border-t border-gray-200 bg-gray-50/80 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={handleClearLocation}
@@ -595,9 +626,10 @@ export default function LocationSearchDialog({
             <button
               type="button"
               onClick={handleApply}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
               disabled={!!mapsError || (!mapsReady && !isLoadingMaps)}
             >
+              <MapPin size={16} />
               ยืนยันตำแหน่ง
             </button>
           </div>
