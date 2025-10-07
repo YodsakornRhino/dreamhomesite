@@ -44,31 +44,31 @@ export default function PropertyCard({
         </div>
       </div>
       <div className="p-6">
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
           <span className="text-2xl font-bold text-blue-600">{price}</span>
         </div>
-        <p className="text-gray-600 mb-4 flex items-center">
-          <MapPin className="mr-1" size={14} />
-          {location}
+        <p className="mt-3 mb-4 flex items-center text-gray-600">
+          <MapPin className="mr-2 h-4 w-4 text-blue-500" />
+          <span className="line-clamp-2">{location}</span>
         </p>
-        <div className="flex items-center space-x-4 mb-4 text-gray-600">
-          <span className="flex items-center">
-            <Bed className="mr-1" size={14} />
+        <div className="mb-6 flex flex-wrap items-center gap-4 text-sm text-gray-600">
+          <span className="flex items-center gap-1">
+            <Bed className="h-4 w-4" />
             {beds} ห้องนอน
           </span>
-          <span className="flex items-center">
-            <Bath className="mr-1" size={14} />
+          <span className="flex items-center gap-1">
+            <Bath className="h-4 w-4" />
             {baths} ห้องน้ำ
           </span>
-          <span className="flex items-center">
-            <Square className="mr-1" size={14} />
+          <span className="flex items-center gap-1">
+            <Square className="h-4 w-4" />
             {sqft.toLocaleString()} ตร.ฟุต
           </span>
         </div>
         <button
           onClick={() => onViewDetails(id)}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium"
+          className="w-full rounded-xl bg-blue-600 py-2.5 font-semibold text-white transition hover:bg-blue-700"
         >
           ดูรายละเอียด
         </button>

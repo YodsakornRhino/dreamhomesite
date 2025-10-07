@@ -1,12 +1,24 @@
 @tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 /* app/globals.css */
 
+:root {
+  color-scheme: light;
+}
 
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
 
 body {
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 *,
@@ -37,6 +49,36 @@ iframe {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+@layer components {
+  .layout-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-spacing {
+    @apply py-12 sm:py-16;
+  }
+
+  .section-spacing-lg {
+    @apply py-16 sm:py-20 lg:py-24;
+  }
+
+  .section-header {
+    @apply mx-auto max-w-3xl text-center;
+  }
+
+  .section-title {
+    @apply text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl;
+  }
+
+  .section-eyebrow {
+    @apply mb-4 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-100 px-4 py-1 text-sm font-semibold text-emerald-700;
+  }
+
+  .section-description {
+    @apply mt-3 text-base text-gray-600 sm:text-lg;
   }
 }
 
@@ -117,6 +159,9 @@ iframe {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+  main {
+    @apply flex-1;
   }
 }
